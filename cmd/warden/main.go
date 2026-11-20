@@ -45,7 +45,7 @@ func main() {
 	}
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")
 	listen := flag.String("listen", "127.0.0.1:8282", "the local panel: this machine only, no sign-in")
-	publicListen := flag.String("public-listen", "127.0.0.1:8284", "the read-only status page's port, when it's on in Settings (warden remote public on publishes it)")
+	publicListen := flag.String("public-listen", "127.0.0.1:8284", "the read-only status page's port, when it's on in Warden settings (warden remote public on publishes it)")
 	adminListen := flag.String("admin-listen", "127.0.0.1:8283", "the administration port for remote admins (sign-in required); warden remote on publishes it")
 	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")

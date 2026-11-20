@@ -83,7 +83,7 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 			}
 		}
 		if len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()) == 0 {
-			add("Backups", false, false, "Backups are only on this machine. Add a second place in Settings so a dead disk can't take them.")
+			add("Backups", false, false, "Backups are only on this machine. Add a second place in Warden settings so a dead disk can't take them.")
 		} else {
 			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()))
 		}
@@ -112,11 +112,11 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 		if c.Cfg.Nightly.Enabled {
 			add("Nightly routine", true, false, "On, at %s.", c.Cfg.Nightly.Time)
 		} else {
-			add("Nightly routine", false, true, "Off. Turn it on in Settings (unless another program already restarts and backs up the server).")
+			add("Nightly routine", false, true, "Off. Turn it on in Warden settings (unless another program already restarts and backs up the server).")
 		}
 		if c.Cfg.Update.Enabled {
 			if _, err := os.Stat(c.Cfg.Update.SteamCMD); c.Cfg.Update.SteamCMD == "" || err != nil {
-				add("Game updates", false, false, "Updates are on but SteamCMD isn't found: set its path in Settings.")
+				add("Game updates", false, false, "Updates are on but SteamCMD isn't found: set its path in Warden settings.")
 			} else {
 				add("Game updates", true, false, "Through SteamCMD in the nightly routine.")
 			}
@@ -124,7 +124,7 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 			add("Game updates", false, true, "Off: the game won't update itself.")
 		}
 		if c.Cfg.Notify.DiscordWebhook == "" && c.Cfg.Notify.NtfyURL == "" {
-			add("Notifications", false, true, "Nobody is told when something goes wrong. Add a Discord webhook or ntfy in Settings.")
+			add("Notifications", false, true, "Nobody is told when something goes wrong. Add a Discord webhook or ntfy in Warden settings.")
 		} else {
 			add("Notifications", true, false, "On.")
 		}

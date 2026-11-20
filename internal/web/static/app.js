@@ -256,7 +256,7 @@ async function setAllow(id, on) { try { await api("/api/allow", { userId: id, on
 async function loadAllow() {
   try {
     const a = await api("/api/allow"); allowSet = new Set(a.players.map((x) => x.userId));
-    $("allownote").textContent = a.on ? "On: only these players can stay on the server; anyone else is kicked as they join." : "Off: anyone can join. Turn it on in Settings once the people you want are on the list.";
+    $("allownote").textContent = a.on ? "On: only these players can stay on the server; anyone else is kicked as they join." : "Off: anyone can join. Turn it on in Warden settings once the people you want are on the list.";
     $("allowform").hidden = me.role === "moderator";
     const rows = $("allowrows"); rows.replaceChildren();
     if (!a.players.length) { const tr = el("tr"); const td = el("td", "Nobody yet. Add players from the list above, or by their ID.", "empty"); td.colSpan = 4; tr.append(td); rows.append(tr); }
@@ -379,7 +379,7 @@ async function loadServer() {
     $("srv-build").textContent = s.build || "–";
     $("srv-update").textContent = s.update ? "Updated by the nightly routine" : "Updates are off";
     $("srv-next").textContent = s.nextRun ? when2(s.nextRun) : "Off";
-    $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in Settings";
+    $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in Warden settings";
     $("srv-crashes").textContent = h.crashes24h;
     $("srv-mem").textContent = s.memory ? `${(s.memory / (1 << 30)).toFixed(1)} GB` : "–";
     if (s.machine) { $("srv-cpu").textContent = `${Math.round(s.machine.cpuPercent)}% CPU`; $("srv-ram").textContent = s.machine.memTotal ? `${(s.machine.memUsed / (1 << 30)).toFixed(1)} of ${(s.machine.memTotal / (1 << 30)).toFixed(0)} GB memory in use` : ""; }
@@ -853,7 +853,7 @@ async function refresh() {
     $("lastbknote").textContent = !lb ? "No backup yet" : lr && !lr.ok ? `The last ${lr.kind} run had problems: see Server` : pf && pf.ok ? `${when2(lb.when)} · restorable (tested ${when2(pf.at)})` : when2(lb.when);
     $("st-backup").classList.toggle("warn", !lb || (lr && !lr.ok) || Date.now() / 1000 - lbAt > 36 * 3600);
     $("nextrun").textContent = s.nextRun ? when2(s.nextRun) : "Off";
-    $("nextrunnote").textContent = s.nextRun ? (s.offsite ? "Backups copied to a second place" : "No second place for backups yet") : "Turn it on in Settings";
+    $("nextrunnote").textContent = s.nextRun ? (s.offsite ? "Backups copied to a second place" : "No second place for backups yet") : "Turn it on in Warden settings";
   } catch (e) {}
 }
 
@@ -1044,3 +1044,14 @@ labelCells(document);
 // Graphs are drawn at their real width: redraw them when the window changes size.
 let resizeTimer = 0;
 window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (!$("view-dash").hidden) history(); }, 250); });
+
+// Menu group headings show only when something under them is visible (roles hide some pages).
+function tidyNav() {
+  for (const h of document.querySelectorAll(".side .navhead")) {
+    let n = h.nextElementSibling, any = false;
+    while (n && !n.classList.contains("navhead")) { if (n.tagName === "A" && !n.hidden) any = true; n = n.nextElementSibling; }
+    if (h.hidden !== !any) h.hidden = !any; // only on a real change: this function runs on hidden changes
+  }
+}
+new MutationObserver(tidyNav).observe(document.querySelector(".side"), { attributes: true, subtree: true, attributeFilter: ["hidden"] });
+tidyNav();
