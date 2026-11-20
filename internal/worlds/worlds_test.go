@@ -1,6 +1,7 @@
 package worlds
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,5 +71,41 @@ func TestWorldOptionSetAside(t *testing.T) {
 	}
 	if m, _ := filepath.Glob(filepath.Join(w, "WorldOption.sav.warden-*.bak")); len(m) != 1 {
 		t.Fatal("kept beside the world")
+	}
+}
+
+func TestImportCoopWorld(t *testing.T) {
+	srv := t.TempDir()
+	zp := filepath.Join(t.TempDir(), "w.zip")
+	f, _ := os.Create(zp)
+	zw := zip.NewWriter(f)
+	add := func(name, body string) { w, _ := zw.Create(name); w.Write([]byte(body)) }
+	add("A1B2C3D4E5F60718293A4B5C6D7E8F90/Level.sav", "level")
+	add("A1B2C3D4E5F60718293A4B5C6D7E8F90/LevelMeta.sav", "meta")
+	add("A1B2C3D4E5F60718293A4B5C6D7E8F90/WorldOption.sav", "opt")
+	add("A1B2C3D4E5F60718293A4B5C6D7E8F90/Players/00000000000000000000000000000001.sav", "host")
+	add("A1B2C3D4E5F60718293A4B5C6D7E8F90/../../evil.txt", "x")
+	zw.Close()
+	f.Close()
+	id, notes, err := Import(srv, zp)
+	if err != nil || id != "A1B2C3D4E5F60718293A4B5C6D7E8F90" {
+		t.Fatal(id, err)
+	}
+	w := filepath.Join(srv, "Pal", "Saved", "SaveGames", "0", id)
+	if _, err := os.Stat(filepath.Join(w, "Level.sav")); err != nil {
+		t.Fatal("unpacked")
+	}
+	if _, err := os.Stat(filepath.Join(w, "WorldOption.sav")); err == nil {
+		t.Fatal("WorldOption.sav must be set aside")
+	}
+	if _, err := os.Stat(filepath.Join(srv, "evil.txt")); err == nil {
+		t.Fatal("nothing escapes")
+	}
+	if len(notes) < 2 {
+		t.Fatalf("notes about WorldOption and the host: %v", notes)
+	}
+	id2, _, err := Import(srv, zp)
+	if err != nil || id2 == id {
+		t.Fatal("a second import gets its own ID, never overwriting the first")
 	}
 }

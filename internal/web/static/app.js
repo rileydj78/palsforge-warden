@@ -978,3 +978,21 @@ async function loadNews() {
     }
   } catch (e) {}
 }
+
+document.querySelector('label[for="world-import"]').addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("world-import").click(); } });
+document.querySelector('label[for="world-import"]').addEventListener("click", async (e) => {
+  e.preventDefault();
+  const ok = await ask({ title: "Bring a world from co-op", text: "1. On the PC that hosted the co-op game, open %LOCALAPPDATA%\\Pal\\Saved\\SaveGames\\<your Steam ID>\\ and zip the world's folder (the one with Level.sav).\n2. Before that, the host should put their items and Pals in a chest: on a dedicated server the host starts a new character (everyone else keeps theirs).\n\nWarden adds it as a new world beside the current one (nothing is replaced), then you can switch to it.", ok: "Choose the .zip" });
+  if (ok != null) $("world-import").click();
+});
+$("world-import").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const fd = new FormData(); fd.append("file", f); toast("Uploading the world…");
+  try {
+    const r = await fetch("/api/worlds/import", { method: "POST", body: fd, headers: { "X-CSRF": csrf } });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || "the upload failed");
+    loadWorlds();
+    const sw = await ask({ title: "World added", text: (d.notes || []).map((n) => "• " + n).join("\n") + "\n\nSwitch the server to it now? (The current world is backed up first and kept.)", ok: "Switch to it" });
+    if (sw != null) switchWorld(d.id, f.name.replace(/\.zip$/i, ""));
+  } catch (err) { toast(err.message); }
+});

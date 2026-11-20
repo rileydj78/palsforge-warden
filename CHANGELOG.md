@@ -18,6 +18,13 @@ accessibility scan (no WCAG 2 A/AA violations).
   patch announcements reach the admin (Discord/ntfy) with the link; the dashboard shows the
   latest Palworld news. (Only with this option on does Warden read Steam's public news feed.)
 - REST API only: Pocketpair has deprecated RCON and says it will stop working.
+- Bring a world from co-op: upload the world folder's zip; Warden adds it beside the current
+  world (never replacing one), sets its WorldOption.sav aside, explains the host-character
+  limit, and switches with a backup first.
+- Crash hints: after a crash, the alert names what the crash report and logs point at (a mod,
+  running out of memory, the game's error).
+- The settings file is checked before every start (a broken file makes the game run on defaults).
+- Linux: tested with a real server in Docker; the Docker guide is the tested setup.
 - Phones: one-row section menu, readable graphs; the last-backup tile shows the newest backup.
 
 ## 1.0.0-rc.1 (2026-11-20)

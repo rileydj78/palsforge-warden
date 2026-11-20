@@ -5,11 +5,14 @@
 package worlds
 
 import (
+	"archive/zip"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -241,4 +244,90 @@ func ApplySetAsideOption(serverDir, settingsPath, dataDir string) (string, error
 		return "", err
 	}
 	return "WorldOption.sav set aside (kept as " + filepath.Base(to) + "); the settings file applies now", nil
+}
+
+// MaxImport is the largest world zip Warden takes (co-op worlds are usually well under 500 MB).
+const MaxImport = 2 << 30
+
+// Import unpacks a world uploaded from co-op (a zip of the world folder: Level.sav, LevelMeta.sav,
+// Players/, maybe WorldOption.sav) as a new world beside the others and returns its ID. Its
+// WorldOption.sav is set aside (it would override the server's settings). The world isn't
+// switched to: SwitchWorld does that, with a backup first. Nothing outside the new folder is
+// written.
+func Import(serverDir, zipPath string) (id string, notes []string, err error) {
+	z, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return "", nil, errors.New("that isn't a .zip file")
+	}
+	defer z.Close()
+	// Find Level.sav: at the top or inside one folder (the world folder itself, zipped).
+	prefix, found := "", false
+	for _, f := range z.File {
+		n := strings.ReplaceAll(f.Name, "\\", "/")
+		if strings.EqualFold(path.Base(n), "Level.sav") && strings.Count(strings.Trim(n, "/"), "/") <= 1 {
+			prefix, found = strings.TrimSuffix(n, path.Base(n)), true
+			break
+		}
+	}
+	if !found {
+		return "", nil, errors.New("there's no Level.sav in it: zip the world's folder (the one with Level.sav, LevelMeta.sav and Players)")
+	}
+	id = strings.ToUpper(strings.Trim(path.Base(strings.TrimSuffix(prefix, "/")), "/"))
+	if !idRe.MatchString(id) {
+		id = NewID()
+	}
+	dst := filepath.Join(savesDir(serverDir), id)
+	if _, err := os.Stat(dst); err == nil {
+		id = NewID() // never overwrite a world that's already here
+		dst = filepath.Join(savesDir(serverDir), id)
+		notes = append(notes, "a world with that ID is already on the server, so this one got a new ID")
+	}
+	var total int64
+	for _, f := range z.File {
+		n := strings.ReplaceAll(f.Name, "\\", "/")
+		if !strings.HasPrefix(n, prefix) || strings.HasSuffix(n, "/") {
+			continue
+		}
+		rel := strings.TrimPrefix(n, prefix)
+		if rel == "" || strings.Contains(rel, "..") || path.IsAbs(rel) || strings.Contains(rel, ":") {
+			continue // nothing escapes the world folder
+		}
+		if total += int64(f.UncompressedSize64); total > 8<<30 {
+			os.RemoveAll(dst)
+			return "", nil, errors.New("that world unpacks to more than 8 GB; it doesn't look like a Palworld world")
+		}
+		to := filepath.Join(dst, filepath.FromSlash(rel))
+		if strings.EqualFold(rel, "WorldOption.sav") {
+			to += ".from-coop.bak"
+			notes = append(notes, "its WorldOption.sav was set aside, so the server's own settings apply")
+		}
+		if err := writeZipFile(f, to); err != nil {
+			os.RemoveAll(dst)
+			return "", nil, err
+		}
+	}
+	if ps, _ := filepath.Glob(filepath.Join(dst, "Players", "00000000000000000000000000000001.sav")); len(ps) > 0 {
+		notes = append(notes, "it has a co-op host's character: on a dedicated server the host starts a new character (everyone else keeps theirs)")
+	}
+	return id, notes, nil
+}
+
+func writeZipFile(f *zip.File, to string) error {
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		return err
+	}
+	r, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	out, err := os.OpenFile(to, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(out, io.LimitReader(r, int64(f.UncompressedSize64)+1))
+	if cerr := out.Close(); err == nil {
+		err = cerr
+	}
+	return err
 }

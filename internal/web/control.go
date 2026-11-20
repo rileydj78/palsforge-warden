@@ -166,6 +166,35 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		go c.Runner.SwitchWorld(context.Background(), in.ID, warn)
 		writeJSON(w, 202, map[string]bool{"started": true})
 	}))
+	mux.HandleFunc("POST /api/worlds/import", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		r.Body = http.MaxBytesReader(w, r.Body, worlds.MaxImport)
+		file, hdr, err := r.FormFile("file")
+		if err != nil {
+			fail(w, 400, "choose the world's .zip file (up to 2 GB)")
+			return
+		}
+		defer file.Close()
+		tmp, err := os.CreateTemp(c.Runner.Backups.DataDir, "world-*.zip")
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		defer os.Remove(tmp.Name())
+		_, err = io.Copy(tmp, file)
+		tmp.Close()
+		if err != nil {
+			fail(w, 400, "the upload didn't finish")
+			return
+		}
+		id, notes, err := worlds.Import(c.Cfg.ServerDir, tmp.Name())
+		s.Store.Audit(ses.User.Name, "import world", hdr.Filename, id, err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		worlds.SetLabel(c.Runner.Backups.DataDir, id, cleanText(strings.TrimSuffix(hdr.Filename, ".zip"), 40))
+		writeJSON(w, 200, map[string]any{"id": id, "notes": notes})
+	}))
 	mux.HandleFunc("POST /api/worlds/label", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		var in struct{ ID, Label string }
 		if readJSON(r, &in) != nil {
