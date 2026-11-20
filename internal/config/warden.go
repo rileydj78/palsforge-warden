@@ -122,11 +122,14 @@ type Backups struct {
 	Dir     string   `json:"dir"`     // local backups; default <data>/backups
 	Offsite []string `json:"offsite"` // second places (folders or network shares), each checked
 	// Copies on other machines over SFTP, each read back and checked; same retention as here.
-	SFTP   []backup.SFTPTarget `json:"sftp"`
-	Image  string              `json:"image"` // whole-server image: "daily", "weekly" (Sundays) or "off"
-	Daily  int                 `json:"keepDaily"`
-	Weekly int                 `json:"keepWeekly"`
-	Tag    string              `json:"tag"` // file name prefix, e.g. "pal"
+	SFTP []backup.SFTPTarget `json:"sftp"`
+	// Copies in S3-compatible storage (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2...), each
+	// checked by the service on arrival and read back by Warden; same retention as here.
+	S3     []backup.S3Target `json:"s3"`
+	Image  string            `json:"image"` // whole-server image: "daily", "weekly" (Sundays) or "off"
+	Daily  int               `json:"keepDaily"`
+	Weekly int               `json:"keepWeekly"`
+	Tag    string            `json:"tag"` // file name prefix, e.g. "pal"
 }
 
 // Update is the game update through SteamCMD during the nightly routine.
@@ -214,6 +217,11 @@ func (w *Warden) Check() error {
 		bad = append(bad, "keep at least one daily backup")
 	}
 	for _, t := range w.Backups.SFTP {
+		if err := t.Check(); err != nil {
+			bad = append(bad, err.Error())
+		}
+	}
+	for _, t := range w.Backups.S3 {
 		if err := t.Check(); err != nil {
 			bad = append(bad, err.Error())
 		}

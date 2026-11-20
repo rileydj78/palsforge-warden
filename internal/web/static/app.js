@@ -690,6 +690,7 @@ async function loadSettings() {
     $("set-path").textContent = `Saved in ${r.path}. The server folder is ${cfg.serverDir}.`;
     $("set-error").hidden = !r.error; $("set-error").textContent = r.error ? `Needs attention: ${r.error}` : "";
     $("s-n-on").checked = cfg.nightly.enabled; $("s-n-time").value = cfg.nightly.time; $("s-n-warn").value = (cfg.nightly.warnMinutes || []).join(", ");
+    drawPlaces();
     $("s-b-dir").value = cfg.backups.dir; $("s-b-off").value = (cfg.backups.offsite || []).join("\n"); $("s-b-img").value = cfg.backups.image;
     $("s-b-d").value = cfg.backups.keepDaily; $("s-b-w").value = cfg.backups.keepWeekly;
     $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate; $("s-u-hold").checked = !!cfg.update.holdForMods;
@@ -846,3 +847,24 @@ async function loadInstances() {
     sel.onchange = () => { if (sel.value) location.href = sel.value; };
   } catch (e) {}
 }
+
+// Backup places on other machines and in cloud storage (edited in the settings object, saved with Save).
+function drawPlaces() {
+  const ul = $("s-places"); ul.replaceChildren();
+  const all = [...(cfg.backups.sftp || []).map((p, i) => ({ kind: "sftp", i, label: p.url.replace(/\/\/[^@]*@/, "//") })),
+               ...(cfg.backups.s3 || []).map((p, i) => ({ kind: "s3", i, label: `${p.endpoint.replace(/^https?:\/\//, "")} / ${p.bucket}/${p.prefix || ""}` }))];
+  if (!all.length) { ul.append(el("li", "None yet.", "note")); return; }
+  for (const p of all) {
+    const li = el("li"); li.append(el("span", (p.kind === "s3" ? "S3: " : "SFTP: ") + p.label, "mono"));
+    const rm = el("button", "Remove", "small"); rm.type = "button";
+    rm.onclick = () => { cfg.backups[p.kind].splice(p.i, 1); drawPlaces(); toast("Removed. Save to keep the change."); };
+    li.append(rm); ul.append(li);
+  }
+}
+$("s3-add").addEventListener("click", () => {
+  const t = { endpoint: $("s3-ep").value.trim(), region: $("s3-rg").value.trim(), bucket: $("s3-bk").value.trim(), prefix: $("s3-px").value.trim(), accessKey: $("s3-ak").value.trim(), secretKey: $("s3-sk").value };
+  if (!t.endpoint || !t.region || !t.bucket || !t.accessKey || !t.secretKey) { toast("Fill in the endpoint, region, bucket and both keys."); return; }
+  (cfg.backups.s3 = cfg.backups.s3 || []).push(t);
+  for (const id of ["s3-ep", "s3-rg", "s3-bk", "s3-px", "s3-ak", "s3-sk"]) $(id).value = "";
+  drawPlaces(); toast("Added. Save to keep it; the next backup goes there too.");
+});

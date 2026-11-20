@@ -103,9 +103,16 @@ func (b *Backups) MakeAll(ctx context.Context) ([]string, error) {
 
 // CopyAndVerify copies tonight's archives to every second place and checks each copy.
 func (b *Backups) CopyAndVerify(ctx context.Context, names []string) error {
-	if len(b.Cfg.Backups.SFTP) > 0 {
+	if len(b.Cfg.Backups.SFTP)+len(b.Cfg.Backups.S3) > 0 {
 		var errs []error
 		for _, t := range b.Cfg.Backups.SFTP {
+			for _, a := range b.made {
+				if err := t.SendVerified(ctx, *a); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", t.Name(), err))
+				}
+			}
+		}
+		for _, t := range b.Cfg.Backups.S3 {
 			for _, a := range b.made {
 				if err := t.SendVerified(ctx, *a); err != nil {
 					errs = append(errs, fmt.Errorf("%s: %w", t.Name(), err))
@@ -217,13 +224,18 @@ func (b *Backups) Prune(ctx context.Context) error {
 			errs = append(errs, err)
 		}
 	}
-	if len(b.Cfg.Backups.SFTP) > 0 { // other machines keep what this one keeps
+	if len(b.Cfg.Backups.SFTP)+len(b.Cfg.Backups.S3) > 0 { // other machines keep what this one keeps
 		keep := map[string]bool{}
 		if list, err := backup.ListTag(b.LocalDir(), b.Cfg.Backups.Tag); err == nil {
 			for _, a := range list {
 				keep[a.Name] = true
 			}
 			for _, t := range b.Cfg.Backups.SFTP {
+				if _, err := t.Mirror(ctx, b.Cfg.Backups.Tag, keep); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", t.Name(), err))
+				}
+			}
+			for _, t := range b.Cfg.Backups.S3 {
 				if _, err := t.Mirror(ctx, b.Cfg.Backups.Tag, keep); err != nil {
 					errs = append(errs, fmt.Errorf("%s: %w", t.Name(), err))
 				}

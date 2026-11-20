@@ -231,6 +231,18 @@
         <h2>Backups</h2>
         <label for="s-b-dir">Folder on this machine (empty = Warden's data folder)</label><input id="s-b-dir">
         <label for="s-b-off">Second places, one per line (another disk, a NAS share). Each copy is checked.</label><textarea id="s-b-off" rows="3"></textarea>
+        <p class="note">Other machines and cloud storage (each copy is read back and checked, and they keep what this machine keeps):</p>
+        <ul class="places" id="s-places"></ul>
+        <details><summary>Add S3 storage (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2…)</summary>
+          <label for="s3-ep">Endpoint</label><input id="s3-ep" placeholder="https://s3.us-east-1.amazonaws.com" autocomplete="off" spellcheck="false">
+          <label for="s3-rg">Region</label><input id="s3-rg" placeholder="us-east-1 (Cloudflare R2: auto)" autocomplete="off">
+          <label for="s3-bk">Bucket</label><input id="s3-bk" autocomplete="off" spellcheck="false">
+          <label for="s3-px">Folder in the bucket (optional)</label><input id="s3-px" placeholder="palworld/" autocomplete="off" spellcheck="false">
+          <label for="s3-ak">Access key</label><input id="s3-ak" autocomplete="off" spellcheck="false">
+          <label for="s3-sk">Secret key (kept on this machine; never shown again)</label><input id="s3-sk" type="password" autocomplete="new-password">
+          <div class="row"><button type="button" class="small" id="s3-add">Add it (then Save)</button></div>
+        </details>
+        <p class="note">Another machine over SFTP: run <code>warden sftp-setup sftp://user@host/folder</code> on this machine; it makes a key and tells you what to add.</p>
         <label for="s-b-img">Whole-server image</label><select id="s-b-img"><option value="weekly">Weekly (Sundays)</option><option value="daily">Every night</option><option value="off">Off</option></select>
         <label for="s-b-d">Keep the newest (nightly)</label><input id="s-b-d" type="number" min="1" max="365">
         <label for="s-b-w">Plus one a week for this many weeks</label><input id="s-b-w" type="number" min="0" max="104">

@@ -142,3 +142,5 @@ form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; } fo
 
 .switcher { font: inherit; font-size: 14px; color: var(--top-ink); background: transparent; border: 1px solid #3A4A40; border-radius: 8px; padding: 5px 8px; max-width: min(320px, 50vw); }
 .switcher option { color: #1C2620; }
+
+.places { list-style: none; padding: 0; margin: 4px 0 12px; } .places li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }

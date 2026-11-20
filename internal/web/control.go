@@ -41,7 +41,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		busy, _ := c.Runner.Busy()
 		runs, _ := s.Store.Runs(1)
 		out := map[string]any{"host": c.Host.State(), "build": c.Host.BuildID(), "routineRunning": busy, "memory": c.Host.Memory(), "machine": host.MachineLoad(), "disk": host.DiskOf(c.Cfg.ServerDir), "health": c.Cfg.Health, "proof": nightly.LastProof(c.Runner.Backups.DataDir),
-			"nightly": c.Cfg.Nightly, "update": c.Cfg.Update.Enabled, "offsite": len(c.Cfg.Backups.Offsite) + len(c.Cfg.Backups.SFTP)}
+			"nightly": c.Cfg.Nightly, "update": c.Cfg.Update.Enabled, "offsite": len(c.Cfg.Backups.Offsite) + len(c.Cfg.Backups.SFTP) + len(c.Cfg.Backups.S3)}
 		if c.Cfg.Nightly.Enabled {
 			out["nextRun"] = nightly.NextRun(c.Cfg.Nightly.Time, time.Now())
 		}
@@ -355,7 +355,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		b := *c.Runner.Backups
 		b.Cfg.Backups.Image = "off"
 		names, err := b.MakeAll(ctx)
-		if err == nil && len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP) > 0 {
+		if err == nil && len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP)+len(c.Cfg.Backups.S3) > 0 {
 			err = b.CopyAndVerify(ctx, names)
 		}
 		s.Store.Audit(ses.User.Name, "back up now", "", "", err == nil)
@@ -380,7 +380,7 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 	}
 	mux.HandleFunc("GET /api/settings", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		cfg, _, err := config.Load(s.Settings.DataDir, "")
-		resp := map[string]any{"settings": cfg, "path": config.ConfigPath(s.Settings.DataDir)}
+		resp := map[string]any{"settings": cfg.Masked(), "path": config.ConfigPath(s.Settings.DataDir)}
 		if err != nil {
 			resp["error"] = err.Error()
 		} else if err := cfg.Check(); err != nil {
@@ -393,6 +393,14 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 		if readJSON(r, &in) != nil {
 			fail(w, 400, "bad request")
 			return
+		}
+		if saved, _, err := config.Load(s.Settings.DataDir, ""); err == nil { // placeholders mean the saved values
+			if in.DiscordWebhook == config.Unchanged {
+				in.DiscordWebhook = saved.Notify.DiscordWebhook
+			}
+			if in.NtfyToken == config.Unchanged {
+				in.NtfyToken = saved.Notify.NtfyToken
+			}
 		}
 		if err := in.Check(); err != nil {
 			fail(w, 400, err.Error())
@@ -412,6 +420,9 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 		if readJSON(r, &cfg) != nil {
 			fail(w, 400, "bad request")
 			return
+		}
+		if saved, _, err := config.Load(s.Settings.DataDir, ""); err == nil {
+			cfg.KeepSecrets(saved)
 		}
 		if err := cfg.Check(); err != nil {
 			fail(w, 400, err.Error())
