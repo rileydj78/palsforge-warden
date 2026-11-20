@@ -10,6 +10,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/logs"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
@@ -291,5 +292,111 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 		if s.Settings.Restart != nil {
 			go func() { time.Sleep(500 * time.Millisecond); s.Settings.Restart() }()
 		}
+	}))
+}
+
+// ---- the game's own settings (PalWorldSettings.ini)
+
+func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
+	c := s.Control
+	if c == nil {
+		return
+	}
+	path := config.SettingsPath(c.Cfg.ServerDir)
+	view := func(w http.ResponseWriter) {
+		f, err := gamesettings.Read(path)
+		if err != nil {
+			fail(w, 500, "can't read the game's settings: "+err.Error())
+			return
+		}
+		values, secrets := map[string]string{}, map[string]bool{}
+		for k, v := range f.Values {
+			if o, ok := gamesettings.Lookup(k); ok && o.Type == "secret" {
+				secrets[k] = v != "" // never send a password to the browser
+				continue
+			}
+			values[k] = v
+		}
+		var unknown []string
+		for _, p := range f.Pairs {
+			if _, ok := gamesettings.Lookup(p.Key); !ok {
+				unknown = append(unknown, p.Key)
+			}
+		}
+		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path})
+	}
+	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w) }))
+	plan := func(r *http.Request) (*gamesettings.File, []gamesettings.Change, string, error) {
+		var in struct {
+			Values  map[string]string `json:"values"`
+			Restart string            `json:"restart"`
+		}
+		if err := readJSON(r, &in); err != nil {
+			return nil, nil, "", err
+		}
+		f, err := gamesettings.Read(path)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		ch, err := f.Plan(in.Values)
+		return f, ch, in.Restart, err
+	}
+	mask := func(ch []gamesettings.Change) []gamesettings.Change {
+		out := append([]gamesettings.Change(nil), ch...)
+		for n, c := range out {
+			if o, ok := gamesettings.Lookup(c.Key); ok && o.Type == "secret" {
+				out[n].Old, out[n].New = "(hidden)", "(changed)"
+				if c.New == "" {
+					out[n].New = "(removed)"
+				}
+			}
+		}
+		return out
+	}
+	mux.HandleFunc("POST /api/game-settings/plan", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		_, ch, _, err := plan(r)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"changes": mask(ch)})
+	}))
+	mux.HandleFunc("POST /api/game-settings/apply", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		f, ch, restart, err := plan(r)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if len(ch) == 0 {
+			fail(w, 400, "nothing changed")
+			return
+		}
+		if busy, _ := c.Runner.Busy(); busy {
+			fail(w, 409, "the nightly routine is running; try again after it")
+			return
+		}
+		bak, err := f.Apply(ch)
+		var names []string
+		for _, x := range mask(ch) {
+			names = append(names, x.Label+": "+x.Old+" → "+x.New)
+		}
+		s.Store.Audit(ses.User.Name, "change game settings", "", strings.Join(names, "; "), err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		if restart == "now" {
+			go func() { // a restart with a minute's warning; the settings apply as the server starts
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				defer cancel()
+				s.Game.Announce(ctx, "The server restarts in 1 minute to apply new settings.")
+				s.Game.Shutdown(ctx, 60, "Restarting to apply new settings.")
+				if c.Host.WaitStopped(ctx, 4*time.Minute) {
+					time.Sleep(5 * time.Second)
+					c.Host.Start(ctx)
+				}
+			}()
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "backup": bak})
 	}))
 }

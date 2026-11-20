@@ -101,3 +101,6 @@ details.run table { margin-top: 8px; }
 .logbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .logbar select { font: inherit; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); margin-bottom: 12px; }
 pre.log { background: #0F1411; color: #CFE3D6; font: 12.5px/1.5 var(--mono); padding: 14px; border-radius: 10px; height: min(65vh, 640px); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.form input.changed, .form select.changed { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.form .note { margin: -2px 0 6px; }
+#dlgtext { white-space: pre-line; }

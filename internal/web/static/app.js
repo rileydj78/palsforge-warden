@@ -63,7 +63,7 @@ function signedIn(out) {
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
-  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; }).catch(() => {});
+  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -302,6 +302,56 @@ $("b-backup").addEventListener("click", async () => {
   try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${r.made.join(", ")}`); loadBackups(); } catch (e) { toast(e.message); }
 });
 
+// ---- the game's settings
+let game = null;
+async function loadGame() {
+  try {
+    game = await api("/api/game-settings");
+    const box = $("g-groups"); box.replaceChildren();
+    const groups = [...new Set(game.catalog.map((o) => o.group))];
+    for (const g of groups) {
+      const card = el("section", null, "card form wide"); card.append(el("h2", g));
+      for (const o of game.catalog.filter((x) => x.group === g)) {
+        const id = "g-" + o.key, cur = game.values[o.key];
+        const lab = el("label", o.label); lab.htmlFor = id;
+        let input;
+        if (o.type === "bool") { input = el("select"); for (const [v, t] of [["True", "On"], ["False", "Off"]]) { const op = el("option", t); op.value = v; input.append(op); } input.value = /^true$/i.test(cur ?? o.default) ? "True" : "False"; }
+        else if (o.type === "enum") { input = el("select"); for (const c of o.choices) { const op = el("option", c); op.value = c; input.append(op); } input.value = cur ?? o.default; }
+        else { input = el("input"); input.value = o.type === "secret" ? "" : (cur ?? ""); if (o.type === "float" || o.type === "int") { input.inputMode = "decimal"; input.value = cur != null ? String(parseFloat(cur)) : ""; } if (o.type === "secret") { input.type = "password"; input.placeholder = game.secretsSet[o.key] ? "Set (type to change; a space removes it)" : "Not set"; input.autocomplete = "new-password"; } }
+        input.id = id; input.dataset.key = o.key; input.dataset.orig = input.value; input.disabled = !!o.locked;
+        input.addEventListener("input", () => input.classList.toggle("changed", input.value !== input.dataset.orig));
+        input.addEventListener("change", () => input.classList.toggle("changed", input.value !== input.dataset.orig));
+        const def = o.default ? ` Default: ${o.type === "float" ? parseFloat(o.default) : o.type === "bool" ? (/true/i.test(o.default) ? "on" : "off") : o.default}.` : "";
+        const lim = o.max ? ` Range ${o.min} to ${o.max}.` : "";
+        card.append(lab, input, el("p", o.help + def + lim + (o.locked ? " (Not editable here.)" : ""), "note"));
+      }
+      box.append(card);
+    }
+    $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
+  } catch (e) { toast(e.message); }
+}
+function gameEdits() {
+  const out = {};
+  for (const i of document.querySelectorAll("#g-groups [data-key]")) {
+    if (i.value === i.dataset.orig) continue;
+    out[i.dataset.key] = i.type === "password" && i.value.trim() === "" ? "" : i.value;
+  }
+  return out;
+}
+$("g-review").addEventListener("click", async () => {
+  const values = gameEdits();
+  if (!Object.keys(values).length) { toast("Nothing has changed."); return; }
+  let plan;
+  try { plan = await api("/api/game-settings/plan", { values }); } catch (e) { toast(e.message); return; }
+  if (!plan.changes.length) { toast("Those values are the same as now."); return; }
+  const list = plan.changes.map((c) => `${c.label}: ${c.old || "(empty)"} → ${c.new || "(empty)"}`).join("\n");
+  const ans = await ask({ title: `Apply ${plan.changes.length} change${plan.changes.length === 1 ? "" : "s"}?`, text: list + "\n\nType LATER to apply them at the next restart, or NOW to restart the server in 1 minute (players are warned).", label: "LATER or NOW" });
+  if (ans == null) return;
+  const w = ans.trim().toUpperCase();
+  if (w !== "LATER" && w !== "NOW") { toast("Not confirmed; nothing was changed."); return; }
+  try { await api("/api/game-settings/apply", { values, restart: w === "NOW" ? "now" : "later" }); toast(w === "NOW" ? "Saved. The server restarts in 1 minute." : "Saved. They apply at the next restart."); loadGame(); } catch (e) { toast(e.message); }
+});
+
 // ---- logs
 async function loadLogs(first) {
   const sel = $("lg-src");
@@ -364,7 +414,7 @@ $("setform").addEventListener("submit", async (e) => {
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -374,6 +424,7 @@ function route() {
   if (view === "backups") loadBackups();
   if (view === "settings") loadSettings();
   if (view === "logs") loadLogs(true);
+  if (view === "game") loadGame();
 }
 window.addEventListener("hashchange", route);
 async function refresh() {
