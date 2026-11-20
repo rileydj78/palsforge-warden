@@ -321,8 +321,8 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 1 | Allow-list / maintenance lockdown | **Done** (Warden's own list, kick on join; lockdown = turn it on) |
 | 2 | Frozen-server restart, RAM threshold | **Done** (capped at 3 automatic restarts per 6 h) |
 | 3 | Inventory, Pals, guilds, bases | **Done through PalDefender**; save parser for servers without it: not started |
-| 4 | Give items / Pals | **Done through PalDefender**; kits and starter kits: not started |
-| 6 | Richer map | **Partly**: bases; Alpha Pals, landmarks, offline positions not started |
+| 4 | Give items / Pals | **Done through PalDefender**, with starter kits |
+| 6 | Richer map | **Partly**: bases, offline positions; Alpha Pals and landmarks not started |
 | 7 | Discord | **Partly**: join/leave alerts, live status message; command bot and chat relay not started |
 | 8 | Character migration / host-save fix | Not started |
 | 9 | More than one server | Not started (0.3 plan) |
@@ -330,17 +330,19 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 11 | Two-factor sign-in | **Done** (TOTP, escalating lock, codes work once) |
 | 12 | Public status page | **Done** (own read-only port; Funnel publishes only it) + the Discord live status |
 | 13 | Install the server from scratch | **Done** (SteamCMD + server + first settings; tested on Windows) |
-| 14 | Host metrics | **Mostly**: CPU and RAM in history, disk free with a warning; network not started |
-| 15 | Settings extras | **Partly**: presets, import/export; Engine.ini and launch arguments not started |
+| 14 | Host metrics | **Done** (CPU, RAM, network in history; disk free with a warning) |
+| 15 | Settings extras | **Done** (presets, import/export, Engine.ini, launch options) |
 | 16 | Scheduled events | **Done** (weekly events, admin edits kept, survive restarts) |
 | 17 | Timed broadcasts / MOTD | **Done** (rotating messages, private welcome) |
 | 18 | Ban list from every source | **Done** (game list, PalDefender incl. IP bans) |
-| 19 | Anti-cheat review | Not started |
+| 19 | Anti-cheat review | **Done** (PalDefender cheat logs, fast-levelling flag) |
 | 20 | S3 / WebDAV / SFTP targets | Not started |
 | 21 | Download a backup | **Done** |
-| 22 | Version hold | **Partly**: updates can be turned off; no "hold until mods catch up" yet |
+| 22 | Version hold | **Done** (held while mods are on until an admin allows the build) |
 | 23 | Docker | **Done** (sidecar image + guide, `warden adduser`); not tried with a live Palworld container |
-| 24–25, 27–30 | API keys, auto-pause, worlds, self-update, console, files | Not started |
+| 20 | Off-machine targets | **Partly**: SFTP (pinned host key, read back and checked); S3 not started |
+| 24–25, 27–28, 30 | API keys, auto-pause, worlds, self-update, files | Not started |
+| 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 
 Not release-ready until the "Not started" items that matter most to owners (8, 9, 10) are

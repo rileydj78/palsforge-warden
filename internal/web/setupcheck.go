@@ -79,10 +79,10 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 				add("PalDefender", false, true, "Installed but not connected. Connect it on this page for guilds, map positions, messages and IP bans.")
 			}
 		}
-		if len(c.Cfg.Backups.Offsite) == 0 {
+		if len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP) == 0 {
 			add("Backups", false, false, "Backups are only on this machine. Add a second place in Settings so a dead disk can't take them.")
 		} else {
-			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite))
+			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP))
 		}
 		if list, _ := backup.ListTag(c.Runner.Backups.LocalDir(), c.Cfg.Backups.Tag); len(list) == 0 {
 			add("Last backup", false, true, "No backup yet.")

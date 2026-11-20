@@ -3,8 +3,13 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,9 +18,11 @@ import (
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	setup "github.com/rileydj78/palsforge-warden/internal/install"
 	"github.com/rileydj78/palsforge-warden/internal/store"
+	"golang.org/x/crypto/ssh"
 )
 
 const taskName = "Palsforge Warden"
@@ -38,6 +45,8 @@ func subcommand(args []string) bool {
 		err = remote(args[1:])
 	case "install-server":
 		_, err = installServer(args[1:])
+	case "sftp-setup":
+		err = sftpSetup(args[1:])
 	case "adduser":
 		err = addUserCmd(args[1:])
 	case "help", "-h", "--help":
@@ -59,6 +68,7 @@ const usage = `Palsforge Warden: an admin panel for a Palworld dedicated server.
   warden uninstall                   stop starting it with Windows
   warden open                        open the panel in its own window
   warden install-server <folder>     download SteamCMD and the Palworld server, with first settings Warden can use
+  warden sftp-setup sftp://user@host/folder   make a key for backups on another machine and print what to add
   warden adduser <name> <role>       make a remote admin account (moderator, admin or owner); reads the password from input
   warden remote public on|off        put the read-only status page on the internet (Tailscale Funnel)
   warden remote on|off               let remote admins sign in over your Tailscale network (never the internet)
@@ -476,4 +486,52 @@ func installServer(args []string) (string, error) {
 	fmt.Println("\nThe server is installed. Keep the game's ports open for players (UDP 8211, and 27015 for the")
 	fmt.Println("server list) and keep TCP 8212 (the REST API) closed to the internet.")
 	return dir, nil
+}
+
+// sftpSetup makes Warden's SSH key (once), reads the other machine's host key, and prints the
+// lines to add there and in Warden's settings.
+func sftpSetup(args []string) error {
+	if len(args) == 0 {
+		return errors.New("use: warden sftp-setup sftp://user@host/folder [-data <folder>]")
+	}
+	u, err := url.Parse(args[0])
+	if err != nil || u.Scheme != "sftp" || u.Host == "" || u.User == nil {
+		return errors.New("the address looks like sftp://user@host/folder")
+	}
+	data := flagValue(args, "data")
+	if data == "" {
+		data = store.DefaultDir()
+	}
+	keyFile := filepath.Join(data, "sftp_ed25519")
+	if _, err := os.Stat(keyFile); err != nil {
+		pub, priv, err := ed25519.GenerateKey(rand.Reader)
+		if err != nil {
+			return err
+		}
+		block, err := ssh.MarshalPrivateKey(priv, "palsforge-warden")
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(keyFile, pem.EncodeToMemory(block), 0o600); err != nil {
+			return err
+		}
+		sp, _ := ssh.NewPublicKey(pub)
+		os.WriteFile(keyFile+".pub", ssh.MarshalAuthorizedKey(sp), 0o644)
+	}
+	pubLine, err := os.ReadFile(keyFile + ".pub")
+	if err != nil {
+		return err
+	}
+	hp := u.Host
+	if u.Port() == "" {
+		hp = net.JoinHostPort(u.Hostname(), "22")
+	}
+	fp, typ, err := backup.HostKeyOf(hp)
+	if err != nil {
+		return fmt.Errorf("couldn't reach %s: %w", hp, err)
+	}
+	fmt.Printf("1. On %s, add this line to %s's ~/.ssh/authorized_keys (restrict,command=\"internal-sftp\" lets the key do SFTP and nothing else):\n\n   restrict,command=\"internal-sftp\" %s\n\n", u.Hostname(), u.User.Username(), strings.TrimSpace(string(pubLine)))
+	fmt.Printf("2. Check this is really %s's %s host key (on that machine: ssh-keygen -lf /etc/ssh/ssh_host_*_key.pub):\n\n   %s\n\n", u.Hostname(), typ, fp)
+	fmt.Printf("3. In warden.json, under backups, add:\n\n   \"sftp\": [{\"url\": %q, \"keyFile\": %q, \"hostKey\": %q}]\n", args[0], keyFile, fp)
+	return nil
 }

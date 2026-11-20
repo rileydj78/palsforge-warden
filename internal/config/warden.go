@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
@@ -120,10 +121,12 @@ type Nightly struct {
 type Backups struct {
 	Dir     string   `json:"dir"`     // local backups; default <data>/backups
 	Offsite []string `json:"offsite"` // second places (folders or network shares), each checked
-	Image   string   `json:"image"`   // whole-server image: "daily", "weekly" (Sundays) or "off"
-	Daily   int      `json:"keepDaily"`
-	Weekly  int      `json:"keepWeekly"`
-	Tag     string   `json:"tag"` // file name prefix, e.g. "pal"
+	// Copies on other machines over SFTP, each read back and checked; same retention as here.
+	SFTP   []backup.SFTPTarget `json:"sftp"`
+	Image  string              `json:"image"` // whole-server image: "daily", "weekly" (Sundays) or "off"
+	Daily  int                 `json:"keepDaily"`
+	Weekly int                 `json:"keepWeekly"`
+	Tag    string              `json:"tag"` // file name prefix, e.g. "pal"
 }
 
 // Update is the game update through SteamCMD during the nightly routine.
@@ -209,6 +212,11 @@ func (w *Warden) Check() error {
 	}
 	if w.Backups.Daily < 1 || w.Backups.Weekly < 0 {
 		bad = append(bad, "keep at least one daily backup")
+	}
+	for _, t := range w.Backups.SFTP {
+		if err := t.Check(); err != nil {
+			bad = append(bad, err.Error())
+		}
 	}
 	if !tagRe.MatchString(w.Backups.Tag) {
 		bad = append(bad, "backups.tag must be 1-20 lowercase letters or digits")

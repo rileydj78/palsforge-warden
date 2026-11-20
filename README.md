@@ -22,6 +22,9 @@ internet, and Palworld's admin password never leaves the server.
 - **Backups you can trust:** every night a backup of the world, settings and mods (and a whole-server
   image weekly or nightly). Each is checksummed, copied to a second place (another disk or a NAS
   share) and checked there. Keeps the newest 14 plus one a week for 8 weeks.
+- **Backups on another machine over SFTP:** `warden sftp-setup sftp://user@host/folder` makes a key
+  and prints the host key to pin; each backup is uploaded, read back and checksum-matched there,
+  and the other machine keeps what this one keeps.
 - **Safe restore:** preview what's in a backup, then restore it. Warden checks the backup first,
   makes a safety backup of the world as it is now, keeps the old folders aside, and rolls back if
   anything goes wrong.
