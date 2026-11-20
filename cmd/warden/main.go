@@ -24,13 +24,20 @@ import (
 var version = "0.0.1-dev"
 
 func main() {
+	if subcommand(os.Args[1:]) {
+		return
+	}
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")
 	listen := flag.String("listen", "127.0.0.1:8282", "where the panel listens (loopback only)")
 	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")
 	flag.Parse()
 	if *serverDir == "" {
-		fmt.Fprintln(os.Stderr, "warden: say where the server is, e.g. -server C:\\PalServer")
+		*serverDir = findServer()
+	}
+	if *serverDir == "" {
+		fmt.Fprint(os.Stderr, "Warden couldn't find your Palworld server. Say where it is, for example:\n  warden -server C:\\PalServer\n\n"+usage)
+		pauseIfDoubleClicked()
 		os.Exit(2)
 	}
 	st, err := config.ReadSettings(config.SettingsPath(*serverDir))
