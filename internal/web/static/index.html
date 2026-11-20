@@ -135,18 +135,19 @@
         <div class="stat"><span class="label">Memory</span><span class="value" id="srv-mem">–</span><span class="note" id="srv-memnote"></span></div>
         <div class="stat"><span class="label">This machine</span><span class="value" id="srv-cpu">–</span><span class="note" id="srv-ram"></span></div>
       </section>
-      <section class="card admin-only"><h2>Can players get in?</h2><p class="note">Checked on this machine only; nothing is sent anywhere.</p><ul class="checks" id="conn"><li class="note">Checking…</li></ul></section>
-      <section class="card admin-only"><h2>Setup check</h2><ul class="checks" id="checks"><li class="note">Checking…</li></ul></section>
-      <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>
+      <div class="seg" role="tablist" aria-label="Server sections"><button role="tab" data-pane="health" aria-selected="true">Health</button><button role="tab" data-pane="worlds" class="admin-only">Worlds</button><button role="tab" data-pane="history">History</button></div>
+      <section class="card admin-only" data-pane="health"><h2>Can players get in?</h2><p class="note">Checked on this machine only; nothing is sent anywhere.</p><ul class="checks" id="conn"><li class="note">Checking…</li></ul></section>
+      <section class="card admin-only" data-pane="health"><h2>Setup check</h2><ul class="checks" id="checks"><li class="note">Checking…</li></ul></section>
+      <section class="card" id="pd-card" data-pane="health" hidden><h2>PalDefender</h2><p id="pd-state"></p>
         <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
-      <section class="card admin-only"><h2>Game updates</h2><p id="upd-state" class="note">Warden updates the game in the nightly routine when updates are on.</p>
+      <section class="card admin-only" data-pane="health"><h2>Game updates</h2><p id="upd-state" class="note">Warden updates the game in the nightly routine when updates are on.</p>
         <div class="row start"><button type="button" class="small" id="upd-check">Check for a game update</button><button type="button" class="small" id="upd-allow" hidden></button></div></section>
-      <section class="card admin-only"><h2>Worlds</h2>
+      <section class="card admin-only" data-pane="worlds"><h2>Worlds</h2>
         <p class="note">Each world is kept in its own folder; switching never deletes one, so you can always switch back. The current world is backed up first, and Warden only switches if that backup worked.</p>
         <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>World</th><th>Players</th><th>Size</th><th>Last played</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="worldrows"></tbody></table></div>
         <div class="row start owner-only"><button type="button" class="small" id="world-new">Start a fresh world…</button><label class="small" for="world-import" tabindex="0" role="button">Bring a world from co-op…</label><input type="file" id="world-import" accept=".zip" hidden></div></section>
-      <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
-      <section class="card"><h2>Server events</h2><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
+      <section class="card" data-pane="history"><h2>Recent runs</h2><div id="runs"></div></section>
+      <section class="card" data-pane="history"><h2>Server events</h2><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>
     </section>
 

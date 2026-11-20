@@ -391,11 +391,16 @@ async function loadServer() {
     if (me.role !== "moderator") api("/api/setup-check").then((cs) => {
       const ul = $("checks"); ul.replaceChildren();
       cs.sort((a, b) => (a.ok - b.ok) || (b.warn - a.warn));
-      for (const c of cs) { const li = el("li", null, c.ok ? "ok" : c.warn ? "warn" : "bad"); li.append(el("b", c.area + ":"), el("span", c.detail)); ul.append(li); }
+      const good = [];
+      for (const c of cs) { const li = el("li", null, c.ok ? "ok" : c.warn ? "warn" : "bad"); li.append(el("b", c.area + ":"), el("span", c.detail)); if (c.ok) good.push(li); else ul.append(li); }
+      if (good.length) {
+        const d = el("details", null, "passed"), sm = el("summary", `${good.length} thing${good.length === 1 ? "" : "s"} look${good.length === 1 ? "s" : ""} good`), inner = el("ul", null, "checks");
+        inner.append(...good); d.append(sm, inner); const li = el("li", null, "plain"); li.append(d); ul.append(li);
+      }
     }).catch(() => {});
     try {
       const pd = await api("/api/paldefender");
-      $("pd-card").hidden = !pd.installed && !pd.connected;
+      $("pd-card").hidden = pd.connected || !pd.installed; // connected: the setup check says so already
       pdConnected = pd.connected && !pd.error;
       $("pd-state").textContent = pd.connected ? (pd.error ? `Connected, but: ${pd.error}` : `Connected: ${pd.version}. Guilds, exact map positions, private messages and IP bans are on.`) : "Installed, not connected. Connecting turns its API on for this machine only and gives Warden its own token; it takes effect after the server's next restart.";
       $("pd-connect").hidden = pd.connected || me.role !== "owner";
@@ -998,3 +1003,41 @@ $("world-import").addEventListener("change", async (e) => {
     if (sw != null) switchWorld(d.id, f.name.replace(/\.zip$/i, ""));
   } catch (err) { toast(err.message); }
 });
+
+// Server page sections: one at a time (remembered on this browser).
+function showPane(name) {
+  for (const b of document.querySelectorAll('#view-server .seg [role="tab"]')) b.setAttribute("aria-selected", String(b.dataset.pane === name));
+  for (const c of document.querySelectorAll('#view-server section[data-pane]')) c.classList.toggle("off", c.dataset.pane !== name);
+  try { localStorage.setItem("warden.serverPane", name); } catch (e) {}
+}
+for (const b of document.querySelectorAll('#view-server .seg [role="tab"]')) b.addEventListener("click", () => showPane(b.dataset.pane));
+try { const p = localStorage.getItem("warden.serverPane"); showPane(p || "health"); } catch (e) { showPane("health"); }
+
+// Settings: section links at the top, and a save bar that stays in view and says when something changed.
+(function () {
+  const form = $("setform"), nav = el("nav", null, "chips"); nav.setAttribute("aria-label", "Settings sections");
+  form.querySelectorAll("h2").forEach((h, i) => {
+    h.id = h.id || "set-" + i;
+    const a = el("a", h.textContent); a.href = "#"; a.onclick = (e) => { e.preventDefault(); h.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    nav.append(a);
+  });
+  form.before(nav);
+  const bar = form.querySelector('button[type="submit"]').parentElement; bar.classList.add("savebar");
+  const note = el("span", "", "note unsaved"); bar.prepend(note);
+  const dirty = () => { note.textContent = "Unsaved changes"; };
+  form.addEventListener("input", dirty); form.addEventListener("change", dirty);
+  form.addEventListener("submit", () => { note.textContent = ""; });
+})();
+
+// Phones show each table row as a card; label every value with its column's heading so the card
+// still says what's what. Runs whenever a table is (re)drawn.
+function labelCells(root) {
+  for (const t of root.querySelectorAll ? root.querySelectorAll(".tablewrap table") : []) {
+    const heads = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+    for (const tr of t.querySelectorAll("tbody tr")) {
+      [...tr.children].forEach((td, i) => { if (i > 0 && heads[i] && !td.classList.contains("acts") && td.colSpan === 1) td.dataset.label = heads[i]; });
+    }
+  }
+}
+new MutationObserver((ms) => { for (const m of ms) if (m.target.closest && m.target.closest(".tablewrap")) { labelCells(m.target.closest(".tablewrap")); } }).observe(document.body, { childList: true, subtree: true });
+labelCells(document);

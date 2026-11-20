@@ -177,11 +177,35 @@ ul.checks li b { overflow-wrap: anywhere; }
 /* Phones: wide tables marked .stack become one small card per row. */
 @media (max-width: 760px) {
   ul.checks li b { display: block; }
-  table.stack thead { display: none; }
-  table.stack, table.stack tbody { display: block; width: 100%; }
-  table.stack tr { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-  table.stack td { border: 0; padding: 0; white-space: normal; }
-  table.stack td:first-child { grid-column: 1 / -1; font-weight: 600; overflow-wrap: anywhere; }
-  table.stack td.acts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
-  table.stack td.acts > * { margin-left: 0; }
+  .tablewrap table thead { display: none; }
+  .tablewrap table, .tablewrap table tbody { display: block; width: 100%; }
+  .tablewrap table tr { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .tablewrap table td { border: 0; padding: 0; white-space: normal; }
+  .tablewrap table td:first-child { grid-column: 1 / -1; font-weight: 600; overflow-wrap: anywhere; }
+  .tablewrap table td.acts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+  .tablewrap table td.acts > * { margin-left: 0; }
+}
+
+/* Segmented sections (Server page). */
+.seg { display: inline-flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); align-self: flex-start; }
+.seg [role="tab"] { font: inherit; font-weight: 600; font-size: 14px; padding: 8px 16px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; min-height: 40px; }
+.seg [role="tab"][aria-selected="true"] { background: var(--accent-bg); color: var(--accent-ink); }
+section.off { display: none !important; }
+ul.checks li.plain { padding: 0; } ul.checks li.plain::before { content: none; }
+details.passed summary { cursor: pointer; padding: 8px 12px; color: var(--muted); }
+details.passed summary::before { content: "✓ "; color: var(--accent); font-weight: 700; }
+
+/* Settings: section links and a save bar that stays in view. */
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips a { font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--ink); text-decoration: none; }
+.chips a:hover { border-color: var(--accent); }
+.form h2 { scroll-margin-top: 70px; }
+.row.savebar { position: sticky; bottom: 0; z-index: 4; background: var(--card); margin: 8px -20px -18px; padding: 12px 20px; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; align-items: center; }
+.row.savebar .unsaved { margin-right: auto; color: var(--warn-ink); font-weight: 600; }
+
+/* Groups of fields inside a form stack like the form itself; text boxes look like inputs. */
+.form > div:not(.row):not(.chips) { display: flex; flex-direction: column; gap: 8px; }
+.form textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); resize: vertical; }
+@media (max-width: 760px) {
+  .tablewrap td[data-label]::before { content: attr(data-label); display: block; font-family: var(--font); font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--soft); }
 }
