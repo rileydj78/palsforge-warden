@@ -104,7 +104,8 @@
     <section id="view-players" class="view" hidden>
       <h1>Everyone who has played</h1>
       <p class="sub">First and last seen, and total time online since Warden started watching.</p>
-      <input class="search" id="rsearch" type="search" placeholder="Find a player" aria-label="Find a player">
+      <div class="row start"><input class="search" id="rsearch" type="search" placeholder="Find a player" aria-label="Find a player">
+        <label for="rfilter" class="sr">Show</label><select id="rfilter" class="search narrow"><option value="all">Everyone</option><option value="week">Played this week</option><option value="inactive">Not seen for 30+ days</option></select></div>
       <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First seen</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="rosterrows"></tbody></table></div></div>

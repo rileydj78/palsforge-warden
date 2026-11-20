@@ -172,3 +172,4 @@ ul.checks li span { overflow-wrap: anywhere; }
 .tablewrap td.wrap { overflow-wrap: anywhere; min-width: 12em; }
 
 .news { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; } .news a { color: var(--accent-ink); }
+.search.narrow { width: auto; }

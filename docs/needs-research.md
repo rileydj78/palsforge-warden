@@ -4,7 +4,9 @@
 > **What 1.0 did with this (2026-11-20):** built the connection check (pain points 1 and 7), the
 > WorldOption.sav check (6) and "update soon" (3); explained the game's own backups. Also built: the co-op
 > world upload (9, without the host-character fix, which needs save editing), crash hints, and a
-> settings-file check. Left for later: clean-up of
+> settings-file check. The Players page can show who
+> hasn't played for 30+ days; removing abandoned bases (PalDefender's deletebase) waits until
+> its guild data can be checked on a real server. Left for later: clean-up of
 > inactive players and bases, and crash explanations. Reddit couldn't be reached by the research
 > tools, so its threads aren't counted here.
 

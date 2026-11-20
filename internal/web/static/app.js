@@ -224,7 +224,8 @@ let roster = [];
 function renderRoster() {
   const q = $("rsearch").value.trim().toLowerCase();
   const rows = $("rosterrows"); rows.replaceChildren();
-  const list = roster.filter((p) => !q || p.name.toLowerCase().includes(q));
+  const f = $("rfilter").value, now = Date.now() / 1000;
+  const list = roster.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (f === "all" || (f === "week" ? now - p.lastSeen < 7 * 86400 : now - p.lastSeen > 30 * 86400)));
   if (!list.length) { const tr = el("tr"); const td = el("td", roster.length ? "No match." : "Nobody yet. Players appear here once Warden has seen them online.", "empty"); td.colSpan = 7; tr.append(td); rows.append(tr); }
   // Progress check: level per hour played, against everyone else's (works at any XP rate).
   const rate = (p) => p.level / Math.max(p.seconds / 3600, 0.25);
@@ -285,6 +286,7 @@ async function loadBans() {
     }
   } catch (e) {}
 }
+$("rfilter").addEventListener("change", () => renderRoster());
 $("rsearch").addEventListener("input", renderRoster);
 async function loadAudit() {
   try {
