@@ -627,6 +627,7 @@ func (s *Server) Handler() http.Handler {
 	s.palDefDataRoutes(mux)
 	s.setupCheckRoutes(mux)
 	s.allowRoutes(mux)
+	s.fileRoutes(mux)
 	return secure(mux)
 }
 

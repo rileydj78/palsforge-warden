@@ -1058,10 +1058,11 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 				uid[p.PlayerUID] = p.UserID
 			}
 		}
-		seen := map[string]int64{}
+		seen, byName := map[string]int64{}, map[string]int64{}
 		if ro, err := s.Store.Roster(); err == nil {
 			for _, p := range ro {
 				seen[p.UserID] = p.LastSeen
+				byName[strings.ToLower(p.Name)] = max(byName[strings.ToLower(p.Name)], p.LastSeen)
 			}
 		}
 		type guildView struct {
@@ -1074,6 +1075,9 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			for _, m := range g.Members {
 				v.LastSeen = max(v.LastSeen, seen[uid[m]])
 			}
+			// PalDefender only links IDs for players it has loaded; the leader's name still
+			// matches Warden's records when nobody in the guild is online.
+			v.LastSeen = max(v.LastSeen, byName[strings.ToLower(g.Admin.Name)])
 			v.Members = nil // IDs stay on the server
 			out = append(out, v)
 		}

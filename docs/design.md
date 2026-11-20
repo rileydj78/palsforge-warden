@@ -31,7 +31,7 @@ for now: the project is too new; Smart App Control blocks unsigned programs).
 | Translations | 1.1 |
 | Character / host-save migration | not planned: Palworld's saves use Oodle, which is proprietary |
 | Discord command bot | done (rc.4): slash commands mapped to Warden roles, audited |
-| File manager | not planned: Warden runs on the machine, and each file worth editing has its page |
+| File manager | done (rc.4): config/mod/PalDefender/log folders, versions kept, bin for deletes |
 
 The full competitor comparison and the parity gaps are in [feature-survey.md](feature-survey.md).
 

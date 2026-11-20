@@ -13,6 +13,11 @@
   days. The owner can delete a base: Warden backs up first (a restore brings it back), then has
   PalDefender remove it, and records what went (buildings, Pals, items) in Activity. Checked
   against a live PalDefender 1.9.3, whose base IDs differ from its docs.
+- **Files** (owner only): the server's config, mod, PalDefender and log folders. Edit text
+  files in the browser (a file changed meanwhile isn't overwritten), upload, download, delete.
+  Every save keeps the previous version (last 20 per file, viewable and restorable), deletes go
+  to Warden's bin, and everything is in Activity. World saves stay with Backups; PalDefender's
+  token folder is never shown; paths can't leave the folders, even through links.
 - Layout pass, graphs, the Inter font, side menu grouped Server / Players / Records / Admin.
 
 ## 1.0.0-rc.3 (2026-11-20)

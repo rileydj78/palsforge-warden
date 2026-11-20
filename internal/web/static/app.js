@@ -71,6 +71,7 @@ function signedIn(out) {
   loadInstances();
   $("adminsnav").hidden = me.role !== "owner";
   $("settingsnav").hidden = me.role !== "owner";
+  $("filesnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
   api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; $("modsnav").hidden = me.role === "moderator"; }).catch(() => {});
@@ -855,11 +856,91 @@ $("setform").addEventListener("submit", async (e) => {
   } catch (err) { $("set-msg").textContent = err.message; }
 });
 
+// ---- files (owner only)
+const fs = { root: "", path: "", open: null };
+const fq = (p) => `root=${encodeURIComponent(fs.root)}&path=${encodeURIComponent(p)}`;
+async function loadFiles() {
+  try {
+    if (!$("f-root").options.length) {
+      const roots = await api("/api/files/roots");
+      for (const r of roots) { const o = el("option", r.name); o.value = r.id; $("f-root").append(o); }
+      if (!roots.length) { $("f-rows").replaceChildren(); toast("None of the folders exist yet on this server."); return; }
+      fs.root = roots[0].id;
+    }
+    const ls = await api(`/api/files/list?${fq(fs.path)}`);
+    const crumbs = $("f-crumbs"); crumbs.replaceChildren();
+    const parts = fs.path ? fs.path.split("/") : [];
+    const go = (p) => { fs.path = p; loadFiles(); };
+    const top = el("button", $("f-root").selectedOptions[0]?.textContent || "Top", "small"); top.type = "button"; top.onclick = () => go(""); crumbs.append(top);
+    parts.forEach((p, i) => { const b = el("button", p, "small"); b.type = "button"; b.onclick = () => go(parts.slice(0, i + 1).join("/")); crumbs.append(" / ", b); });
+    const rows = $("f-rows"); rows.replaceChildren();
+    if (!ls.length) { const tr = el("tr"); const td = el("td", "Empty folder.", "empty"); td.colSpan = 4; tr.append(td); rows.append(tr); }
+    for (const e of ls) {
+      const p = fs.path ? `${fs.path}/${e.name}` : e.name;
+      const tr = el("tr"), acts = el("td", null, "acts");
+      let name;
+      if (e.dir) { name = el("button", e.name + "/", "small"); name.type = "button"; name.onclick = () => go(p); }
+      else name = el("span", e.name);
+      if (!e.dir && e.editable) { const b = el("button", "Edit", "small"); b.type = "button"; b.onclick = () => openFile(p); acts.append(b); }
+      if (!e.dir) { const a = el("a", "Download", "small"); a.href = `/api/files/download?${fq(p)}`; a.setAttribute("download", e.name); acts.append(a); }
+      const del = el("button", "Delete", "small danger"); del.type = "button"; del.setAttribute("aria-label", `Delete ${e.name}`);
+      del.onclick = async () => {
+        if (await ask({ title: `Delete ${e.name}?`, text: "It's moved to Warden's bin (in Warden's data folder), so it can be put back by hand.", ok: "Delete" }) == null) return;
+        try { await api("/api/files/trash", { root: fs.root, path: p }); toast("Moved to Warden's bin."); loadFiles(); } catch (err) { toast(err.message); }
+      };
+      acts.append(del);
+      const td = el("td"); td.append(name);
+      tr.append(td, el("td", e.dir ? "" : size(e.size), "num"), el("td", when(e.modified)), acts);
+      rows.append(tr);
+    }
+  } catch (e) { toast(e.message); }
+}
+async function openFile(p) {
+  try {
+    const r = await api(`/api/files/text?${fq(p)}`);
+    fs.open = { path: p, modified: r.modified };
+    $("f-edit-name").textContent = p; $("f-text").value = r.text; $("f-edit").hidden = false; $("f-edit-note").textContent = "";
+    if (/PalWorldSettings\.ini$/i.test(p)) $("f-edit-note").textContent = "Tip: the Game settings page edits this file with explanations, and keeps it valid.";
+    const vs = await api(`/api/files/versions?${fq(p)}`), sel = $("f-vers");
+    sel.replaceChildren(el("option", vs.length ? "Earlier versions…" : "No earlier versions")); sel.options[0].value = "";
+    for (const v of vs) { const o = el("option", v.replace(/^(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d).*/, "$1-$2-$3 $4:$5:$6")); o.value = v; sel.append(o); }
+    $("f-edit").scrollIntoView({ block: "start" }); $("f-text").focus({ preventScroll: true });
+  } catch (e) { toast(e.message); }
+}
+$("f-root").addEventListener("change", () => { fs.root = $("f-root").value; fs.path = ""; $("f-edit").hidden = true; loadFiles(); });
+$("f-close").addEventListener("click", () => { $("f-edit").hidden = true; fs.open = null; });
+$("f-save").addEventListener("click", async () => {
+  if (!fs.open) return;
+  try {
+    await api("/api/files/text", { root: fs.root, path: fs.open.path, text: $("f-text").value, modified: fs.open.modified });
+    toast("Saved. The previous version is kept."); await openFile(fs.open.path); loadFiles();
+  } catch (e) { $("f-edit-note").textContent = e.message; }
+});
+$("f-vers").addEventListener("change", async () => {
+  const v = $("f-vers").value; if (!v || !fs.open) return;
+  try {
+    const r = await api(`/api/files/version?${fq(fs.open.path)}&v=${encodeURIComponent(v)}`);
+    $("f-text").value = r.text; $("f-edit-note").textContent = "An earlier version is shown. Save to put it back (the current one is kept too).";
+  } catch (e) { toast(e.message); }
+});
+$("f-up").addEventListener("click", () => $("f-file").click());
+$("f-file").addEventListener("change", async () => {
+  for (const f of $("f-file").files) {
+    const p = fs.path ? `${fs.path}/${f.name}` : f.name;
+    try {
+      const r = await fetch(`/api/files/upload?${fq(p)}`, { method: "POST", headers: { "Content-Type": "application/octet-stream", "X-CSRF": csrf }, body: f });
+      if (!r.ok) { let m = `Warden answered ${r.status}`; try { m = (await r.json()).error || m; } catch (e) {} throw new Error(m); }
+      toast(`Uploaded ${f.name}.`);
+    } catch (e) { toast(`${f.name}: ${e.message}`); }
+  }
+  $("f-file").value = ""; loadFiles();
+});
+
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
   const vv = v.split("?")[0];
-  const view = ["commands", "players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods", "guilds", "player"].includes(vv) ? vv : "dash";
+  const view = ["commands", "players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods", "guilds", "player", "files"].includes(vv) ? vv : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -875,6 +956,7 @@ function route() {
   if (view === "map") drawMap();
   if (view === "mods") loadMods();
   if (view === "guilds") loadGuilds();
+  if (view === "files") loadFiles();
   if (view === "player") loadPlayer(new URLSearchParams(v.split("?")[1] || "").get("id"));
 }
 window.addEventListener("hashchange", route);

@@ -40,6 +40,7 @@
     <span class="navhead">Admin</span>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Accounts</a>
     <a href="#/settings" data-view="settings" id="settingsnav" hidden>Warden settings</a>
+    <a href="#/files" data-view="files" id="filesnav" hidden>Files</a>
   </nav>
   <main id="main">
     <section id="view-dash" class="view">
@@ -325,6 +326,24 @@
         <div class="row"><button class="btn primary" type="submit">Save and restart Warden</button></div>
         <p class="msg" id="set-msg" role="alert"></p>
       </form>
+    </section>
+
+    <section id="view-files" class="view" hidden>
+      <h1>Files</h1>
+      <p class="sub">The server's config, mod, PalDefender and log folders. Saving keeps the previous version (the last 20 of each file), and deleting moves a file to Warden's bin, so nothing here is final. World saves aren't here: use Backups.</p>
+      <div class="row start"><label for="f-root">Folder</label><select id="f-root"></select>
+        <button class="btn" type="button" id="f-up">Upload…</button><input type="file" id="f-file" hidden multiple></div>
+      <nav aria-label="Folder path" class="note" id="f-crumbs"></nav>
+      <section class="card form full" id="f-edit" hidden>
+        <h2 id="f-edit-name"></h2>
+        <label for="f-text" class="sr">File contents</label><textarea id="f-text" rows="22" spellcheck="false" class="mono"></textarea>
+        <div class="row start"><button class="btn primary" type="button" id="f-save">Save</button><button class="btn" type="button" id="f-close">Close</button>
+          <label for="f-vers" class="sr">Earlier versions</label><select id="f-vers"><option value="">Earlier versions…</option></select></div>
+        <p class="note" id="f-edit-note"></p>
+      </section>
+      <div class="card" id="f-list-card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
+        <thead><tr><th>Name</th><th>Size</th><th>Changed</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody id="f-rows"></tbody></table></div></div>
     </section>
 
     <section id="view-admins" class="view" hidden>
