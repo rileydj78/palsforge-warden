@@ -31,7 +31,8 @@ func main() {
 		return
 	}
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")
-	listen := flag.String("listen", "127.0.0.1:8282", "where the panel listens (loopback only)")
+	listen := flag.String("listen", "127.0.0.1:8282", "the local panel: this machine only, no sign-in")
+	adminListen := flag.String("admin-listen", "127.0.0.1:8283", "the administration port for remote admins (sign-in required); warden remote on publishes it")
 	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")
 	flag.Parse()
@@ -67,7 +68,7 @@ func main() {
 	}
 	if err := os.MkdirAll(*dataDir, 0o700); err == nil {
 		if f, err := os.OpenFile(filepath.Join(*dataDir, "warden.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
-			log.SetOutput(io.MultiWriter(os.Stderr, f)) // a service has no console: the log file is where the setup code is
+			log.SetOutput(io.MultiWriter(os.Stderr, f)) // a service has no console
 		}
 	}
 	st2, err := store.Open(*dataDir)
@@ -79,8 +80,8 @@ func main() {
 		log.Fatalf("could not read Warden's accounts: %v", err)
 	}
 	srv.Store, srv.Auth = st2, au
-	if au.SetupCode != "" {
-		log.Printf("FIRST RUN: open the panel and create the owner account with this setup code: %s", au.SetupCode)
+	if n, _ := au.UserCount(); n == 0 {
+		log.Printf("no remote accounts yet: on this machine, open the panel (Start menu: Palsforge Warden) and add them under Admins")
 	}
 	go monitor.Run(context.Background(), game, st2)
 
@@ -122,6 +123,6 @@ func main() {
 		log.Printf("server control: %s mode; nightly routine %s", wcfg.Control.Mode, map[bool]string{true: "at " + wcfg.Nightly.Time, false: "off"}[wcfg.Nightly.Enabled])
 	}
 	srv.Settings = &web.Settings{DataDir: *dataDir, Restart: restartSelf}
-	log.Printf("Warden %s: panel on http://%s/ (this machine only); data in %s", version, *listen, *dataDir)
-	log.Fatal(srv.Listen(*listen))
+	log.Printf("Warden %s: panel on http://%s/ (this machine only, no sign-in); administration port %s (sign-in); data in %s", version, *listen, *adminListen, *dataDir)
+	log.Fatal(srv.Listen(*listen, *adminListen))
 }

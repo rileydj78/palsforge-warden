@@ -18,31 +18,29 @@ func newAuth(t *testing.T) *Auth {
 	return a
 }
 
-func TestOwnerNeedsSetupCode(t *testing.T) {
+func TestAccountsAndRemoval(t *testing.T) {
 	a := newAuth(t)
-	if a.SetupCode == "" {
-		t.Fatal("a fresh install needs a setup code")
-	}
-	if err := a.CreateOwner("wrong", "moss", "correct horse battery"); err == nil {
-		t.Fatal("a wrong setup code must be refused")
-	}
-	if err := a.CreateOwner(a.SetupCode, "moss", "short"); err == nil {
+	if err := a.AddUser("moss", "short", Admin); err == nil {
 		t.Fatal("a short password must be refused")
 	}
-	if err := a.CreateOwner(a.SetupCode, "moss", "correct horse battery"); err != nil {
+	if err := a.AddUser("moss", "correct horse battery", Owner); err != nil {
 		t.Fatal(err)
 	}
-	if a.SetupCode != "" {
-		t.Fatal("the setup code must be used up")
+	tok, _, err := a.Login("moss", "correct horse battery")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if err := a.CreateOwner("anything", "eve", "correct horse battery"); err == nil {
-		t.Fatal("a second owner must be refused")
+	if err := a.RemoveUser("moss"); err != nil || a.Session(tok) != nil {
+		t.Fatal("removing an account must end its sessions")
+	}
+	if a.RemoveUser("nobody") == nil {
+		t.Fatal("removing a missing account is an error")
 	}
 }
 
 func TestLoginLockout(t *testing.T) {
 	a := newAuth(t)
-	a.CreateOwner(a.SetupCode, "moss", "correct horse battery")
+	a.AddUser("moss", "correct horse battery", Owner)
 	tok, s, err := a.Login("moss", "correct horse battery")
 	if err != nil || tok == "" || s.User.Role != Owner || s.CSRF == "" {
 		t.Fatalf("login: %v", err)

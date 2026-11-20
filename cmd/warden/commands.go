@@ -47,9 +47,10 @@ const usage = `Palsforge Warden: an admin panel for a Palworld dedicated server.
   warden install -server <folder>    start Warden with Windows (a background task)
   warden uninstall                   stop starting it with Windows
   warden open                        open the panel in its own window
-  warden remote on|off               show the panel to your Tailscale devices (never the internet)
+  warden remote on|off               let remote admins sign in over your Tailscale network (never the internet)
 
-Options: -data <folder> (Warden's own data), -listen 127.0.0.1:<port>, -check.
+Options: -data <folder> (Warden's own data), -listen 127.0.0.1:<port> (local, no sign-in),
+-admin-listen 127.0.0.1:<port> (remote admins, sign-in), -check.
 `
 
 func listenFrom(args []string) string {
@@ -129,7 +130,6 @@ WantedBy=multi-user.target
 	} else {
 		fmt.Printf("Warden will now start with Windows, and it's starting now.\nOpen the panel with: \"%s\" open\n", exe)
 	}
-	fmt.Println("The first time, it asks for a setup code: it's in warden.log in Warden's data folder (C:\\ProgramData\\Warden).")
 	return nil
 }
 
@@ -184,7 +184,11 @@ func remote(args []string) error {
 	}
 	var cmd *exec.Cmd
 	if args[0] == "on" {
-		cmd = exec.Command(ts, "serve", "--bg", "--https=8443", "http://"+listenFrom(args[1:]))
+		admin := flagValue(args[1:], "admin-listen")
+		if admin == "" {
+			admin = "127.0.0.1:8283"
+		}
+		cmd = exec.Command(ts, "serve", "--bg", "--https=8443", "http://"+admin) // the sign-in port, never the local one
 	} else {
 		cmd = exec.Command(ts, "serve", "--https=8443", "off")
 	}

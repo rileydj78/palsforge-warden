@@ -28,8 +28,9 @@ internet, and Palworld's admin password never leaves the server.
 - **Runs the server for you, or works alongside what you have:** Warden can start the server
   itself and restart it after a crash, or work with an existing service, scheduled task or
   watchdog script.
-- **Logins and an audit log:** an owner account, admins and moderators (moderators can announce
-  and kick, not ban or stop the server), and a record of who did what.
+- **No sign-in on the server, accounts for remote admins:** at the machine you're the owner; for
+  others you create moderator, admin or owner accounts that sign in over Tailscale. Every action
+  is in the audit log.
 
 ## Install (Windows)
 
@@ -41,14 +42,15 @@ internet, and Palworld's admin password never leaves the server.
    ```
    Warden now starts with Windows. Its data, logs and backups live in `C:\ProgramData\Warden`.
 3. Open the panel from the Start menu (**Palsforge Warden**), or run `C:\Warden\warden.exe open`.
-   The first time, it asks for a **setup code**: it's in
-   `C:\ProgramData\Warden\warden.log`. Create the owner account.
+   On the server machine there's no account or password: whoever is at the machine is the owner.
 4. In **Settings**, choose a second place for backups, the nightly time, and SteamCMD's location,
    then turn the nightly routine on. (It's off until you've looked at the settings.)
 
-**Remote access:** install [Tailscale](https://tailscale.com) on the server and on your phone or
-laptop, then run `warden remote on`. The panel appears on your Tailscale network only, at port
-8443. `warden remote off` takes it away again.
+**Remote admins:** in **Accounts**, add an account for each person (moderator, admin or owner).
+Install [Tailscale](https://tailscale.com) on the server and on their devices, then run
+`warden remote on`: the administration port (sign-in required) appears on your Tailscale network
+only, at port 8443. The no-sign-in local panel is never published. `warden remote off` takes it
+away again.
 
 **Already have a watchdog script or service?** In Settings choose "Another program runs it", give
 the command that starts it, and (if your script stops when a file exists) that file. Warden then

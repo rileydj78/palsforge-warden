@@ -13,8 +13,8 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
-	"log"
 	"math"
 	"net"
 	"net/http"
@@ -45,6 +45,7 @@ type Server struct {
 	Settings *Settings
 	PalDef   *paldefender.Client // nil unless PalDefender is connected
 	mu       sync.Mutex
+	local    *auth.Session // the local port's session: the owner, at the server
 	last     *Status
 	lastAt   time.Time
 }
@@ -163,7 +164,26 @@ func sameOrigin(r *http.Request) bool {
 	return o == "http://"+r.Host || o == "https://"+r.Host
 }
 
+type ctxKey int
+
+const localKey ctxKey = 1
+
+// onLocalPort says the request came in on the local port (this machine, no sign-in).
+func onLocalPort(r *http.Request) bool { v, _ := r.Context().Value(localKey).(bool); return v }
+
+func (s *Server) localSession() *auth.Session {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.local == nil {
+		s.local = &auth.Session{User: auth.User{Name: "owner (on the server)", Role: auth.Owner}, CSRF: auth.NewToken(24)}
+	}
+	return s.local
+}
+
 func (s *Server) session(r *http.Request) *auth.Session {
+	if onLocalPort(r) { // whoever is at the server machine is its rightful operator
+		return s.localSession()
+	}
 	c, err := r.Cookie(cookieName)
 	if err != nil {
 		return nil
@@ -212,24 +232,11 @@ func (s *Server) Handler() http.Handler {
 
 	mux.HandleFunc("GET /api/me", func(w http.ResponseWriter, r *http.Request) {
 		if ses := s.session(r); ses != nil {
-			writeJSON(w, 200, map[string]any{"user": ses.User, "csrf": ses.CSRF})
+			writeJSON(w, 200, map[string]any{"user": ses.User, "csrf": ses.CSRF, "local": onLocalPort(r)})
 			return
 		}
-		writeJSON(w, 200, map[string]any{"user": nil, "setupNeeded": s.Auth.SetupCode != ""})
-	})
-	mux.HandleFunc("POST /api/setup", func(w http.ResponseWriter, r *http.Request) {
-		var in struct{ Code, Name, Password string }
-		if !sameOrigin(r) || readJSON(r, &in) != nil {
-			fail(w, 400, "bad request")
-			return
-		}
-		name := strings.TrimSpace(in.Name)
-		if err := s.Auth.CreateOwner(strings.TrimSpace(in.Code), name, in.Password); err != nil {
-			fail(w, 400, err.Error())
-			return
-		}
-		s.Store.Audit(name, "setup", "", "created the owner account", true)
-		s.signIn(w, r, name, in.Password)
+		n, _ := s.Auth.UserCount()
+		writeJSON(w, 200, map[string]any{"user": nil, "accounts": n})
 	})
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Name, Password string }
@@ -240,8 +247,9 @@ func (s *Server) Handler() http.Handler {
 		s.signIn(w, r, strings.TrimSpace(in.Name), in.Password)
 	})
 	mux.HandleFunc("POST /api/logout", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
-		c, _ := r.Cookie(cookieName)
-		s.Auth.Logout(c.Value)
+		if c, err := r.Cookie(cookieName); err == nil {
+			s.Auth.Logout(c.Value)
+		}
 		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
@@ -277,6 +285,20 @@ func (s *Server) Handler() http.Handler {
 		}
 		writeJSON(w, 200, a)
 	}))
+	mux.HandleFunc("POST /api/users/remove", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Name string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := s.Auth.RemoveUser(in.Name)
+		s.Store.Audit(ses.User.Name, "remove account", in.Name, "", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("GET /api/users", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		u, err := s.Auth.Users()
 		if err != nil {
@@ -292,7 +314,7 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		err := s.Auth.AddUser(strings.TrimSpace(in.Name), in.Password, in.Role)
-		s.Store.Audit(ses.User.Name, "add admin", in.Name, in.Role, err == nil)
+		s.Store.Audit(ses.User.Name, "add account", in.Name, in.Role, err == nil)
 		if err != nil {
 			fail(w, 400, err.Error())
 			return
@@ -439,6 +461,31 @@ func clientAddr(r *http.Request) string {
 	return host
 }
 
+// isLocal says the request comes from the server machine itself: a direct loopback connection,
+// addressed to a loopback name, not forwarded by tailscale serve or any other proxy.
+func isLocal(r *http.Request) bool {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip := net.ParseIP(host)
+	if ip == nil || !ip.IsLoopback() {
+		return false
+	}
+	for _, h := range []string{"X-Forwarded-For", "X-Forwarded-Host", "Forwarded", "Tailscale-User-Login", "X-Real-Ip"} {
+		if r.Header.Get(h) != "" {
+			return false
+		}
+	}
+	h := r.Host
+	if hh, _, err := net.SplitHostPort(h); err == nil {
+		h = hh
+	}
+	h = strings.Trim(strings.ToLower(h), "[]")
+	if h == "localhost" {
+		return true
+	}
+	hip := net.ParseIP(h)
+	return hip != nil && hip.IsLoopback()
+}
+
 // hostOK refuses requests addressed to any other name (DNS rebinding): only this machine and
 // its own Tailscale name may be used.
 func hostOK(h string) bool {
@@ -454,16 +501,26 @@ func hostOK(h string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
-// Listen serves on addr, which must be a loopback address.
-func (s *Server) Listen(addr string) error {
+// localOnly wraps the local port: requests must come straight from this machine (not forwarded by
+// tailscale serve or any other proxy), and then they act as the owner without signing in.
+func localOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !isLocal(r) {
+			http.Error(w, "This port is for the server machine only. Remote admins use the administration port (warden remote on).", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), localKey, true)))
+	})
+}
+
+func listen(addr string) (net.Listener, error) {
 	host, _, err := net.SplitHostPort(addr)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if ip := net.ParseIP(host); ip == nil || !ip.IsLoopback() {
-		log.Fatalf("refusing to listen on %s: Warden listens on 127.0.0.1 only (use tailscale serve for remote access)", addr)
+		return nil, fmt.Errorf("refusing to listen on %s: Warden listens on 127.0.0.1 only (remote access goes through tailscale serve)", addr)
 	}
-	srv := &http.Server{Addr: addr, Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
 	var ln net.Listener
 	for i := 0; ; i++ { // after a restart the old process may hold the port for a moment
 		if ln, err = net.Listen("tcp", addr); err == nil || i == 20 {
@@ -471,8 +528,27 @@ func (s *Server) Listen(addr string) error {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
+	return ln, err
+}
+
+// Listen serves the panel on two loopback ports: local (this machine, no sign-in, full owner
+// control) and admin (what tailscale serve publishes; every request needs a signed-in account).
+func (s *Server) Listen(localAddr, adminAddr string) error {
+	h := s.Handler()
+	lln, err := listen(localAddr)
 	if err != nil {
 		return err
 	}
-	return srv.Serve(ln)
+	aln, err := listen(adminAddr)
+	if err != nil {
+		return err
+	}
+	errs := make(chan error, 2)
+	go func() {
+		errs <- (&http.Server{Handler: localOnly(h), ReadHeaderTimeout: 10 * time.Second}).Serve(lln)
+	}()
+	go func() {
+		errs <- (&http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}).Serve(aln)
+	}()
+	return <-errs
 }

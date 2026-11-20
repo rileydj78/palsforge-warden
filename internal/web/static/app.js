@@ -34,21 +34,18 @@ async function api(path, body) {
 }
 
 // ---- sign-in and first-run setup
-function showGate(setup) {
+function showGate(noAccounts) {
   $("layout").hidden = true; $("signout").hidden = true; $("state").hidden = true; $("gate").hidden = false;
-  $("codewrap").hidden = !setup;
-  $("gatetitle").textContent = setup ? "Set up Warden" : "Sign in";
-  $("gatesub").textContent = setup ? "Create the owner account. You'll need the setup code Warden printed when it started." : "";
-  $("gatebtn").textContent = setup ? "Create the owner account" : "Sign in";
-  $("g-pw").autocomplete = setup ? "new-password" : "current-password";
-  $("gate").dataset.setup = setup ? "1" : "";
+  $("gatetitle").textContent = "Sign in";
+  $("gatesub").textContent = noAccounts ? "There are no accounts yet. The owner adds them on the server machine (Start menu: Palsforge Warden → Admins)." : "";
+  for (const id of ["g-name", "g-pw", "gatebtn"]) $(id).hidden = !!noAccounts;
+  for (const l of document.querySelectorAll("#gateform label")) l.hidden = !!noAccounts;
   $("g-name").focus();
 }
 $("gateform").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const setup = $("gate").dataset.setup === "1";
   try {
-    const out = await api(setup ? "/api/setup" : "/api/login", { code: $("g-code").value, name: $("g-name").value, password: $("g-pw").value });
+    const out = await api("/api/login", { name: $("g-name").value, password: $("g-pw").value });
     $("g-pw").value = ""; $("gatemsg").textContent = "";
     signedIn(out);
   } catch (err) { $("gatemsg").textContent = err.message; }
@@ -59,6 +56,7 @@ function signedIn(out) {
   me = out.user; csrf = out.csrf;
   $("gate").hidden = true; $("layout").hidden = false; $("signout").hidden = false; $("state").hidden = false;
   $("signout").textContent = `Sign out (${me.name})`;
+  $("signout").hidden = !!out.local; // on the server machine there's nobody to sign out
   $("adminsnav").hidden = me.role !== "owner";
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
@@ -226,7 +224,13 @@ async function loadAudit() {
 async function loadUsers() {
   try {
     const u = await api("/api/users"); const rows = $("userrows"); rows.replaceChildren();
-    for (const x of u) { const tr = el("tr"); tr.append(el("td", x.name, "strong"), el("td", x.role), el("td", when(x.created)), el("td", when(x.lastLogin))); rows.append(tr); }
+    if (!u.length) { const tr = el("tr"); const td = el("td", "No remote accounts yet. On this machine you never need one.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+    for (const x of u) {
+      const tr = el("tr"), acts = el("td", null, "acts"), b = el("button", "Remove", "small danger");
+      b.onclick = async () => { const ok = await ask({ title: `Remove ${x.name}?`, text: "They're signed out at once and can't sign in again.", label: "Type REMOVE to confirm", confirmWord: "REMOVE", ok: "Remove" }); if (ok == null) return; try { await api("/api/users/remove", { name: x.name }); toast("Removed."); loadUsers(); } catch (e) { toast(e.message); } };
+      acts.append(b);
+      tr.append(el("td", x.name, "strong"), el("td", x.role), el("td", when(x.created)), el("td", when(x.lastLogin)), acts); rows.append(tr);
+    }
   } catch (e) {}
 }
 $("adduser").addEventListener("submit", async (e) => {
@@ -535,7 +539,7 @@ async function refresh() {
 (async function start() {
   try {
     const out = await api("/api/me");
-    if (out.user) signedIn(out); else showGate(out.setupNeeded);
+    if (out.user) signedIn(out); else showGate(out.accounts === 0);
   } catch (e) { showGate(false); }
   setInterval(() => { if (me && !$("layout").hidden) refresh(); }, 10000);
   setInterval(() => { if (me && !$("layout").hidden) history(); }, 60000);

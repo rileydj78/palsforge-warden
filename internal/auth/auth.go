@@ -1,9 +1,8 @@
 // Package auth: admin accounts, sign-in and sessions.
 //
 //   - Passwords are hashed with Argon2id; only the hash is stored.
-//   - The very first account (the owner) can only be created with a one-time setup code that
-//     Warden prints on the server's console and log, so nobody who merely reaches the panel first
-//     can claim it.
+//   - There is no first-run account: whoever is at the server machine uses the local port as the
+//     owner without signing in. Accounts are for remote admins; the owner creates them.
 //   - Sessions are random tokens in an HttpOnly, SameSite=Strict cookie; every change also needs
 //     the session's CSRF token in a header.
 //   - Five wrong passwords in a row lock sign-in for a minute.
@@ -50,25 +49,20 @@ type Session struct {
 
 // Auth manages accounts and sessions.
 type Auth struct {
-	DB        *sql.DB
-	SetupCode string // shown on the console until the owner exists
-	mu        sync.Mutex
-	sessions  map[string]*Session
-	attempts  map[string]*attempt
+	DB       *sql.DB
+	mu       sync.Mutex
+	sessions map[string]*Session
+	attempts map[string]*attempt
 }
 
 // SessionLife is how long a sign-in lasts.
 const SessionLife = 12 * time.Hour
 
-// New prepares auth; it makes a setup code if there is no owner yet.
+// New prepares auth.
 func New(db *sql.DB) (*Auth, error) {
 	a := &Auth{DB: db, sessions: map[string]*Session{}}
-	n, err := a.UserCount()
-	if err != nil {
+	if _, err := a.UserCount(); err != nil { // the database is readable
 		return nil, err
-	}
-	if n == 0 {
-		a.SetupCode = token(6)
 	}
 	return a, nil
 }
@@ -124,27 +118,32 @@ func validName(n string) bool {
 	return true
 }
 
-// CreateOwner makes the first account, given the setup code.
-func (a *Auth) CreateOwner(code, name, pw string) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if a.SetupCode == "" {
-		return errors.New("Warden is already set up")
-	}
-	if subtle.ConstantTimeCompare([]byte(code), []byte(a.SetupCode)) != 1 {
-		return errors.New("that setup code isn't right; it is printed in Warden's console and log")
-	}
-	if err := a.addUser(name, pw, Owner); err != nil {
+// NewToken returns a random token (for the local port's session).
+func NewToken(n int) string { return token(n) }
+
+// RemoveUser deletes an account and ends its sessions.
+func (a *Auth) RemoveUser(name string) error {
+	res, err := a.DB.Exec(`DELETE FROM users WHERE name=?`, name)
+	if err != nil {
 		return err
 	}
-	a.SetupCode = ""
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("no such account")
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	for t, ses := range a.sessions {
+		if ses.User.Name == name {
+			delete(a.sessions, t)
+		}
+	}
 	return nil
 }
 
-// AddUser makes another admin (the owner does this).
+// AddUser makes an account for a remote admin (the owner does this).
 func (a *Auth) AddUser(name, pw, role string) error {
-	if role != Admin && role != Moderator {
-		return errors.New("role must be admin or moderator")
+	if role != Admin && role != Moderator && role != Owner {
+		return errors.New("role must be moderator, admin or owner")
 	}
 	return a.addUser(name, pw, role)
 }

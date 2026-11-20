@@ -89,21 +89,22 @@ func setup(t *testing.T) (*client, *fakeGame, *auth.Auth) {
 	return &client{t: t, base: ts.URL, http: &http.Client{Jar: jar}}, fg, au
 }
 
-func TestFirstRunSignInAndCSRF(t *testing.T) {
+func TestAdminPortNeedsAccounts(t *testing.T) {
 	c, fg, au := setup(t)
 	code, me := c.do("GET", "/api/me", nil, false)
-	if code != 200 || me["setupNeeded"] != true {
-		t.Fatalf("a fresh install should ask for setup: %v", me)
+	if code != 200 || me["user"] != nil || me["accounts"] != float64(0) {
+		t.Fatalf("the admin port starts with nobody signed in and no accounts: %v", me)
 	}
 	if code, _ := c.do("GET", "/api/status", nil, false); code != 401 {
-		t.Fatalf("status without sign-in should be refused, got %d", code)
+		t.Fatalf("status without sign-in must be refused, got %d", code)
 	}
-	if code, _ := c.do("POST", "/api/setup", map[string]string{"code": "nope", "name": "moss", "password": "correct horse battery"}, false); code != 400 {
-		t.Fatal("a wrong setup code must be refused")
+	if code, _ := c.do("POST", "/api/setup", map[string]string{"name": "eve", "password": "correct horse battery"}, false); code == 200 {
+		t.Fatal("there is no remote setup: nobody can claim Warden from the admin port")
 	}
-	code, out := c.do("POST", "/api/setup", map[string]string{"code": au.SetupCode, "name": "moss", "password": "correct horse battery"}, false)
+	au.AddUser("moss", "correct horse battery", auth.Owner)
+	code, out := c.do("POST", "/api/login", map[string]string{"name": "moss", "password": "correct horse battery"}, false)
 	if code != 200 || out["csrf"] == nil {
-		t.Fatalf("setup failed: %d %v", code, out)
+		t.Fatalf("login failed: %d %v", code, out)
 	}
 	c.csrf = out["csrf"].(string)
 	code, st := c.do("GET", "/api/status", nil, false)
@@ -113,7 +114,6 @@ func TestFirstRunSignInAndCSRF(t *testing.T) {
 	if strings.Contains(fmt.Sprint(st), "10.0.0.9") {
 		t.Fatal("player IP addresses must never reach the browser")
 	}
-	// A change without the CSRF token is refused and never reaches the game.
 	if code, _ := c.do("POST", "/api/action/announce", map[string]string{"message": "hi"}, false); code != 403 {
 		t.Fatalf("missing CSRF must be refused, got %d", code)
 	}
@@ -125,15 +125,39 @@ func TestFirstRunSignInAndCSRF(t *testing.T) {
 	if code, _ := c.do("POST", "/api/action/announce", map[string]string{"message": "Boss raid at 8"}, true); code != 200 {
 		t.Fatalf("announce with CSRF should work, got %d", code)
 	}
-	code, _ = c.do("GET", "/api/audit", nil, false)
-	if code != 200 {
-		t.Fatal("audit log should be readable")
+}
+
+func TestLocalPortIsTheOwnerWithoutSignIn(t *testing.T) {
+	st, _ := store.Open(t.TempDir())
+	au, _ := auth.New(st.DB)
+	fg := &fakeGame{}
+	s := &Server{Game: fg.start(t), Store: st, Auth: au, Version: "test"}
+	ts := httptest.NewServer(localOnly(s.Handler()))
+	t.Cleanup(ts.Close)
+	jar, _ := cookiejar.New(nil)
+	c := &client{t: t, base: ts.URL, http: &http.Client{Jar: jar}}
+	code, me := c.do("GET", "/api/me", nil, false)
+	user, _ := me["user"].(map[string]any)
+	if code != 200 || user["role"] != "owner" || me["local"] != true {
+		t.Fatalf("the local port is the owner: %v", me)
+	}
+	c.csrf = me["csrf"].(string)
+	if code, _ := c.do("POST", "/api/users", map[string]string{"name": "friend", "password": "another long password", "role": "admin"}, true); code != 200 {
+		t.Fatalf("the owner adds remote accounts from the local port, got %d", code)
+	}
+	if code, _ := c.do("POST", "/api/action/save", map[string]string{}, false); code != 403 {
+		t.Fatal("the local port still needs the CSRF token (other web pages on this machine)")
+	}
+	req, _ := http.NewRequest("GET", ts.URL+"/api/me", nil)
+	req.Header.Set("X-Forwarded-For", "100.64.0.9")
+	if resp, err := http.DefaultClient.Do(req); err != nil || resp.StatusCode != 403 {
+		t.Fatal("a request forwarded from elsewhere must never get the local port's owner rights")
 	}
 }
 
 func TestModeratorCannotBan(t *testing.T) {
 	c, _, au := setup(t)
-	au.CreateOwner(au.SetupCode, "owner", "correct horse battery")
+	au.AddUser("owner", "correct horse battery", auth.Owner)
 	if err := au.AddUser("mod", "another long password", auth.Moderator); err != nil {
 		t.Fatal(err)
 	}
