@@ -1050,7 +1050,84 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			fail(w, 502, err.Error())
 			return
 		}
-		writeJSON(w, 200, gs)
+		// When each guild was last played: the latest "last seen" of its members (PalDefender
+		// links its PlayerUIDs to user IDs; Warden's roster knows when each was last online).
+		uid := map[string]string{}
+		if ps, err := s.PalDef.Players(ctx); err == nil {
+			for _, p := range ps {
+				uid[p.PlayerUID] = p.UserID
+			}
+		}
+		seen := map[string]int64{}
+		if ro, err := s.Store.Roster(); err == nil {
+			for _, p := range ro {
+				seen[p.UserID] = p.LastSeen
+			}
+		}
+		type guildView struct {
+			paldefender.Guild
+			LastSeen int64 `json:"lastSeen"` // unix seconds; 0 = unknown
+		}
+		out := make([]guildView, 0, len(gs))
+		for _, g := range gs {
+			v := guildView{Guild: g}
+			for _, m := range g.Members {
+				v.LastSeen = max(v.LastSeen, seen[uid[m]])
+			}
+			v.Members = nil // IDs stay on the server
+			out = append(out, v)
+		}
+		writeJSON(w, 200, out)
+	}))
+	// Deleting a base: owner only, a fresh backup first (a restore brings it back), audited.
+	mux.HandleFunc("POST /api/guilds/delete-base", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		if !need(w) {
+			return
+		}
+		var in struct {
+			Camp  string `json:"camp"`
+			Guild string `json:"guild"`
+		}
+		if readJSON(r, &in) != nil || in.Camp == "" || len(in.Camp) > 40 {
+			fail(w, 400, "which base?")
+			return
+		}
+		in.Guild = cleanText(in.Guild, 80)
+		c := s.Control
+		if c == nil || c.Runner == nil || c.Runner.Backups == nil {
+			fail(w, 409, "this needs Warden's backups set up, so the base can be brought back")
+			return
+		}
+		end, err := c.Runner.Begin("deleting a base")
+		if err != nil {
+			fail(w, 409, err.Error())
+			return
+		}
+		defer end()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		s.Game.Save(ctx)
+		b := *c.Runner.Backups
+		b.Cfg.Backups.Image = "off"
+		names, err := b.MakeAll(ctx)
+		if err != nil {
+			s.Store.Audit(ses.User.Name, "delete base", in.Guild, "backup failed, base kept", false)
+			fail(w, 502, "the backup before deleting failed, so the base was kept: "+err.Error())
+			return
+		}
+		dctx, dcancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer dcancel()
+		res, err := s.PalDef.DeleteBase(dctx, in.Camp)
+		detail := "backup " + strings.Join(names, ", ")
+		if res != nil {
+			detail = fmt.Sprintf("%d buildings, %d Pals, %d items; %s", res.Deleted.Buildings, res.Deleted.Pals, res.Deleted.ItemCount, detail)
+		}
+		s.Store.Audit(ses.User.Name, "delete base", in.Guild+" ("+in.Camp+")", detail, err == nil)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "backup": names, "deleted": res.Deleted})
 	}))
 	mux.HandleFunc("GET /api/players/detail", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		if !need(w) {

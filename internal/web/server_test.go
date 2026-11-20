@@ -316,3 +316,14 @@ func TestDiscordBotCallsAreLimitedAndAudited(t *testing.T) {
 		t.Fatalf("plain HTTP should need sign-in: %v %v", resp.StatusCode, err)
 	}
 }
+
+func TestDeleteBaseIsOwnerOnly(t *testing.T) {
+	st, _ := store.Open(t.TempDir())
+	au, _ := auth.New(st.DB)
+	s := &Server{Game: (&fakeGame{}).start(t), Store: st, Auth: au, Version: "test"}
+	for _, role := range []string{auth.Moderator, auth.Admin} {
+		if code, _ := s.BotCall(t.Context(), role, "discord:x", "POST", "/api/guilds/delete-base", map[string]any{"camp": "13b9e8d7-4f2c-42a1-b79e-fc2a9186e4d5"}); code != 403 && code != 404 {
+			t.Fatalf("%s: %d", role, code)
+		}
+	}
+}

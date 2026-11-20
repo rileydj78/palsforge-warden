@@ -215,7 +215,72 @@ type Guild struct {
 		ID     string `json:"id"`
 		MapPos Loc    `json:"map_pos"`
 	} `json:"camps"`
-	MemberCount int `json:"member_count"`
+	MemberCount int     `json:"member_count"`
+	Members     Members `json:"members"` // PlayerUIDs
+}
+
+// Members are a guild's PlayerUIDs. The docs say a list; versions seen in the wild send an
+// object keyed by PlayerUID (or with an id in each value), so all three are read.
+type Members []string
+
+func (m *Members) UnmarshalJSON(b []byte) error {
+	var list []string
+	if json.Unmarshal(b, &list) == nil {
+		*m = list
+		return nil
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(b, &obj); err != nil {
+		*m = nil
+		return nil // an unknown shape just means "members unknown"
+	}
+	out := Members{}
+	for k, v := range obj {
+		var inner struct {
+			ID  string `json:"id"`
+			UID string `json:"PlayerUID"`
+		}
+		if json.Unmarshal(v, &inner) == nil && (inner.ID != "" || inner.UID != "") {
+			out = append(out, inner.UID+inner.ID)
+			continue
+		}
+		out = append(out, k)
+	}
+	*m = out
+	return nil
+}
+
+var hex32 = regexp.MustCompile(`^[0-9A-Fa-f]{32}$`)
+
+// DeleteResult is what PalDefender removed with a base (it also keeps its own archive).
+type DeleteResult struct {
+	BaseCamp struct {
+		ID      string `json:"Id"`
+		Summary string `json:"Summary"`
+	} `json:"BaseCamp"`
+	Deleted struct {
+		Pals       int  `json:"BaseCampPals"`
+		Containers int  `json:"StorageContainers"`
+		ItemCount  int  `json:"ItemCount"`
+		Buildings  int  `json:"Buildings"`
+		PalBox     bool `json:"PalBox"`
+	} `json:"Deleted"`
+	Archive string `json:"Archive"`
+}
+
+// DeleteBase removes one base camp for good (its buildings, Pals and stored items).
+func (c *Client) DeleteBase(ctx context.Context, campID string) (*DeleteResult, error) {
+	// PalDefender 1.9 takes Unreal's 8-8-8-8 form or 32 plain hex digits (not the 8-4-4-4-12
+	// form its docs show), so the ID is sent as 32 hex digits whatever form it came in.
+	campID = strings.ReplaceAll(campID, "-", "")
+	if !hex32.MatchString(campID) {
+		return nil, errors.New("that isn't a base ID")
+	}
+	var out DeleteResult
+	if err := c.do(ctx, http.MethodPost, "deletebase/"+campID, map[string]any{}, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
 }
 
 // Guilds lists every guild with its bases.

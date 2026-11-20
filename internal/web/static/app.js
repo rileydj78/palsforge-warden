@@ -529,15 +529,47 @@ async function loadGuilds() {
   try {
     const gs = await api("/api/guilds"), rows = $("guildrows"); rows.replaceChildren();
     if (!gs.length) { const tr = el("tr"); const td = el("td", "No guilds yet.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+    const idle = parseInt($("g-idle").value, 10) || 0;
     gs.sort((a, b) => (b.Level || 0) - (a.Level || 0));
+    let shown = 0;
     for (const g of gs) {
+      const days = g.lastSeen ? (Date.now() / 1000 - g.lastSeen) / 86400 : Infinity;
+      if (idle && days < idle) continue;
+      shown++;
       const tr = el("tr");
-      const camps = (g.camps || []).map((c) => `${Math.round(c.map_pos.X ?? c.map_pos.x)}, ${Math.round(c.map_pos.Y ?? c.map_pos.y)}`).join(" · ") || "none";
-      tr.append(el("td", g.name || "(unnamed)", "strong"), el("td", String(g.Level ?? "–"), "num"), el("td", (g.admin && g.admin.name) || "–"), el("td", String(g.member_count ?? "–"), "num"), el("td", camps, "num"));
+      const bases = el("td", null, "num");
+      for (const c of g.camps || []) {
+        const pos = `${Math.round(c.map_pos.X ?? c.map_pos.x)}, ${Math.round(c.map_pos.Y ?? c.map_pos.y)}`;
+        const line = el("div", pos);
+        if (me.role === "owner") {
+          const del = el("button", "Delete", "small danger"); del.type = "button";
+          del.setAttribute("aria-label", `Delete ${g.name || "this guild"}'s base at ${pos}`);
+          del.onclick = () => deleteBase(g, c, pos);
+          line.append(" ", del);
+        }
+        bases.append(line);
+      }
+      if (!(g.camps || []).length) bases.textContent = "none";
+      tr.append(el("td", g.name || "(unnamed)", "strong"), el("td", String(g.Level ?? "–"), "num"), el("td", (g.admin && g.admin.name) || "–"), el("td", String(g.member_count ?? "–"), "num"),
+        el("td", g.lastSeen ? ago(g.lastSeen) : "unknown"), bases);
       rows.append(tr);
     }
+    if (gs.length && !shown) { const tr = el("tr"); const td = el("td", `No guild has been idle that long.`, "empty"); td.colSpan = 6; tr.append(td); rows.append(tr); }
   } catch (e) { toast(e.message); }
 }
+async function deleteBase(g, c, pos) {
+  const name = g.name || "this guild";
+  const ok = await ask({ title: `Delete ${name}'s base at ${pos}?`, text: `Its buildings, the Pals working there and everything in its chests are removed from the world. Warden makes a backup first, so restoring that backup brings it back (along with everything else since). ${g.lastSeen ? "The guild last played " + ago(g.lastSeen) + "." : "Warden hasn't seen this guild's members play."}`, label: "Type DELETE to confirm", confirmWord: "DELETE", ok: "Back up and delete" });
+  if (ok == null) return;
+  toast("Backing up, then deleting…");
+  try {
+    const r = await api("/api/guilds/delete-base", { camp: c.id, guild: name });
+    const d = r.deleted || {};
+    toast(`Deleted: ${d.Buildings ?? 0} buildings, ${d.BaseCampPals ?? 0} Pals, ${d.ItemCount ?? 0} items. Backup: ${(r.backup || []).join(", ")}`);
+    loadGuilds();
+  } catch (e) { toast(e.message); }
+}
+$("g-idle").addEventListener("change", loadGuilds);
 // A readable tree of whatever PalDefender returns (its formats vary by version). Text only.
 function tree(v, depth = 0) {
   if (v == null || typeof v !== "object") return el("span", String(v));

@@ -8,6 +8,11 @@
   ask "are you sure?" (only the asker can answer). Each command goes through the panel's own
   permission checks and is recorded in Activity as discord:<name>; the bot never gets owner
   powers. The token is kept like the other secrets. Settings → Discord commands.
+- **Guilds: last played and base clean-up.** Each guild shows when its members last played
+  (PalDefender's member list matched to Warden's records), with a filter for guilds idle 14–90+
+  days. The owner can delete a base: Warden backs up first (a restore brings it back), then has
+  PalDefender remove it, and records what went (buildings, Pals, items) in Activity. Checked
+  against a live PalDefender 1.9.3, whose base IDs differ from its docs.
 - Layout pass, graphs, the Inter font, side menu grouped Server / Players / Records / Admin.
 
 ## 1.0.0-rc.3 (2026-11-20)

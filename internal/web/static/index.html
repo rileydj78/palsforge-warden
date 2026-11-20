@@ -93,9 +93,10 @@
 
     <section id="view-guilds" class="view" hidden>
       <h1>Guilds</h1>
-      <p class="sub">From PalDefender: every guild, its leader, members and bases.</p>
+      <p class="sub">From PalDefender: every guild, its leader, members and bases, and when its members last played.</p>
+      <div class="row start"><label for="g-idle">Show</label><select id="g-idle"><option value="0">all guilds</option><option value="14">idle 14+ days</option><option value="30">idle 30+ days</option><option value="60">idle 60+ days</option><option value="90">idle 90+ days</option></select></div>
       <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
-        <thead><tr><th>Guild</th><th>Level</th><th>Leader</th><th>Members</th><th>Bases (map position)</th></tr></thead>
+        <thead><tr><th>Guild</th><th>Level</th><th>Leader</th><th>Members</th><th>Last played</th><th>Bases (map position)</th></tr></thead>
         <tbody id="guildrows"></tbody></table></div></div>
     </section>
 

@@ -80,3 +80,24 @@ func TestScrubRemovesAddresses(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestDeleteBase(t *testing.T) {
+	var path string
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.Method + " " + r.URL.Path
+		w.Write([]byte(`{"BaseCamp":{"Id":"13b9e8d7-4f2c-42a1-b79e-fc2a9186e4d5","Summary":"x"},"Deleted":{"BaseCampPals":3,"Buildings":41,"ItemCount":250,"PalBox":true},"Archive":"a.zip"}`))
+	}))
+	defer s.Close()
+	c := New(Config{URL: s.URL, Token: "t"})
+	if _, err := c.DeleteBase(context.Background(), "../ban/steam_1"); err == nil || path != "" {
+		t.Fatal("a non-GUID must never reach PalDefender")
+	}
+	r, err := c.DeleteBase(context.Background(), "13b9e8d7-4f2c-42a1-b79e-fc2a9186e4d5")
+	if _, err := c.DeleteBase(context.Background(), "ABCDEF01-23456789-ABCDEF01-23456789"); err != nil || path != "POST /v1/pdapi/deletebase/ABCDEF0123456789ABCDEF0123456789" {
+		t.Fatalf("Unreal form: %v %s", err, path)
+	}
+	r, err = c.DeleteBase(context.Background(), "13b9e8d7-4f2c-42a1-b79e-fc2a9186e4d5")
+	if err != nil || path != "POST /v1/pdapi/deletebase/13b9e8d74f2c42a1b79efc2a9186e4d5" || r.Deleted.Buildings != 41 || r.Deleted.Pals != 3 {
+		t.Fatalf("%v %s %+v", err, path, r)
+	}
+}
