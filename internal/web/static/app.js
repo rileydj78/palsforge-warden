@@ -29,7 +29,7 @@ async function api(path, body) {
   let data = null;
   try { data = await r.json(); } catch (e) {}
   if (r.status === 401 && path !== "/api/login" && path !== "/api/setup") { showGate(false); throw new Error("signed out"); }
-  if (!r.ok) throw new Error((data && data.error) || `Warden answered ${r.status}`);
+  if (!r.ok) throw Object.assign(new Error((data && data.error) || `Warden answered ${r.status}`), { data });
   return data;
 }
 
@@ -45,10 +45,20 @@ function showGate(noAccounts) {
 $("gateform").addEventListener("submit", async (e) => {
   e.preventDefault();
   try {
-    const out = await api("/api/login", { name: $("g-name").value, password: $("g-pw").value });
+    const out = await api("/api/login", { name: $("g-name").value, password: $("g-pw").value, code: $("g-code").value });
+    $("g-code").value = ""; $("codewrap").hidden = true;
     $("g-pw").value = ""; $("gatemsg").textContent = "";
     signedIn(out);
-  } catch (err) { $("gatemsg").textContent = err.message; }
+  } catch (err) {
+    $("gatemsg").textContent = err.message;
+    if (err.data && err.data.needCode) { $("codewrap").hidden = false; $("g-code").focus(); }
+  }
+});
+$("security").addEventListener("click", async () => {
+  let st; try { st = await api("/api/me/two-step/start", {}); } catch (e) { toast(e.message); return; }
+  const code = await ask({ title: "Turn on two-step sign-in", text: `In your authenticator app (Google Authenticator, Microsoft Authenticator, 1Password…), add an account and type this key:\n\n${st.key.match(/.{1,4}/g).join(" ")}\n\nThen enter the 6-digit code it shows. From then on, signing in also asks for a code.`, label: "6-digit code", ok: "Turn on", required: true });
+  if (!code) return;
+  try { await api("/api/me/two-step/confirm", { code: code.trim() }); toast("Two-step sign-in is on."); } catch (e) { toast(e.message); }
 });
 $("signout").addEventListener("click", async () => { try { await api("/api/logout", {}); } catch (e) {} showGate(false); });
 
@@ -57,6 +67,7 @@ function signedIn(out) {
   $("gate").hidden = true; $("layout").hidden = false; $("signout").hidden = false; $("state").hidden = false;
   $("signout").textContent = `Sign out (${me.name})`;
   $("signout").hidden = !!out.local; // on the server machine there's nobody to sign out
+  $("security").hidden = !!out.local;
   $("adminsnav").hidden = me.role !== "owner";
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
@@ -251,12 +262,13 @@ async function loadAudit() {
 async function loadUsers() {
   try {
     const u = await api("/api/users"); const rows = $("userrows"); rows.replaceChildren();
-    if (!u.length) { const tr = el("tr"); const td = el("td", "No remote accounts yet. On this machine you never need one.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+    if (!u.length) { const tr = el("tr"); const td = el("td", "No remote accounts yet. On this machine you never need one.", "empty"); td.colSpan = 6; tr.append(td); rows.append(tr); }
     for (const x of u) {
       const tr = el("tr"), acts = el("td", null, "acts"), b = el("button", "Remove", "small danger");
       b.onclick = async () => { const ok = await ask({ title: `Remove ${x.name}?`, text: "They're signed out at once and can't sign in again.", label: "Type REMOVE to confirm", confirmWord: "REMOVE", ok: "Remove" }); if (ok == null) return; try { await api("/api/users/remove", { name: x.name }); toast("Removed."); loadUsers(); } catch (e) { toast(e.message); } };
       acts.append(b);
-      tr.append(el("td", x.name, "strong"), el("td", x.role), el("td", when(x.created)), el("td", when(x.lastLogin)), acts); rows.append(tr);
+      if (x.twoStep) { const off = el("button", "Turn off two-step", "small"); off.onclick = async () => { try { await api("/api/users/two-step-off", { name: x.name }); toast("Two-step sign-in is off for " + x.name + "."); loadUsers(); } catch (e) { toast(e.message); } }; acts.prepend(off); }
+      tr.append(el("td", x.name, "strong"), el("td", x.role), el("td", x.twoStep ? "On" : "Off"), el("td", when(x.created)), el("td", when(x.lastLogin)), acts); rows.append(tr);
     }
   } catch (e) {}
 }

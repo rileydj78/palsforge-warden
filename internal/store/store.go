@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite" // pure Go: warden stays one file, no C compiler
@@ -25,6 +26,8 @@ var schema = []string{
 		action TEXT NOT NULL, target TEXT, detail TEXT, ok INTEGER NOT NULL)`,
 	`CREATE TABLE IF NOT EXISTS samples (
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
+	`ALTER TABLE users ADD COLUMN totp TEXT`,
+	`ALTER TABLE users ADD COLUMN totp_pending TEXT`,
 	`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, kind TEXT, started INTEGER, ok INTEGER, report TEXT)`,
 	`CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts INTEGER, kind TEXT, text TEXT)`,
 	`CREATE TABLE IF NOT EXISTS players (
@@ -53,7 +56,7 @@ func Open(dir string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1) // SQLite: one writer; keeps it simple and safe
 	for _, q := range schema {
-		if _, err := db.Exec(q); err != nil {
+		if _, err := db.Exec(q); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return nil, fmt.Errorf("database setup: %w", err)
 		}
 	}

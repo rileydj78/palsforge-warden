@@ -1,7 +1,10 @@
 package auth
 
 import (
+	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/store"
 )
@@ -63,5 +66,35 @@ func TestLoginLockout(t *testing.T) {
 func TestRoles(t *testing.T) {
 	if !Allows(Owner, Admin) || !Allows(Admin, Moderator) || Allows(Moderator, Admin) {
 		t.Fatal("role order wrong")
+	}
+}
+
+func TestTwoStepSignIn(t *testing.T) {
+	a := newAuth(t)
+	a.AddUser("moss", "correct horse battery", Admin)
+	key, link, err := a.StartTOTP("moss", "Palsforge Warden")
+	if err != nil || !strings.HasPrefix(link, "otpauth://totp/") {
+		t.Fatal(err, link)
+	}
+	if _, _, err := a.Login("moss", "correct horse battery"); err != nil {
+		t.Fatal("two-step isn't on until a code is confirmed")
+	}
+	secret, _ := b32.DecodeString(key)
+	now := totpAt(secret, time.Now().Unix()/30)
+	if a.ConfirmTOTP("moss", "000000") == nil && now != "000000" {
+		t.Fatal("a wrong first code must not turn it on")
+	}
+	if err := a.ConfirmTOTP("moss", now); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := a.LoginFrom("moss", "correct horse battery", "x", ""); !errors.Is(err, ErrNeedCode) {
+		t.Fatalf("the code is now needed: %v", err)
+	}
+	if _, _, err := a.LoginFrom("moss", "correct horse battery", "x", totpAt(secret, time.Now().Unix()/30)); err != nil {
+		t.Fatal(err)
+	}
+	a.DisableTOTP("moss")
+	if _, _, err := a.Login("moss", "correct horse battery"); err != nil {
+		t.Fatal("off again")
 	}
 }

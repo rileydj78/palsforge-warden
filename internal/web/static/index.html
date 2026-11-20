@@ -15,6 +15,7 @@
   </div>
   <div class="topright">
     <span class="pill" id="state" hidden><span class="dot"></span><span id="statetext"></span></span>
+    <button class="ghost" id="security" hidden>Two-step sign-in</button>
     <button class="ghost" id="signout" hidden>Sign out</button>
   </div>
 </header>
@@ -239,7 +240,7 @@
       <h1>Accounts</h1>
       <p class="sub">Accounts are for admins who sign in remotely, over your Tailscale network. On the server machine itself you never sign in. Moderators can announce, kick and message; admins can also ban, save, shut down, back up and change settings; owners can also manage accounts and restore backups.</p>
       <div class="card"><div class="tablewrap"><table>
-        <thead><tr><th>Name</th><th>Role</th><th>Added</th><th>Last sign-in</th><th><span class="sr">Actions</span></th></tr></thead>
+        <thead><tr><th>Name</th><th>Role</th><th>Two-step</th><th>Added</th><th>Last sign-in</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="userrows"></tbody></table></div></div>
       <form class="card form" id="adduser">
         <h2>Add an account</h2>
@@ -259,6 +260,7 @@
     <p class="sub" id="gatesub"></p>
     <label for="g-name">Name</label><input id="g-name" required autocomplete="username" autocapitalize="none" spellcheck="false">
     <label for="g-pw">Password</label><input id="g-pw" type="password" required autocomplete="current-password" autocapitalize="none" spellcheck="false">
+    <div id="codewrap" hidden><label for="g-code">6-digit code from your authenticator app</label><input id="g-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
     <button class="btn primary" type="submit" id="gatebtn">Sign in</button>
     <p class="msg" id="gatemsg" role="alert"></p>
   </form>

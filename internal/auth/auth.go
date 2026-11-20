@@ -165,7 +165,10 @@ func (a *Auth) addUser(name, pw, role string) error {
 }
 
 // Login checks a password and starts a session. Returns the session token.
-func (a *Auth) Login(name, pw string) (string, *Session, error) { return a.LoginFrom(name, pw, "") }
+func (a *Auth) Login(name, pw string) (string, *Session, error) { return a.LoginFrom(name, pw, "", "") }
+
+// ErrNeedCode means the password was right and the account also needs its two-step code.
+var ErrNeedCode = errors.New("enter the 6-digit code from your authenticator app")
 
 // verifySlots limits how many Argon2id checks (64 MB each) run at once.
 var verifySlots = make(chan struct{}, 3)
@@ -173,7 +176,7 @@ var verifySlots = make(chan struct{}, 3)
 // LoginFrom checks a password. Failures are counted per name and per source address before the
 // slow check runs, so parallel guesses can't slip past the limit, and one attacker can't lock the
 // owner out from everywhere.
-func (a *Auth) LoginFrom(name, pw, source string) (string, *Session, error) {
+func (a *Auth) LoginFrom(name, pw, source, code string) (string, *Session, error) {
 	keys := []string{"name:" + strings.ToLower(name), "src:" + source}
 	a.mu.Lock()
 	if a.attempts == nil {
@@ -219,6 +222,14 @@ func (a *Auth) LoginFrom(name, pw, source string) (string, *Session, error) {
 	defer a.mu.Unlock()
 	if !ok {
 		return "", nil, errors.New("that name and password don't match")
+	}
+	if secret := a.totpSecret(name); secret != "" {
+		if code == "" {
+			return "", nil, ErrNeedCode
+		}
+		if !totpOK(secret, code, time.Now()) {
+			return "", nil, errors.New("that two-step code isn't right")
+		}
 	}
 	for _, k := range keys {
 		if at := a.attempts[k]; at != nil {
@@ -266,7 +277,7 @@ func (a *Auth) Logout(tok string) {
 
 // Users lists the admins.
 func (a *Auth) Users() ([]map[string]any, error) {
-	rows, err := a.DB.Query(`SELECT name, role, created, COALESCE(last_login,0) FROM users ORDER BY created`)
+	rows, err := a.DB.Query(`SELECT name, role, created, COALESCE(last_login,0), COALESCE(totp,'')<>'' FROM users ORDER BY created`)
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +286,9 @@ func (a *Auth) Users() ([]map[string]any, error) {
 	for rows.Next() {
 		var n, r string
 		var c, l int64
-		rows.Scan(&n, &r, &c, &l)
-		out = append(out, map[string]any{"name": n, "role": r, "created": c, "lastLogin": l})
+		var two bool
+		rows.Scan(&n, &r, &c, &l, &two)
+		out = append(out, map[string]any{"name": n, "role": r, "created": c, "lastLogin": l, "twoStep": two})
 	}
 	return out, rows.Err()
 }

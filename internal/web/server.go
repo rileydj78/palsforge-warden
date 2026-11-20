@@ -239,13 +239,54 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]any{"user": nil, "accounts": n})
 	})
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
-		var in struct{ Name, Password string }
+		var in struct{ Name, Password, Code string }
 		if !sameOrigin(r) || readJSON(r, &in) != nil {
 			fail(w, 400, "bad request")
 			return
 		}
-		s.signIn(w, r, strings.TrimSpace(in.Name), in.Password)
+		s.signIn(w, r, strings.TrimSpace(in.Name), in.Password, strings.TrimSpace(in.Code))
 	})
+	// Two-step sign-in, for remote accounts (the server machine itself never signs in).
+	mux.HandleFunc("POST /api/me/two-step/start", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		if onLocalPort(r) {
+			fail(w, 400, "on the server machine there's no account to protect; set this up when signed in remotely")
+			return
+		}
+		key, link, err := s.Auth.StartTOTP(ses.User.Name, "Palsforge Warden")
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]string{"key": key, "link": link})
+	}))
+	mux.HandleFunc("POST /api/me/two-step/confirm", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Code string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := s.Auth.ConfirmTOTP(ses.User.Name, in.Code)
+		s.Store.Audit(ses.User.Name, "turn on two-step sign-in", ses.User.Name, "", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
+	mux.HandleFunc("POST /api/users/two-step-off", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Name string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := s.Auth.DisableTOTP(in.Name)
+		s.Store.Audit(ses.User.Name, "turn off two-step sign-in", in.Name, "", err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("POST /api/logout", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		if c, err := r.Cookie(cookieName); err == nil {
 			s.Auth.Logout(c.Value)
@@ -439,8 +480,12 @@ func (s *Server) Handler() http.Handler {
 	return secure(mux)
 }
 
-func (s *Server) signIn(w http.ResponseWriter, r *http.Request, name, pw string) {
-	tok, ses, err := s.Auth.LoginFrom(name, pw, clientAddr(r))
+func (s *Server) signIn(w http.ResponseWriter, r *http.Request, name, pw, code string) {
+	tok, ses, err := s.Auth.LoginFrom(name, pw, clientAddr(r), code)
+	if errors.Is(err, auth.ErrNeedCode) {
+		writeJSON(w, 401, map[string]any{"error": err.Error(), "needCode": true})
+		return
+	}
 	if err != nil {
 		s.Store.Audit(name, "sign in", "", "failed", false)
 		fail(w, 401, err.Error())
