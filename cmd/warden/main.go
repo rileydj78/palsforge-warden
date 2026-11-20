@@ -135,6 +135,33 @@ func main() {
 				nt.Send(context.Background(), notify.Info, "", "Players", strings.Join(parts, "\n"))
 			}
 		}
+		if wcfg.Notify.LiveStatus && wcfg.Notify.DiscordWebhook != "" {
+			go func() { // the live status message in Discord, refreshed every 2 minutes
+				ls := &notify.LiveStatus{Webhook: wcfg.Notify.DiscordWebhook, DataDir: *dataDir}
+				for {
+					info := notify.StatusInfo{}
+					c, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+					if in, err := game.Info(c); err == nil {
+						info.Online, info.Name, info.Description = true, in.ServerName, in.Description
+						if m, err := game.Metrics(c); err == nil {
+							info.Max, info.FPS, info.UptimeSecs, info.Day = m.MaxPlayers, m.ServerFPS, int64(m.Uptime), m.Days
+						}
+						if ps, err := game.Players(c); err == nil {
+							for _, p := range ps {
+								info.Players = append(info.Players, p.Name)
+							}
+						}
+					} else {
+						info.Name = st.ServerName
+					}
+					if err := ls.Update(c, info); err != nil {
+						log.Printf("discord status: %v", err)
+					}
+					cancel()
+					time.Sleep(2 * time.Minute)
+				}
+			}()
+		}
 		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)

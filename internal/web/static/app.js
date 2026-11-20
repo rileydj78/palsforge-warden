@@ -574,11 +574,11 @@ async function loadSettings() {
     const b = cfg.broadcasts || {};
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
-    $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk; $("s-x-joins").checked = !!n.joins;
+    $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk; $("s-x-joins").checked = !!n.joins; $("s-x-live").checked = !!n.liveStatus;
     showMode();
   } catch (e) {}
 }
-const notifyForm = () => ({ discordWebhook: $("s-x-dc").value.trim(), ntfyUrl: $("s-x-ntfy").value.trim(), ntfyToken: $("s-x-tok").value.trim(), routineOk: $("s-x-ok").checked, joins: $("s-x-joins").checked });
+const notifyForm = () => ({ discordWebhook: $("s-x-dc").value.trim(), ntfyUrl: $("s-x-ntfy").value.trim(), ntfyToken: $("s-x-tok").value.trim(), routineOk: $("s-x-ok").checked, joins: $("s-x-joins").checked, liveStatus: $("s-x-live").checked });
 $("s-x-test").addEventListener("click", async () => { try { await api("/api/notify/test", notifyForm()); toast("Test sent."); } catch (e) { toast(e.message); } });
 $("setform").addEventListener("submit", async (e) => {
   e.preventDefault();
