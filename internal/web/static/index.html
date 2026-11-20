@@ -201,6 +201,9 @@
         <label class="check"><input type="checkbox" id="s-u-on"> Update the game during the nightly routine</label>
         <label for="s-u-path">SteamCMD program</label><input id="s-u-path" placeholder="C:\steamcmd\steamcmd.exe">
         <label class="check"><input type="checkbox" id="s-u-val"> Check every game file (slower)</label>
+        <h2>Weekly events</h2>
+        <label for="s-ev">One per line: name | start | end | settings. Each start and end restarts the server with 5 and 1 minute warnings that announce the event; the normal values come back at the end.</label>
+        <textarea id="s-ev" rows="3" placeholder="Double XP weekend | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5"></textarea>
         <h2>Keeping it healthy</h2>
         <label for="s-h-frozen">Restart a server that's running but hasn't answered for this many minutes (0 = only tell me)</label><input id="s-h-frozen" type="number" min="0" max="60">
         <label for="s-h-mem">Restart with warnings when the server uses more memory than this many GB (0 = off; Palworld's memory grows over days)</label><input id="s-h-mem" type="number" min="0" step="0.5">

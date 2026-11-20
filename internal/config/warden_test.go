@@ -62,3 +62,19 @@ func TestByteOrderMarkIsFine(t *testing.T) {
 		t.Fatalf("a file saved by Notepad must load: %v", err)
 	}
 }
+
+func TestEventsAreCheckedWhenSaved(t *testing.T) {
+	w := Defaults(t.TempDir())
+	w.Events = "Double XP weekend | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5"
+	if err := w.Check(); err != nil {
+		t.Fatalf("a good event: %v", err)
+	}
+	w.Events = "Broken | Fri 18:00 | Sun 22:00 | ExpRate=lots"
+	if err := w.Check(); err == nil || !strings.Contains(err.Error(), "Broken") {
+		t.Fatalf("a bad value must be refused when saved, naming the event: %v", err)
+	}
+	w.Events = "Sneaky | Fri 18:00 | Sun 22:00 | AdminPassword=x"
+	if w.Check() == nil {
+		t.Fatal("events can't change locked settings")
+	}
+}

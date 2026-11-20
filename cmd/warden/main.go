@@ -15,6 +15,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
@@ -118,6 +119,9 @@ func main() {
 			Mods:    &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir},
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
 		go runner.Watch(context.Background())
+		if evs, err := events.Parse(wcfg.Events); err == nil {
+			go runner.RunEvents(context.Background(), evs)
+		}
 		var private broadcast.Private
 		if pd := paldefender.New(wcfg.PalDef); pd != nil {
 			private = pd.Message

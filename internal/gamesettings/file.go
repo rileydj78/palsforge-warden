@@ -231,3 +231,17 @@ func (f *File) Apply(changes []Change) (string, error) {
 	}
 	return bak, nil
 }
+
+// Validate checks one option name and value the way Plan does, without a file (for settings
+// stored ahead of time, such as events).
+func Validate(key, value string) error {
+	if !keyRe.MatchString(key) {
+		return fmt.Errorf("%q isn't an option name", key)
+	}
+	o, known := Lookup(key)
+	if known && o.Locked {
+		return fmt.Errorf("%s can't be changed by Warden", o.Label)
+	}
+	_, err := format(o, known, value)
+	return err
+}

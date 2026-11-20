@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
+	"github.com/rileydj78/palsforge-warden/internal/events"
+	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 )
@@ -29,6 +31,8 @@ type Warden struct {
 	PalDef    paldefender.Config `json:"palDefender"`
 	Broadcast broadcast.Config   `json:"broadcasts"`
 	Health    Health             `json:"health"`
+	// Weekly events, one per line: "Name | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5".
+	Events string `json:"events"`
 }
 
 // Health is what Warden does on its own to keep the server up.
@@ -161,6 +165,17 @@ func (w *Warden) Check() error {
 	}
 	if w.Health.MemoryLimitGB < 0 || (w.Health.MemoryLimitGB > 0 && w.Health.MemoryLimitGB < 4) {
 		bad = append(bad, "health.memoryLimitGB must be 0 (off) or at least 4")
+	}
+	if evs, err := events.Parse(w.Events); err != nil {
+		bad = append(bad, "events: "+err.Error())
+	} else {
+		for _, e := range evs {
+			for k, v := range e.Settings {
+				if err := gamesettings.Validate(k, v); err != nil {
+					bad = append(bad, "event "+e.Name+": "+err.Error())
+				}
+			}
+		}
 	}
 	if err := w.Notify.Check(); err != nil {
 		bad = append(bad, err.Error())
