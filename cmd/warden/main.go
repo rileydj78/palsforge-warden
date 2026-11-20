@@ -16,6 +16,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
+	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 	"github.com/rileydj78/palsforge-warden/internal/web"
@@ -94,10 +95,23 @@ func main() {
 	if err := wcfg.Check(); err != nil {
 		log.Printf("settings need attention (%s): %v; server control is off", config.ConfigPath(*dataDir), err)
 	} else {
+		nt := notify.New(wcfg.Notify, st.ServerName)
 		h := host.New(wcfg, *dataDir)
-		h.OnEvent = func(e host.Event) { log.Printf("server: %s", e.Text); st2.AddEvent(e.At, e.Kind, e.Text) }
-		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2,
+		h.OnEvent = func(e host.Event) {
+			log.Printf("server: %s", e.Text)
+			st2.AddEvent(e.At, e.Kind, e.Text)
+			switch e.Kind {
+			case "crash":
+				nt.Send(context.Background(), notify.Urgent, "crash", "The server crashed", e.Text+". Warden is starting it again.")
+			case "gave-up":
+				nt.Send(context.Background(), notify.Urgent, "gave-up", "The server keeps crashing", e.Text)
+			case "update":
+				nt.Send(context.Background(), notify.Info, "", "Game updated", e.Text)
+			}
+		}
+		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2, Notify: nt,
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
+		go runner.WatchDown(context.Background())
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		go h.Supervise(context.Background())
 		go runner.Schedule(context.Background())

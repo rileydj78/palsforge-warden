@@ -10,16 +10,19 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+
+	"github.com/rileydj78/palsforge-warden/internal/notify"
 )
 
 // Warden is Warden's own configuration, kept in warden.json in its data folder. Everything has a
 // sensible default, so a new install only needs the server folder.
 type Warden struct {
-	ServerDir string  `json:"serverDir"`
-	Control   Control `json:"control"`
-	Nightly   Nightly `json:"nightly"`
-	Backups   Backups `json:"backups"`
-	Update    Update  `json:"update"`
+	ServerDir string        `json:"serverDir"`
+	Control   Control       `json:"control"`
+	Nightly   Nightly       `json:"nightly"`
+	Backups   Backups       `json:"backups"`
+	Update    Update        `json:"update"`
+	Notify    notify.Config `json:"notify"`
 }
 
 // Control says how Warden starts and stops the game server.
@@ -134,6 +137,9 @@ func (w *Warden) Check() error {
 		if _, err := os.Stat(w.Update.SteamCMD); err != nil {
 			bad = append(bad, fmt.Sprintf("SteamCMD isn't at %s", w.Update.SteamCMD))
 		}
+	}
+	if err := w.Notify.Check(); err != nil {
+		bad = append(bad, err.Error())
 	}
 	if len(bad) > 0 {
 		return errors.New(strings.Join(bad, "; "))

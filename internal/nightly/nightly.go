@@ -15,6 +15,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/routine"
 	"github.com/rileydj78/palsforge-warden/internal/store"
@@ -146,6 +147,7 @@ type Runner struct {
 	Host    *host.Host
 	Backups *Backups
 	Store   *store.Store
+	Notify  *notify.Notifier
 	mu      sync.Mutex
 	busy    bool
 	stepNow string
@@ -172,7 +174,26 @@ func (r *Runner) RunNow(ctx context.Context, kind string, warn []int, update boo
 	rep := routine.Run(ctx, p, r.Game, r.Host, r.Backups)
 	r.Store.AddRun(kind, rep.Started, rep.OK, rep)
 	log.Printf("%s routine finished: ok=%v", kind, rep.OK)
+	r.tell(kind, rep)
 	return rep, nil
+}
+
+// tell sends a run's result: problems always, a clean run only if the admin asked for that.
+func (r *Runner) tell(kind string, rep *routine.Report) {
+	if r.Notify == nil || (rep.OK && !r.Cfg.Notify.RoutineOK) {
+		return
+	}
+	var bad []string
+	for _, s := range rep.Steps {
+		if !s.OK {
+			bad = append(bad, s.Name+": "+s.Detail)
+		}
+	}
+	if rep.OK {
+		r.Notify.Send(context.Background(), notify.Info, "", "The "+kind+" routine went fine", strings.Join(rep.Backups, ", "))
+		return
+	}
+	r.Notify.Send(context.Background(), notify.Warn, "", "The "+kind+" routine had problems", strings.Join(bad, "\n"))
 }
 
 // NextRun is when the stop happens; the warnings start before it.

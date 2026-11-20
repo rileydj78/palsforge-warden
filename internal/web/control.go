@@ -12,6 +12,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
+	"github.com/rileydj78/palsforge-warden/internal/notify"
 )
 
 // Control is the server-control side of the panel (nil when Warden only watches).
@@ -217,6 +218,25 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 			resp["error"] = err.Error()
 		}
 		writeJSON(w, 200, resp)
+	}))
+	mux.HandleFunc("POST /api/notify/test", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in notify.Config
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		if err := in.Check(); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		n := notify.New(in, "Warden")
+		if !n.Enabled() {
+			fail(w, 400, "set a Discord webhook or an ntfy address first")
+			return
+		}
+		n.Send(r.Context(), notify.Info, "", "Test message", "If you can read this, Warden's notifications reach you.")
+		s.Store.Audit(ses.User.Name, "send test notification", "", "", true)
+		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 	mux.HandleFunc("POST /api/settings", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		var cfg config.Warden

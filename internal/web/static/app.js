@@ -318,15 +318,20 @@ async function loadSettings() {
     $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate;
     $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
     $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
+    const n = cfg.notify || {};
+    $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk;
     showMode();
   } catch (e) {}
 }
+const notifyForm = () => ({ discordWebhook: $("s-x-dc").value.trim(), ntfyUrl: $("s-x-ntfy").value.trim(), ntfyToken: $("s-x-tok").value.trim(), routineOk: $("s-x-ok").checked });
+$("s-x-test").addEventListener("click", async () => { try { await api("/api/notify/test", notifyForm()); toast("Test sent."); } catch (e) { toast(e.message); } });
 $("setform").addEventListener("submit", async (e) => {
   e.preventDefault();
   const c = structuredClone(cfg);
   c.nightly = { enabled: $("s-n-on").checked, time: $("s-n-time").value.trim(), warnMinutes: $("s-n-warn").value.split(",").map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)) };
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
   Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked });
+  c.notify = notifyForm();
   Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
   try {
     await api("/api/settings", c); $("set-msg").textContent = "";

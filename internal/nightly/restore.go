@@ -59,6 +59,7 @@ func (r *Runner) Restore(ctx context.Context, a backup.Archive, by string) (*rou
 		step("start", r.Host.Start(ctx), "")
 		rep.Finished = time.Now()
 		r.Store.AddRun("restore", rep.Started, rep.OK, rep)
+		r.tell("restore", rep)
 		return rep, nil
 	}
 	if a.Kind != backup.Data {
