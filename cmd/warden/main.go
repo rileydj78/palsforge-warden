@@ -111,6 +111,16 @@ func main() {
 		nt := notify.New(wcfg.Notify, st.ServerName)
 		var pin func(string) // set once the runner exists
 		h := host.New(wcfg, *dataDir)
+		mm := &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir}
+		h.ModsOn = func() bool {
+			l, _, err := mm.List()
+			for _, m := range l {
+				if m.Enabled {
+					return true
+				}
+			}
+			return err != nil // can't tell: assume mods, so a hold stays safe
+		}
 		h.OnEvent = func(e host.Event) {
 			log.Printf("server: %s", e.Text)
 			st2.AddEvent(e.At, e.Kind, e.Text)

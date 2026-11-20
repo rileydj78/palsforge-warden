@@ -133,6 +133,8 @@
       <section class="card admin-only"><h2>Setup check</h2><ul class="checks" id="checks"><li class="note">Checking…</li></ul></section>
       <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>
         <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
+      <section class="card admin-only"><h2>Game updates</h2><p id="upd-state" class="note">Warden updates the game in the nightly routine when updates are on.</p>
+        <div class="row" style="justify-content:flex-start"><button type="button" class="small" id="upd-check">Check for a game update</button><button type="button" class="small" id="upd-allow" hidden></button></div></section>
       <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
       <section class="card"><h2>Server events</h2><div class="tablewrap"><table>
         <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>
@@ -230,6 +232,7 @@
         <label class="check"><input type="checkbox" id="s-u-on"> Update the game during the nightly routine</label>
         <label for="s-u-path">SteamCMD program</label><input id="s-u-path" placeholder="C:\steamcmd\steamcmd.exe">
         <label class="check"><input type="checkbox" id="s-u-val"> Check every game file (slower)</label>
+        <label class="check"><input type="checkbox" id="s-u-hold"> While mods are on, hold new game builds until I allow them (mods often break on game updates)</label>
         <h2>Weekly events</h2>
         <label for="s-ev">One per line: name | start | end | settings. Each start and end restarts the server with 5 and 1 minute warnings that announce the event; the normal values come back at the end.</label>
         <textarea id="s-ev" rows="3" placeholder="Double XP weekend | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5"></textarea>

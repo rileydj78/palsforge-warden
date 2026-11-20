@@ -108,3 +108,24 @@ func TestExternalStopMarker(t *testing.T) {
 		t.Fatal("start must remove the marker")
 	}
 }
+
+func TestPublicBuildIsRead(t *testing.T) {
+	out := `"2394010"
+{
+	"depots"
+	{
+		"branches"
+		{
+			"public"
+			{
+				"buildid"		"20841234"
+				"timeupdated"		"1795000000"
+			}
+		}
+	}
+}`
+	m := publicBuildRe.FindStringSubmatch(out)
+	if m == nil || m[1] != "20841234" {
+		t.Fatalf("got %v", m)
+	}
+}

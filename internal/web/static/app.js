@@ -661,7 +661,7 @@ async function loadSettings() {
     $("s-n-on").checked = cfg.nightly.enabled; $("s-n-time").value = cfg.nightly.time; $("s-n-warn").value = (cfg.nightly.warnMinutes || []).join(", ");
     $("s-b-dir").value = cfg.backups.dir; $("s-b-off").value = (cfg.backups.offsite || []).join("\n"); $("s-b-img").value = cfg.backups.image;
     $("s-b-d").value = cfg.backups.keepDaily; $("s-b-w").value = cfg.backups.keepWeekly;
-    $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate;
+    $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate; $("s-u-hold").checked = !!cfg.update.holdForMods;
     $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
     $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
     $("s-ev").value = cfg.events || "";
@@ -684,7 +684,7 @@ $("setform").addEventListener("submit", async (e) => {
   const c = structuredClone(cfg);
   c.nightly = { enabled: $("s-n-on").checked, time: $("s-n-time").value.trim(), warnMinutes: $("s-n-warn").value.split(",").map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)) };
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
-  Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked });
+  Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked, holdForMods: $("s-u-hold").checked });
   c.notify = notifyForm();
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0 };
@@ -786,3 +786,15 @@ cmd("c-restart", async () => {
 });
 $("c-save").addEventListener("click", () => doAction("save", {}, "World saved."));
 $("c-backup").addEventListener("click", async () => { toast("Backing up…"); try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${(r.made || []).join(", ")}`); } catch (e) { toast(e.message); } });
+
+$("upd-check").addEventListener("click", async () => {
+  const b = $("upd-check"); b.disabled = true; $("upd-state").textContent = "Asking Steam (takes up to a minute)…";
+  try {
+    const u = await api("/api/update/check", {});
+    const newer = u.latest && u.installed && u.latest !== u.installed;
+    $("upd-state").textContent = !newer ? `Up to date (build ${u.installed || "unknown"}).`
+      : `Build ${u.latest} is out; this server has ${u.installed}.` + (u.hold ? (u.allowed === u.latest ? " Allowed: it installs in the next nightly routine." : " It's held while mods are on: check your mods support it, then allow it.") : " It installs in the next nightly routine.");
+    const a = $("upd-allow"); a.hidden = !(newer && u.hold && u.allowed !== u.latest); a.textContent = `Allow build ${u.latest}`;
+    a.onclick = async () => { try { await api("/api/update/allow", { build: u.latest }); toast("Allowed. It installs in the next nightly routine."); a.hidden = true; } catch (e) { toast(e.message); } };
+  } catch (e) { $("upd-state").textContent = e.message; } finally { b.disabled = false; }
+});

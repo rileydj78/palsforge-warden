@@ -131,6 +131,9 @@ type Update struct {
 	Enabled  bool   `json:"enabled"`
 	SteamCMD string `json:"steamcmd"` // path to steamcmd(.exe)
 	Validate bool   `json:"validate"`
+	// HoldForMods: when mods are on and a new game build is out, don't update until an admin
+	// allows that build (mods often break on game updates).
+	HoldForMods bool `json:"holdForMods"`
 }
 
 // AppID is Palworld Dedicated Server's Steam app.

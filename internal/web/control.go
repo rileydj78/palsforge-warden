@@ -115,6 +115,30 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		return nil
 	})
+	mux.HandleFunc("POST /api/update/check", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		latest, err := c.Host.LatestBuild(r.Context())
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"installed": c.Host.BuildID(), "latest": latest, "allowed": c.Host.AllowedBuild(), "hold": c.Cfg.Update.HoldForMods})
+	}))
+	mux.HandleFunc("POST /api/update/allow", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			Build string `json:"build"`
+		}
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := c.Host.AllowBuild(in.Build)
+		s.Store.Audit(ses.User.Name, "allow game update", in.Build, "", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("POST /api/server/restart", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		var in struct {
 			Minutes int `json:"minutes"`

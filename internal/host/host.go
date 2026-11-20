@@ -37,6 +37,10 @@ type Host struct {
 	cfg     config.Warden
 	logPath string // the server's own console output (supervise mode)
 	OnEvent func(Event)
+	// ModsOn says whether any mods are on (for holding updates); nil = none.
+	ModsOn func() bool
+
+	dataDir string
 
 	mu      sync.Mutex
 	want    bool      // supervise: should the server be running?
@@ -48,7 +52,7 @@ type Host struct {
 
 // New returns a Host. dataDir is where the server's console log goes in supervise mode.
 func New(cfg config.Warden, dataDir string) *Host {
-	return &Host{cfg: cfg, logPath: filepath.Join(dataDir, "server-console.log"), want: true}
+	return &Host{cfg: cfg, logPath: filepath.Join(dataDir, "server-console.log"), want: true, dataDir: dataDir}
 }
 
 func (h *Host) event(kind, text string) {
@@ -320,6 +324,16 @@ func (h *Host) Update(ctx context.Context) (string, error) {
 		return "", errors.New("SteamCMD's location isn't set (update.steamcmd)")
 	}
 	before := h.BuildID()
+	if h.cfg.Update.HoldForMods && h.ModsOn != nil && h.ModsOn() {
+		latest, err := h.LatestBuild(ctx)
+		switch {
+		case err != nil:
+			return "", fmt.Errorf("couldn't check for a game update while mods are on (holding to be safe): %w", err)
+		case latest != "" && latest != before && latest != h.AllowedBuild():
+			h.event("update", "game build "+latest+" is out; held because mods are on")
+			return "held: game build " + latest + " is out, but mods are on. Check your mods support it, then allow it on the Server page", nil
+		}
+	}
 	args := []string{"+force_install_dir", h.cfg.ServerDir, "+login", "anonymous", "+app_update", config.AppID}
 	if h.cfg.Update.Validate {
 		args = append(args, "validate")
@@ -428,3 +442,51 @@ type Disk struct {
 
 // DiskOf reports the drive holding path.
 func DiskOf(path string) Disk { f, t := diskFree(path); return Disk{Free: f, Total: t} }
+
+var publicBuildRe = regexp.MustCompile(`"branches"\s*\{\s*"public"\s*\{\s*"buildid"\s*"(\d+)"`)
+
+var latestCache struct {
+	sync.Mutex
+	build string
+	at    time.Time
+}
+
+// LatestBuild asks Steam (through SteamCMD) for the newest public build of the server. It's
+// remembered for an hour.
+func (h *Host) LatestBuild(ctx context.Context) (string, error) {
+	latestCache.Lock()
+	defer latestCache.Unlock()
+	if latestCache.build != "" && time.Since(latestCache.at) < time.Hour {
+		return latestCache.build, nil
+	}
+	if h.cfg.Update.SteamCMD == "" {
+		return "", errors.New("SteamCMD's location isn't set (update.steamcmd)")
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, h.cfg.Update.SteamCMD, "+login", "anonymous", "+app_info_update", "1", "+app_info_print", config.AppID, "+quit")
+	hideWindow(cmd)
+	out, _ := cmd.CombinedOutput()
+	m := publicBuildRe.FindSubmatch(out)
+	if m == nil {
+		return "", fmt.Errorf("SteamCMD didn't say the latest build: %s", lastLines(string(out), 2))
+	}
+	latestCache.build, latestCache.at = string(m[1]), time.Now()
+	return latestCache.build, nil
+}
+
+func (h *Host) allowFile() string { return filepath.Join(h.dataDir, "update-allowed.txt") }
+
+// AllowedBuild is the game build an admin allowed while updates are held ("" = none).
+func (h *Host) AllowedBuild() string {
+	b, _ := os.ReadFile(h.allowFile())
+	return strings.TrimSpace(string(b))
+}
+
+// AllowBuild lets the next update install a held build.
+func (h *Host) AllowBuild(build string) error {
+	if !regexp.MustCompile(`^\d{1,12}$`).MatchString(build) {
+		return errors.New("not a build number")
+	}
+	return os.WriteFile(h.allowFile(), []byte(build), 0o600)
+}
