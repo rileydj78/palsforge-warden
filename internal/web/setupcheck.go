@@ -17,6 +17,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
+	"github.com/rileydj78/palsforge-warden/internal/worlds"
 )
 
 // Check is one line of the setup check.
@@ -84,6 +85,9 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 			add("Backups", false, false, "Backups are only on this machine. Add a second place in Settings so a dead disk can't take them.")
 		} else {
 			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()))
+		}
+		if worlds.OptionFile(c.Cfg.ServerDir, config.SettingsPath(c.Cfg.ServerDir)) != "" {
+			add("Game settings", false, false, "The running world has its own WorldOption.sav, which overrides most of PalWorldSettings.ini (common after uploading a co-op world). See Game settings.")
 		}
 		if s.Instances != nil {
 			for _, e := range instances.List(s.Instances.MainData) {

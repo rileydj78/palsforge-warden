@@ -46,3 +46,29 @@ func TestListAndSwitch(t *testing.T) {
 		t.Fatal("only real world IDs")
 	}
 }
+
+func TestWorldOptionSetAside(t *testing.T) {
+	srv, data := t.TempDir(), t.TempDir()
+	cfg := filepath.Join(srv, "Pal", "Saved", "Config", "WindowsServer")
+	os.MkdirAll(cfg, 0o755)
+	settings := filepath.Join(cfg, "PalWorldSettings.ini")
+	id := "D701B76E4A3241AD755C9D87150366ED"
+	w := filepath.Join(srv, "Pal", "Saved", "SaveGames", "0", id)
+	os.MkdirAll(w, 0o755)
+	os.WriteFile(filepath.Join(w, "Level.sav"), []byte("l"), 0o644)
+	os.WriteFile(filepath.Join(w, "WorldOption.sav"), []byte("o"), 0o644)
+	os.WriteFile(filepath.Join(cfg, "GameUserSettings.ini"), []byte("[/Script/Pal.PalGameLocalSettings]\r\nDedicatedServerName="+id+"\r\n"), 0o644)
+	if OptionFile(srv, settings) == "" {
+		t.Fatal("found")
+	}
+	if s, _ := ApplySetAsideOption(srv, settings, data); s != "" {
+		t.Fatal("nothing happens unless asked")
+	}
+	QueueSetAsideOption(data)
+	if s, err := ApplySetAsideOption(srv, settings, data); err != nil || s == "" || OptionFile(srv, settings) != "" {
+		t.Fatal(s, err)
+	}
+	if m, _ := filepath.Glob(filepath.Join(w, "WorldOption.sav.warden-*.bak")); len(m) != 1 {
+		t.Fatal("kept beside the world")
+	}
+}

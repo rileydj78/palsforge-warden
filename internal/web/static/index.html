@@ -47,7 +47,7 @@
         <div class="actions">
           <button class="btn" id="b-announce">Announce</button>
           <button class="btn" id="b-save">Save now</button>
-          <button class="btn primary" id="b-shutdown">Shut down…</button>
+          <button class="btn danger" id="b-shutdown">Shut down…</button>
         </div>
       </div>
       <a class="todo" id="todo" href="#/server" hidden></a>
@@ -56,7 +56,7 @@
         <div class="stat"><span class="label">Server FPS</span><span class="value" id="fps">–</span><span class="note" id="fpsnote"></span></div>
         <div class="stat"><span class="label">Up for</span><span class="value" id="uptime">–</span><span class="note" id="daysnote"></span></div>
         <div class="stat"><span class="label">Bases</span><span class="value" id="bases">–</span><span class="note">Across all guilds</span></div>
-        <div class="stat" id="st-backup" hidden><span class="label">Last backup</span><span class="value" id="lastbk">–</span><span class="note" id="lastbknote"></span></div>
+        <div class="stat" id="st-backup" hidden><span class="label">Last backup</span><span class="value date" id="lastbk">–</span><span class="note" id="lastbknote"></span></div>
         <div class="stat" id="st-next" hidden><span class="label">Next nightly run</span><span class="value" id="nextrun">–</span><span class="note" id="nextrunnote"></span></div>
       </section>
       <section class="card" aria-labelledby="hist">
@@ -70,7 +70,7 @@
       </section>
       <section class="card" aria-labelledby="pl">
         <h2 id="pl">Players online</h2>
-        <div class="tablewrap"><table>
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
           <thead><tr><th>Player</th><th>Guild</th><th>Level</th><th>Platform</th><th>Ping</th><th><span class="sr">Actions</span></th></tr></thead>
           <tbody id="playerrows"></tbody></table></div>
       </section>
@@ -80,13 +80,13 @@
       <h1>Where everyone is</h1>
       <p class="sub">Positions in the game's own map coordinates, updated every 10 seconds.</p>
       <div class="card"><div class="map" id="map" role="img" aria-label="Players on the map"></div>
-      <div class="tablewrap"><table><thead><tr><th>Player</th><th>Map position</th><th>Level</th></tr></thead><tbody id="maprows"></tbody></table></div></div>
+      <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Player</th><th>Map position</th><th>Level</th></tr></thead><tbody id="maprows"></tbody></table></div></div>
     </section>
 
     <section id="view-guilds" class="view" hidden>
       <h1>Guilds</h1>
       <p class="sub">From PalDefender: every guild, its leader, members and bases.</p>
-      <div class="card"><div class="tablewrap"><table>
+      <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>Guild</th><th>Level</th><th>Leader</th><th>Members</th><th>Bases (map position)</th></tr></thead>
         <tbody id="guildrows"></tbody></table></div></div>
     </section>
@@ -103,15 +103,15 @@
       <h1>Everyone who has played</h1>
       <p class="sub">First and last seen, and total time online since Warden started watching.</p>
       <input class="search" id="rsearch" type="search" placeholder="Find a player" aria-label="Find a player">
-      <div class="card"><div class="tablewrap"><table>
+      <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First seen</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="rosterrows"></tbody></table></div></div>
       <section class="card"><h2>Bans</h2><p class="note">Every ban, wherever it was made: in Warden, in the game, or by PalDefender.</p>
-        <div class="tablewrap"><table><thead><tr><th>Player</th><th>Banned by</th><th>Reason</th><th><span class="sr">Actions</span></th></tr></thead>
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Player</th><th>Banned by</th><th>Reason</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="banrows"></tbody></table></div></section>
       <section class="card"><h2>Allow-list</h2><p class="note" id="allownote"></p>
         <form id="allowform" class="inline"><label for="allowid" class="sr">Player ID</label><input id="allowid" placeholder="Player ID, e.g. steam_76561198000000000" autocomplete="off" spellcheck="false"><button>Allow</button></form>
-        <div class="tablewrap"><table><thead><tr><th>Player</th><th>Added</th><th>By</th><th><span class="sr">Actions</span></th></tr></thead>
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Player</th><th>Added</th><th>By</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="allowrows"></tbody></table></div></section>
     </section>
 
@@ -136,13 +136,13 @@
       <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>
         <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
       <section class="card admin-only"><h2>Game updates</h2><p id="upd-state" class="note">Warden updates the game in the nightly routine when updates are on.</p>
-        <div class="row" style="justify-content:flex-start"><button type="button" class="small" id="upd-check">Check for a game update</button><button type="button" class="small" id="upd-allow" hidden></button></div></section>
+        <div class="row start"><button type="button" class="small" id="upd-check">Check for a game update</button><button type="button" class="small" id="upd-allow" hidden></button></div></section>
       <section class="card admin-only"><h2>Worlds</h2>
         <p class="note">Each world is kept in its own folder; switching never deletes one, so you can always switch back. The current world is backed up first, and Warden only switches if that backup worked.</p>
-        <div class="tablewrap"><table><thead><tr><th>World</th><th>Players</th><th>Size</th><th>Last played</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="worldrows"></tbody></table></div>
-        <div class="row owner-only" style="justify-content:flex-start"><button type="button" class="small" id="world-new">Start a fresh world…</button></div></section>
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>World</th><th>Players</th><th>Size</th><th>Last played</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="worldrows"></tbody></table></div>
+        <div class="row start owner-only"><button type="button" class="small" id="world-new">Start a fresh world…</button></div></section>
       <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
-      <section class="card"><h2>Server events</h2><div class="tablewrap"><table>
+      <section class="card"><h2>Server events</h2><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>
     </section>
 
@@ -159,12 +159,14 @@
         <div class="hero"><h1>Game settings</h1><p class="sub" id="g-sub"></p></div>
         <div class="actions"><button class="btn primary" id="g-review">Review changes</button></div>
       </div>
+      <section class="card warnbox" id="g-effect" hidden><h2>Some settings aren't in effect</h2><p id="g-effect-text"></p><ul id="g-effect-list" class="note"></ul>
+        <div class="row start"><button type="button" class="btn" id="g-wo" hidden>Set WorldOption.sav aside at the next restart</button></div></section>
       <section class="card"><h2>Start from a preset</h2><p class="note">Fills in the form below; nothing changes until you review and apply.</p><div class="presets" id="g-presets"></div>
         <div class="row"><button type="button" class="small" id="g-export">Export these settings</button><label class="small" for="g-import" tabindex="0" role="button">Import a file…</label><input type="file" id="g-import" accept=".json,.ini,.txt" hidden></div>
         <p class="note">Import takes a file exported here or any PalWorldSettings.ini (from another server or a settings generator). Passwords are never exported or imported.</p></section>
       <div id="g-groups"></div>
       <section class="card" id="g-unknown-card" hidden><h2>Other options</h2><p class="note">Options Warden doesn't explain yet. They're kept exactly as they are.</p><p class="mono" id="g-unknown"></p></section>
-      <details class="card"><summary><h2 style="display:inline">Engine.ini (advanced)</h2></summary>
+      <details class="card"><summary><h2>Engine.ini (advanced)</h2></summary>
         <p class="note">Unreal Engine tuning, such as the network tick rate. Written at the next stop, with a copy of the old file kept. Wrong values can make the server lag or not start, so change one thing at a time.</p>
         <label for="g-engine" class="sr">Engine.ini</label><textarea id="g-engine" rows="12" spellcheck="false" class="mono"></textarea>
         <p class="note" id="g-engine-state"></p><div class="row"><button type="button" id="g-engine-save">Save for the next stop</button></div></details>
@@ -180,9 +182,9 @@
         <h2>Install a mod</h2>
         <label for="md-file">The mod's .zip file. Warden works out where it goes.</label>
         <input type="file" id="md-file" accept=".zip" required>
-        <div class="row" style="justify-content:flex-start"><button class="btn primary" type="submit">Install</button></div>
+        <div class="row start"><button class="btn primary" type="submit">Install</button></div>
       </form>
-      <div class="card"><div class="tablewrap"><table>
+      <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>Mod</th><th>Kind</th><th>Size</th><th>Changed</th><th>State</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="modrows"></tbody></table></div></div>
       <p class="note">Most mods must also be installed, at the same version, on every player's game.</p>
@@ -218,7 +220,7 @@
     <section id="view-activity" class="view" hidden>
       <h1>Activity</h1>
       <p class="sub">Everything done through Warden, newest first.</p>
-      <div class="card"><div class="tablewrap"><table>
+      <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
         <tbody id="auditrows"></tbody></table></div></div>
     </section>
@@ -288,7 +290,7 @@
         <label class="check"><input type="checkbox" id="s-x-ok"> Also tell me when the nightly routine went fine</label>
         <label class="check"><input type="checkbox" id="s-x-joins"> Tell me when players join and leave</label>
         <label class="check"><input type="checkbox" id="s-x-live"> Keep a live server-status message in the Discord channel (updated every 2 minutes)</label>
-        <div class="row" style="justify-content:flex-start"><button class="btn" type="button" id="s-x-test">Send a test message</button></div>
+        <div class="row start"><button class="btn" type="button" id="s-x-test">Send a test message</button></div>
         <h2>Starting and stopping the server</h2>
         <label for="s-c-mode">Who runs the server</label><select id="s-c-mode"><option value="supervise">Warden runs it and restarts it after a crash</option><option value="external">Another program runs it (a service, a task, a host's panel)</option></select>
         <div id="s-sup"><label for="s-c-exe">Server program (inside the server folder)</label><input id="s-c-exe">
@@ -305,7 +307,7 @@
     <section id="view-admins" class="view" hidden>
       <h1>Accounts</h1>
       <p class="sub">Accounts are for admins who sign in remotely, over your Tailscale network. On the server machine itself you never sign in. Moderators can announce, kick and message; admins can also ban, save, shut down, back up and change settings; owners can also manage accounts and restore backups.</p>
-      <div class="card"><div class="tablewrap"><table>
+      <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
         <thead><tr><th>Name</th><th>Role</th><th>Two-step</th><th>Added</th><th>Last sign-in</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="userrows"></tbody></table></div></div>
       <form class="card form" id="adduser">
@@ -320,7 +322,7 @@
         <p class="note">For a bot or a website (a Discord bot, your site's server status). Send it as <code>Authorization: Bearer wk_…</code> to the administration port. A key acts as a moderator or an admin, never the owner, and everything it does is in the activity log.</p>
         <form id="keyform" class="inline"><label for="key-name" class="sr">Key name</label><input id="key-name" placeholder="Name, e.g. discord-bot" autocomplete="off" spellcheck="false" required>
           <label for="key-role" class="sr">Role</label><select id="key-role"><option value="moderator">Moderator (see, announce, kick)</option><option value="admin">Admin (also ban, restart, backups)</option></select><button>Make a key</button></form>
-        <div class="tablewrap"><table><thead><tr><th>Name</th><th>Role</th><th>Made</th><th>Last used</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="keyrows"></tbody></table></div></section>
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Name</th><th>Role</th><th>Made</th><th>Last used</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="keyrows"></tbody></table></div></section>
     </section>
   </main>
 </div>

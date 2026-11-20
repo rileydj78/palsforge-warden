@@ -168,7 +168,7 @@ function render(st) {
 
 // Small SVG line chart drawn from the samples; gaps where the server was down.
 function chart(box, samples, key, label, color, maxHint) {
-  const W = 760, H = 120, P = 28;
+  const W = Math.max(280, Math.round(box.clientWidth || 760)), H = 120, P = 28; // 1 unit = 1 px: labels stay readable
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
@@ -362,7 +362,7 @@ async function loadServer() {
     $("srv-build").textContent = s.build || "–";
     $("srv-update").textContent = s.update ? "Updated by the nightly routine" : "Updates are off";
     $("srv-next").textContent = s.nextRun ? when2(s.nextRun) : "Off";
-    $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in warden.json";
+    $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in Settings";
     $("srv-crashes").textContent = h.crashes24h;
     $("srv-mem").textContent = s.memory ? `${(s.memory / (1 << 30)).toFixed(1)} GB` : "–";
     if (s.machine) { $("srv-cpu").textContent = `${Math.round(s.machine.cpuPercent)}% CPU`; $("srv-ram").textContent = s.machine.memTotal ? `${(s.machine.memUsed / (1 << 30)).toFixed(1)} of ${(s.machine.memTotal / (1 << 30)).toFixed(0)} GB memory in use` : ""; }
@@ -374,7 +374,7 @@ async function loadServer() {
     if (me.role !== "moderator") api("/api/setup-check").then((cs) => {
       const ul = $("checks"); ul.replaceChildren();
       cs.sort((a, b) => (a.ok - b.ok) || (b.warn - a.warn));
-      for (const c of cs) { const li = el("li", null, c.ok ? "ok" : c.warn ? "warn" : "bad"); li.append(el("strong", c.area), el("span", " " + c.detail)); ul.append(li); }
+      for (const c of cs) { const li = el("li", null, c.ok ? "ok" : c.warn ? "warn" : "bad"); li.append(el("b", c.area + ":"), el("span", c.detail)); ul.append(li); }
     }).catch(() => {});
     try {
       const pd = await api("/api/paldefender");
@@ -395,7 +395,7 @@ async function loadServer() {
     }
     const ev = await api("/api/events"), rows = $("eventrows"); rows.replaceChildren();
     if (!ev.length) { const tr = el("tr"); const td = el("td", "Nothing yet.", "empty"); td.colSpan = 3; tr.append(td); rows.append(tr); }
-    for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts)), el("td", e.kind, "strong"), el("td", e.text)); rows.append(tr); }
+    for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts), "nowrap"), el("td", e.kind, "strong"), el("td", e.text)); rows.append(tr); }
   } catch (e) {}
 }
 $("pd-connect").addEventListener("click", async () => {
@@ -436,7 +436,7 @@ async function loadBackups() {
         }
         tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–"), acts); tb.append(tr);
       }
-      t.append(tb); const w = el("div", null, "tablewrap"); w.append(t); c.append(w); box.append(c);
+      t.append(tb); const w = el("div", null, "tablewrap"); w.tabIndex = 0; w.setAttribute("role", "region"); w.setAttribute("aria-label", "Table (scrolls sideways on small screens)"); w.append(t); c.append(w); box.append(c);
     });
   } catch (e) {}
 }
@@ -580,6 +580,14 @@ async function loadGame() {
       pr.append(b);
     }
     loadEngine();
+    const ne = game.notInEffect || [];
+    $("g-effect").hidden = !ne.length && !game.worldOption;
+    $("g-effect-text").textContent = game.worldOption
+      ? (game.worldOptionQueued ? "WorldOption.sav will be set aside at the next restart (kept beside the world, so it can be put back); then this file applies." : "The running world has its own WorldOption.sav (it comes with a world uploaded from co-op). The game uses it instead of this file for almost every setting, so changes here don't take effect. Setting it aside makes this file apply; it's kept beside the world, so it can be put back.")
+      : "The running server reports different values from this file, usually because it hasn't restarted since the file changed.";
+    const ul = $("g-effect-list"); ul.replaceChildren();
+    for (const x of ne.slice(0, 12)) ul.append(el("li", `${x.label}: file ${x.file}, running ${x.running}`));
+    $("g-wo").hidden = !game.worldOption || game.worldOptionQueued || me.role !== "owner";
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
 }
@@ -805,10 +813,10 @@ async function refresh() {
     const s = await api("/api/server");
     $("st-backup").hidden = false; $("st-next").hidden = false;
     const lr = s.lastRun;
-    $("lastbk").textContent = lr ? when(lr.started) : "Never";
-    const pf = s.proof;
-    $("lastbknote").textContent = lr ? (lr.ok ? (pf && pf.ok ? `Restorable: tested ${when2(pf.at)}` : `${lr.kind} run completed`) : `${lr.kind} run had problems: see Server`) : "No backup has run yet";
-    $("st-backup").classList.toggle("warn", !lr || !lr.ok || Date.now() / 1000 - lr.started > 36 * 3600);
+    const lb = s.lastBackup, pf = s.proof, lbAt = lb ? new Date(lb.when).getTime() / 1000 : 0;
+    $("lastbk").textContent = lb ? ago(lbAt) : "Never";
+    $("lastbknote").textContent = !lb ? "No backup yet" : lr && !lr.ok ? `The last ${lr.kind} run had problems: see Server` : pf && pf.ok ? `${when2(lb.when)} · restorable (tested ${when2(pf.at)})` : when2(lb.when);
+    $("st-backup").classList.toggle("warn", !lb || (lr && !lr.ok) || Date.now() / 1000 - lbAt > 36 * 3600);
     $("nextrun").textContent = s.nextRun ? when2(s.nextRun) : "Off";
     $("nextrunnote").textContent = s.nextRun ? (s.offsite ? "Backups copied to a second place" : "No second place for backups yet") : "Turn it on in Settings";
   } catch (e) {}
@@ -897,10 +905,11 @@ async function loadInstances() {
 function drawPlaces() {
   const ul = $("s-places"); ul.replaceChildren();
   const all = [...(cfg.backups.sftp || []).map((p, i) => ({ kind: "sftp", i, label: p.url.replace(/\/\/[^@]*@/, "//") })),
+               ...(cfg.backups.webdav || []).map((p, i) => ({ kind: "webdav", i, label: p.url })),
                ...(cfg.backups.s3 || []).map((p, i) => ({ kind: "s3", i, label: `${p.endpoint.replace(/^https?:\/\//, "")} / ${p.bucket}/${p.prefix || ""}` }))];
   if (!all.length) { ul.append(el("li", "None yet.", "note")); return; }
   for (const p of all) {
-    const li = el("li"); li.append(el("span", (p.kind === "s3" ? "S3: " : "SFTP: ") + p.label, "mono"));
+    const li = el("li"); li.append(el("span", ({ s3: "S3: ", sftp: "SFTP: ", webdav: "WebDAV: " })[p.kind] + p.label, "mono"));
     const rm = el("button", "Remove", "small"); rm.type = "button";
     rm.onclick = () => { cfg.backups[p.kind].splice(p.i, 1); drawPlaces(); toast("Removed. Save to keep the change."); };
     li.append(rm); ul.append(li);
@@ -912,4 +921,18 @@ $("s3-add").addEventListener("click", () => {
   (cfg.backups.s3 = cfg.backups.s3 || []).push(t);
   for (const id of ["s3-ep", "s3-rg", "s3-bk", "s3-px", "s3-ak", "s3-sk"]) $(id).value = "";
   drawPlaces(); toast("Added. Save to keep it; the next backup goes there too.");
+});
+
+// "2 h ago" style times for tiles (the exact time is in the note).
+function ago(sec) {
+  const d = Math.max(0, Date.now() / 1000 - sec);
+  if (d < 90) return "just now";
+  if (d < 3600) return `${Math.round(d / 60)} min ago`;
+  if (d < 48 * 3600) return `${Math.round(d / 3600)} h ago`;
+  return `${Math.round(d / 86400)} days ago`;
+}
+
+$("g-wo").addEventListener("click", async () => {
+  if (await ask({ title: "Set WorldOption.sav aside?", text: "At the next restart Warden renames it (kept beside the world), so PalWorldSettings.ini applies. Your world itself is untouched.", ok: "Set it aside" }) == null) return;
+  try { await api("/api/game-settings/world-option", {}); toast("Done at the next restart (nightly routine, or Restart on the Commands page)."); loadGame(); } catch (e) { toast(e.message); }
 });

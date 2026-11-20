@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +49,14 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		if len(runs) > 0 {
 			out["lastRun"] = runs[0]
+		}
+		if list, err := backup.ListTag(c.Runner.Backups.LocalDir(), c.Cfg.Backups.Tag); err == nil {
+			for _, a := range list { // newest first: the newest world backup, however it was made
+				if a.Kind == backup.Data {
+					out["lastBackup"] = map[string]any{"name": a.Name, "when": a.When}
+					break
+				}
+			}
 		}
 		writeJSON(w, 200, out)
 	}))
@@ -529,8 +538,43 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			}
 			values[k] = v
 		}
-		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending, "presets": gamesettings.Presets})
+		// Is the file what the server is actually running with? (A world's WorldOption.sav wins
+		// over the file for almost everything.)
+		var notInEffect []map[string]string
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if running, err := s.Game.Settings(ctx); err == nil {
+			for k, fv := range f.Values {
+				o, ok := gamesettings.Lookup(k)
+				rv, has := running[k]
+				if !ok || !has || o.Type == "secret" {
+					continue
+				}
+				if _, waiting := pending[k]; waiting {
+					continue
+				}
+				if !gamesettings.Same(k, fmt.Sprint(rv), fv) {
+					notInEffect = append(notInEffect, map[string]string{"key": k, "label": o.Label, "file": fv, "running": fmt.Sprint(rv)})
+				}
+			}
+		}
+		cancel()
+		sort.Slice(notInEffect, func(i, j int) bool { return notInEffect[i]["label"] < notInEffect[j]["label"] })
+		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending, "presets": gamesettings.Presets,
+			"notInEffect": notInEffect, "worldOption": worlds.OptionFile(c.Cfg.ServerDir, path) != "", "worldOptionQueued": worlds.SetAsideOptionQueued(c.Runner.Backups.DataDir)})
 	}
+	mux.HandleFunc("POST /api/game-settings/world-option", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		if worlds.OptionFile(c.Cfg.ServerDir, path) == "" {
+			fail(w, 400, "the running world has no WorldOption.sav")
+			return
+		}
+		err := worlds.QueueSetAsideOption(c.Runner.Backups.DataDir)
+		s.Store.Audit(ses.User.Name, "set aside WorldOption.sav", "", "at the next stop", err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w) }))
 	plan := func(r *http.Request) (*gamesettings.File, []gamesettings.Change, string, error) {
 		var in struct {
@@ -629,7 +673,12 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			}
 			time.Sleep(3 * time.Second) // let the game finish writing its own copy first
 			sum, err := c.Runner.WhileStopped(ctx)
-			s.Store.AddEvent(time.Now(), "settings", fmt.Sprintf("%s %v", sum, err))
+			if err != nil {
+				sum = strings.TrimPrefix(sum+"; "+err.Error(), "; ")
+			}
+			if sum != "" {
+				s.Store.AddEvent(time.Now(), "settings", sum)
+			}
 			c.Host.Start(ctx)
 		}()
 		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "restarting now"})

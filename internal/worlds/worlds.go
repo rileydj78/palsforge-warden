@@ -196,3 +196,49 @@ func ApplyPending(settingsPath, dataDir string) (string, error) {
 
 // Cancel drops a queued switch.
 func Cancel(dataDir string) { os.Remove(pendingFile(dataDir)) }
+
+// OptionFile is the active world's WorldOption.sav, if it has one. The game prefers it to
+// PalWorldSettings.ini for almost every setting (a co-op world uploaded to a server brings one
+// along), so changes made in the settings file silently don't apply while it exists.
+func OptionFile(serverDir, settingsPath string) string {
+	id := Active(settingsPath)
+	if id == "" {
+		return ""
+	}
+	p := filepath.Join(savesDir(serverDir), id, "WorldOption.sav")
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	return ""
+}
+
+func optionPending(dataDir string) string { return filepath.Join(dataDir, "worldoption-setaside.txt") }
+
+// QueueSetAsideOption asks for the active world's WorldOption.sav to be set aside at the next stop.
+func QueueSetAsideOption(dataDir string) error {
+	return os.WriteFile(optionPending(dataDir), []byte("yes"), 0o600)
+}
+
+// SetAsideOptionQueued says whether that's waiting.
+func SetAsideOptionQueued(dataDir string) bool {
+	_, err := os.Stat(optionPending(dataDir))
+	return err == nil
+}
+
+// ApplySetAsideOption renames the active world's WorldOption.sav (kept beside it, so it can be put
+// back) so the settings file applies. Call only while the server is stopped.
+func ApplySetAsideOption(serverDir, settingsPath, dataDir string) (string, error) {
+	if !SetAsideOptionQueued(dataDir) {
+		return "", nil
+	}
+	os.Remove(optionPending(dataDir))
+	p := OptionFile(serverDir, settingsPath)
+	if p == "" {
+		return "", nil
+	}
+	to := p + ".warden-" + time.Now().Format("20060102-150405") + ".bak"
+	if err := os.Rename(p, to); err != nil {
+		return "", err
+	}
+	return "WorldOption.sav set aside (kept as " + filepath.Base(to) + "); the settings file applies now", nil
+}
