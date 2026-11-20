@@ -176,7 +176,21 @@ func main() {
 				}
 			}()
 		}
-		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn)
+		var gate broadcast.Gate
+		if wcfg.AllowList.On {
+			msg := wcfg.AllowList.Message
+			if msg == "" {
+				msg = "This server is invite-only right now."
+			}
+			gate = func(userID, name string) string {
+				if st2.Allowed(userID) {
+					return ""
+				}
+				st2.Audit("allow-list", "kick", name+" ("+userID+")", "not on the allow-list", true)
+				return msg
+			}
+		}
+		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn, gate, game.Kick)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
 		go h.Supervise(context.Background())

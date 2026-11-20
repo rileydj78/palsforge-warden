@@ -15,3 +15,15 @@ func TestPlaytimeCountsOnlyNearbySightings(t *testing.T) {
 		t.Fatalf("roster: %+v", r)
 	}
 }
+
+func TestAllowList(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	s.Allow("steam_1", "owner", true)
+	if !s.Allowed("steam_1") || s.Allowed("steam_2") {
+		t.Fatal("allowed")
+	}
+	s.Allow("steam_1", "owner", false)
+	if s.Allowed("steam_1") {
+		t.Fatal("removed")
+	}
+}

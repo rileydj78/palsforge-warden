@@ -224,6 +224,8 @@ function renderRoster() {
     }
     const name = el("td", p.name, "strong"); if (p.banned) name.append(el("span", "banned", "tag"));
     if (p.note) name.append(el("div", p.note, "note"));
+    if (allowSet.has(p.userId)) name.append(el("span", "allowed", "tag"));
+    if (me.role !== "moderator") { const ab = el("button", allowSet.has(p.userId) ? "Disallow" : "Allow", "small"); ab.onclick = () => setAllow(p.userId, !allowSet.has(p.userId)); acts.append(ab); }
     const nb = el("button", p.note ? "Edit note" : "Note", "small");
     nb.onclick = async () => { const t = await ask({ title: `Note about ${p.name}`, text: "Only admins see it.", label: "Note", value: p.note || "", ok: "Save" }); if (t == null) return; try { await api("/api/players/note", { userId: p.userId, note: t }); loadRoster(); } catch (e) { toast(e.message); } };
     acts.append(nb);
@@ -231,7 +233,24 @@ function renderRoster() {
     rows.append(tr);
   }
 }
-async function loadRoster() { try { roster = await api("/api/roster"); renderRoster(); } catch (e) {} loadBans(); }
+let allowSet = new Set();
+async function setAllow(id, on) { try { await api("/api/allow", { userId: id, on }); toast(on ? "Allowed." : "Taken off the allow-list."); loadRoster(); } catch (e) { toast(e.message); } }
+async function loadAllow() {
+  try {
+    const a = await api("/api/allow"); allowSet = new Set(a.players.map((x) => x.userId));
+    $("allownote").textContent = a.on ? "On: only these players can stay on the server; anyone else is kicked as they join." : "Off: anyone can join. Turn it on in Settings once the people you want are on the list.";
+    $("allowform").hidden = me.role === "moderator";
+    const rows = $("allowrows"); rows.replaceChildren();
+    if (!a.players.length) { const tr = el("tr"); const td = el("td", "Nobody yet. Add players from the list above, or by their ID.", "empty"); td.colSpan = 4; tr.append(td); rows.append(tr); }
+    for (const x of a.players) {
+      const tr = el("tr"), acts = el("td", null, "acts");
+      if (me.role !== "moderator") { const b = el("button", "Remove", "small"); b.onclick = () => setAllow(x.userId, false); acts.append(b); }
+      tr.append(el("td", x.name || x.userId, "strong"), el("td", when(x.added)), el("td", x.by || "–"), acts); rows.append(tr);
+    }
+  } catch (e) {}
+}
+$("allowform").addEventListener("submit", (e) => { e.preventDefault(); const v = $("allowid").value.trim(); if (v) setAllow(v, true).then(() => { $("allowid").value = ""; }); });
+async function loadRoster() { await loadAllow(); try { roster = await api("/api/roster"); renderRoster(); } catch (e) {} loadBans(); }
 const SRC = { palworld: "The game", paldefender: "PalDefender" };
 async function loadBans() {
   try {
@@ -614,6 +633,7 @@ async function loadSettings() {
     $("s-ev").value = cfg.events || "";
     const hl = cfg.health || {};
     $("s-h-frozen").value = hl.restartFrozenMinutes ?? 5; $("s-h-mem").value = hl.memoryLimitGB || 0;
+    const al = cfg.allowList || {}; $("s-a-on").checked = !!al.on; $("s-a-msg").value = al.message || "";
     const b = cfg.broadcasts || {};
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
@@ -632,6 +652,7 @@ $("setform").addEventListener("submit", async (e) => {
   c.notify = notifyForm();
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0 };
+  c.allowList = { on: $("s-a-on").checked, message: $("s-a-msg").value.trim() };
   c.broadcasts = { enabled: $("s-m-on").checked, messages: lines($("s-m-list").value), everyMinutes: parseInt($("s-m-every").value, 10) || 0, welcome: $("s-m-welcome").value.trim() };
   Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
   try {

@@ -106,6 +106,10 @@
       <section class="card"><h2>Bans</h2><p class="note">Every ban, wherever it was made: in Warden, in the game, or by PalDefender.</p>
         <div class="tablewrap"><table><thead><tr><th>Player</th><th>Banned by</th><th>Reason</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="banrows"></tbody></table></div></section>
+      <section class="card"><h2>Allow-list</h2><p class="note" id="allownote"></p>
+        <form id="allowform" class="inline"><label for="allowid" class="sr">Player ID</label><input id="allowid" placeholder="Player ID, e.g. steam_76561198000000000" autocomplete="off" spellcheck="false"><button>Allow</button></form>
+        <div class="tablewrap"><table><thead><tr><th>Player</th><th>Added</th><th>By</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody id="allowrows"></tbody></table></div></section>
     </section>
 
     <section id="view-server" class="view" hidden>
@@ -213,6 +217,9 @@
         <h2>Keeping it healthy</h2>
         <label for="s-h-frozen">Restart a server that's running but hasn't answered for this many minutes (0 = only tell me)</label><input id="s-h-frozen" type="number" min="0" max="60">
         <label for="s-h-mem">Restart with warnings when the server uses more memory than this many GB (0 = off; Palworld's memory grows over days)</label><input id="s-h-mem" type="number" min="0" step="0.5">
+        <h2>Allow-list</h2>
+        <label class="check"><input type="checkbox" id="s-a-on"> Only players on the allow-list may join (others are kicked as they arrive)</label>
+        <label for="s-a-msg">Message for people who aren't on it</label><input id="s-a-msg" placeholder="This server is invite-only right now.">
         <h2>Server messages</h2>
         <label class="check"><input type="checkbox" id="s-m-on"> Send messages in the game</label>
         <label for="s-m-list">Messages, one per line, sent in turn while anyone is online (your Discord, website, rules, events)</label><textarea id="s-m-list" rows="4"></textarea>

@@ -31,8 +31,16 @@ type Warden struct {
 	PalDef    paldefender.Config `json:"palDefender"`
 	Broadcast broadcast.Config   `json:"broadcasts"`
 	Health    Health             `json:"health"`
+	// Allow-list: when on, players who aren't on Warden's list are kicked as they join.
+	AllowList AllowList `json:"allowList"`
 	// Weekly events, one per line: "Name | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5".
 	Events string `json:"events"`
+}
+
+// AllowList is the join gate.
+type AllowList struct {
+	On      bool   `json:"on"`
+	Message string `json:"message"` // shown to people who are kicked
 }
 
 // Health is what Warden does on its own to keep the server up.

@@ -42,7 +42,7 @@ func TestCleanAndWelcomeOnlyNewPlayers(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 70*time.Second)
 	defer cancel()
 	var joins []string
-	go Run(ctx, Config{Enabled: true, Welcome: "Welcome, {name}!"}, f, priv, nil, func(j, l []string) { f.mu.Lock(); joins = append(joins, j...); f.mu.Unlock() })
+	go Run(ctx, Config{Enabled: true, Welcome: "Welcome, {name}!"}, f, priv, nil, func(j, l []string) { f.mu.Lock(); joins = append(joins, j...); f.mu.Unlock() }, nil, nil)
 	time.Sleep(35 * time.Second) // first look: whoever is already on isn't welcomed
 	f.mu.Lock()
 	f.players = append(f.players, palworld.Player{Name: "Moss", UserID: "steam_2"})

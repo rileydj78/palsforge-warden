@@ -28,6 +28,7 @@ var schema = []string{
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
 	`ALTER TABLE users ADD COLUMN totp TEXT`,
 	`ALTER TABLE samples ADD COLUMN cpu REAL`,
+	`CREATE TABLE IF NOT EXISTS allowed (user_id TEXT PRIMARY KEY, added INTEGER, by TEXT)`,
 	`ALTER TABLE samples ADD COLUMN mem REAL`,
 	`ALTER TABLE users ADD COLUMN totp_pending TEXT`,
 	`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, kind TEXT, started INTEGER, ok INTEGER, report TEXT)`,
@@ -258,4 +259,38 @@ func (s *Store) SetNote(userID, note string) error {
 		return fmt.Errorf("no player %s in the roster yet", userID)
 	}
 	return nil
+}
+
+// Allow puts a player on the allow-list (or takes them off).
+func (s *Store) Allow(userID, by string, on bool) error {
+	if on {
+		_, err := s.DB.Exec(`INSERT OR REPLACE INTO allowed(user_id, added, by) VALUES(?,?,?)`, userID, time.Now().Unix(), by)
+		return err
+	}
+	_, err := s.DB.Exec(`DELETE FROM allowed WHERE user_id=?`, userID)
+	return err
+}
+
+// Allowed says whether a player is on the allow-list.
+func (s *Store) Allowed(userID string) bool {
+	var n int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM allowed WHERE user_id=?`, userID).Scan(&n)
+	return n > 0
+}
+
+// AllowList returns everyone on the allow-list, with the name Warden last saw them under.
+func (s *Store) AllowList() ([]map[string]any, error) {
+	rows, err := s.DB.Query(`SELECT a.user_id, COALESCE(p.name,''), a.added, COALESCE(a.by,'') FROM allowed a LEFT JOIN players p ON p.user_id=a.user_id ORDER BY a.added`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var id, name, by string
+		var added int64
+		rows.Scan(&id, &name, &added, &by)
+		out = append(out, map[string]any{"userId": id, "name": name, "added": added, "by": by})
+	}
+	return out, rows.Err()
 }

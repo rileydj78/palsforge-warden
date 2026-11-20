@@ -32,10 +32,16 @@ type Private func(ctx context.Context, userID, msg string) error
 // Seen is told when players join and leave (for notifications); nil to skip.
 type Seen func(joined, left []string)
 
+// Gate decides whether a joining player may stay; a non-empty message kicks them with it.
+type Gate func(userID, name string) (kickMessage string)
+
+// Kicker removes a player (the REST API's kick).
+type Kicker func(ctx context.Context, userID, msg string) error
+
 // Run sends messages until ctx ends. busy reports when the routine or a restart is running.
-func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() bool, seenFn Seen) {
+func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() bool, seenFn Seen, gate Gate, kick Kicker) {
 	msgsOn := cfg.Enabled && (len(cfg.Messages) > 0 || cfg.Welcome != "")
-	if !msgsOn && seenFn == nil {
+	if !msgsOn && seenFn == nil && gate == nil {
 		return
 	}
 	if !cfg.Enabled {
@@ -69,6 +75,16 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 		now := map[string]string{}
 		var joined, left []string
 		for _, p := range ps {
+			if gate != nil && kick != nil {
+				if msg := gate(p.UserID, p.Name); msg != "" { // not on the allow-list: out, at once
+					c, cancel := context.WithTimeout(ctx, 10*time.Second)
+					if err := kick(c, p.UserID, msg); err != nil {
+						log.Printf("allow-list: couldn't kick %s: %v", p.Name, err)
+					}
+					cancel()
+					continue
+				}
+			}
 			now[p.UserID] = p.Name
 			if _, was := seen[p.UserID]; !first && !was {
 				joined = append(joined, p.Name)

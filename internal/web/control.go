@@ -851,3 +851,36 @@ func (s *Server) stillBanned(id, serverDir string) bool {
 	}
 	return false
 }
+
+// ---- the allow-list
+
+func (s *Server) allowRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/allow", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		l, err := s.Store.AllowList()
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		on := s.Control != nil && s.Control.Cfg.AllowList.On
+		writeJSON(w, 200, map[string]any{"on": on, "players": l})
+	}))
+	mux.HandleFunc("POST /api/allow", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			UserID string `json:"userId"`
+			On     bool   `json:"on"`
+		}
+		if readJSON(r, &in) != nil || !idRe2.MatchString(in.UserID) {
+			fail(w, 400, "a player ID looks like steam_76561198000000000 (it's on the Players page)")
+			return
+		}
+		err := s.Store.Allow(in.UserID, ses.User.Name, in.On)
+		s.Store.Audit(ses.User.Name, map[bool]string{true: "allow", false: "disallow"}[in.On], in.UserID, "", err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
+}
+
+var idRe2 = regexp.MustCompile(`^[A-Za-z0-9_-]{3,100}$`)

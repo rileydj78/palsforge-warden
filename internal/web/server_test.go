@@ -184,3 +184,16 @@ func TestMapCoords(t *testing.T) {
 		t.Fatalf("got %d,%d", x, y)
 	}
 }
+
+func TestAllowListNeedsAdmin(t *testing.T) {
+	c, _, au := setup(t)
+	au.AddUser("mod", "another long password", auth.Moderator)
+	_, out := c.do("POST", "/api/login", map[string]string{"name": "mod", "password": "another long password"}, false)
+	c.csrf = out["csrf"].(string)
+	if code, _ := c.do("POST", "/api/allow", map[string]any{"userId": "steam_1", "on": true}, true); code != 403 {
+		t.Fatalf("a moderator must not change the allow-list, got %d", code)
+	}
+	if code, _ := c.do("GET", "/api/allow", nil, false); code != 200 {
+		t.Fatalf("a moderator may see it, got %d", code)
+	}
+}
