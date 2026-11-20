@@ -752,7 +752,7 @@ async function loadSettings() {
     drawPlaces();
     $("s-b-dir").value = cfg.backups.dir; $("s-b-off").value = (cfg.backups.offsite || []).join("\n"); $("s-b-img").value = cfg.backups.image;
     $("s-b-d").value = cfg.backups.keepDaily; $("s-b-w").value = cfg.backups.keepWeekly;
-    $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate; $("s-u-hold").checked = !!cfg.update.holdForMods;
+    $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate; $("s-u-hold").checked = !!cfg.update.holdForMods; $("s-u-soon").checked = !!cfg.update.soon;
     $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
     $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
     $("s-ev").value = cfg.events || "";
@@ -775,7 +775,7 @@ $("setform").addEventListener("submit", async (e) => {
   const c = structuredClone(cfg);
   c.nightly = { enabled: $("s-n-on").checked, time: $("s-n-time").value.trim(), warnMinutes: $("s-n-warn").value.split(",").map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)) };
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
-  Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked, holdForMods: $("s-u-hold").checked });
+  Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked, holdForMods: $("s-u-hold").checked, soon: $("s-u-soon").checked });
   c.notify = notifyForm();
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0, pauseEmptyMinutes: parseInt($("s-h-pause").value, 10) || 0 };

@@ -147,6 +147,10 @@ type Update struct {
 	// HoldForMods: when mods are on and a new game build is out, don't update until an admin
 	// allows that build (mods often break on game updates).
 	HoldForMods bool `json:"holdForMods"`
+	// Soon: check for a new game build every 30 minutes and update straight away (with in-game
+	// warnings) instead of waiting for the night: players' games update themselves, and a server
+	// on the old build turns them all away ("incompatible version").
+	Soon bool `json:"soon"`
 }
 
 // AppID is Palworld Dedicated Server's Steam app.

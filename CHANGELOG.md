@@ -15,6 +15,16 @@ The first release candidate. Warden has run a live Palworld community server on 
 - Several servers on one machine (one Warden each, with a switcher) and several worlds per server.
 - Install a server from nothing: `warden install-server`, or NEW in the double-click setup.
 
+**From the needs research (server owners' most common problems)**
+- "Can players get in?": checks the game port, Windows Firewall (rules that really cover it),
+  the community-list flag consoles depend on, crossplay, and gives the router/CGNAT hint, all on
+  the machine, each problem with its exact fix.
+- A world's WorldOption.sav silently overrides the settings file: Warden detects it, can set it
+  aside, and shows any setting the running server isn't using.
+- Update soon after a new game build (optional), so players aren't turned away as
+  "incompatible version" until the night.
+- REST API only: Pocketpair has deprecated RCON and says it will stop working.
+
 **Backups**
 - World, settings and mods nightly; a whole-server image weekly or nightly; SHA-256 checksums.
 - Second places: another folder or NAS, SFTP (pinned host key), S3-compatible storage, WebDAV.

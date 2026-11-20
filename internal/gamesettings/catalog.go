@@ -85,7 +85,7 @@ var Catalog = []Option{
 	{Key: "ServerPassword", Group: "Server", Label: "Join password", Help: "Players need it to join. Empty = anyone can join.", Type: "secret"},
 	i("Server", "ServerPlayerMaxNum", "Player slots", "The most players online at once (the game allows up to 32).", "32", 1, 32),
 	b("Server", "bShowPlayerList", "Show player list", "Players can see who's online in the game's menu.", "False"),
-	b("Server", "bIsUseBackupSaveData", "Game's own backups", "The game also keeps its own rolling world backups (Warden backs up separately).", "True"),
+	b("Server", "bIsUseBackupSaveData", "Game's own backups", "The game keeps a few rolling copies of the world in Pal/Saved/SaveGames/0/<world>/backup, on the same disk: handy to undo the last minutes, useless if the disk dies. Warden's backups are separate: checksummed, copied to a second place and checked there. Keep both on.", "True"),
 	i("Server", "PublicPort", "Game port", "The port players connect to. Change it only together with your firewall and router.", "8211", 1024, 65535),
 	{Key: "AdminPassword", Group: "Server", Label: "Admin password", Help: "Warden signs in to the server with it, so change it in the file while Warden is stopped.", Type: "secret", Locked: true},
 	{Key: "RESTAPIEnabled", Group: "Server", Label: "REST API", Help: "Warden needs it on.", Type: "bool", Default: "False", Locked: true},

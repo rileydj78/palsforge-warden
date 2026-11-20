@@ -179,6 +179,7 @@ func main() {
 		pin = runner.PinLatest
 		go runner.Watch(context.Background())
 		go runner.AutoPause(context.Background())
+		go runner.UpdateSoon(context.Background())
 		if evs, err := events.Parse(wcfg.Events); err == nil {
 			go runner.RunEvents(context.Background(), evs)
 		}

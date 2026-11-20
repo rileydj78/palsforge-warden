@@ -488,11 +488,11 @@ var latestCache struct {
 }
 
 // LatestBuild asks Steam (through SteamCMD) for the newest public build of the server. It's
-// remembered for an hour.
+// remembered for 20 minutes.
 func (h *Host) LatestBuild(ctx context.Context) (string, error) {
 	latestCache.Lock()
 	defer latestCache.Unlock()
-	if latestCache.build != "" && time.Since(latestCache.at) < time.Hour {
+	if latestCache.build != "" && time.Since(latestCache.at) < 20*time.Minute {
 		return latestCache.build, nil
 	}
 	if h.cfg.Update.SteamCMD == "" {
