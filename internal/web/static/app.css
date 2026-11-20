@@ -126,3 +126,6 @@ ul.checks li.ok::before { content: "✓"; color: var(--accent); }
 ul.checks li.warn { background: var(--warn-bg); } ul.checks li.warn::before { content: "!"; color: var(--warn-ink); }
 ul.checks li.bad { background: #FBE3DF; color: #6B1A12; } ul.checks li.bad::before { content: "✗"; }
 @media (prefers-color-scheme: dark) { ul.checks li.bad { background: #3B1E1A; color: #F4A79C; } }
+.presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.preset { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); cursor: pointer; }
+.preset:hover { border-color: var(--accent); }

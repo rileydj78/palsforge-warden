@@ -27,6 +27,13 @@ because Smart App Control blocks new unsigned programs):
 | PalDefender: connect, guilds, map positions, messages, IP bans | done |
 | Signed Windows release | waiting on SignPath Foundation |
 | Access: no sign-in on the server; accounts on a separate admin port | done |
+| Server messages + welcome; join/leave alerts; live Discord status message | done |
+| Frozen-server and memory-limit restarts; save watchdog | done |
+| Unified ban list; player notes; guilds; bases on the map; player inventory/Pals; give items/Pals | done |
+| Weekly events; game-settings presets; settings written only while stopped | done |
+| Proven restores; crash-aware retention (pinned backups); backup download | done |
+| Setup check with exposure check | done |
+| Allow-list, Discord commands, save migration, multi-server, translations, Docker, first-run installer | next (see feature-survey.md) |
 
 The full competitor comparison and the parity gaps are in [feature-survey.md](feature-survey.md).
 

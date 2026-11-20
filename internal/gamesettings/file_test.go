@@ -73,3 +73,13 @@ func TestPendingAppliedWhileStopped(t *testing.T) {
 		t.Fatalf("%v", f.Values)
 	}
 }
+
+func TestPresetsAreValid(t *testing.T) {
+	for _, p := range Presets {
+		for k, v := range p.Values {
+			if err := Validate(k, v); err != nil {
+				t.Fatalf("preset %s: %s=%s: %v", p.Name, k, v, err)
+			}
+		}
+	}
+}

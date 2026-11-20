@@ -471,6 +471,20 @@ async function loadGame() {
     }
     const np = Object.keys(game.pending || {}).length;
     $("g-sub").textContent = np ? `${np} change${np === 1 ? " is" : "s are"} waiting: Palworld rewrites its settings when it stops, so Warden writes them at the next stop (the nightly routine, or a restart from here).` : "Changes are written while the server is stopped (Palworld rewrites its settings when it shuts down). Every change keeps a copy of the old file.";
+    const pr = $("g-presets"); pr.replaceChildren();
+    for (const p of game.presets || []) {
+      const b = el("button", null, "preset"); b.type = "button"; b.append(el("strong", p.name), el("span", p.about, "note"));
+      b.onclick = () => {
+        let n = 0;
+        for (const [k, v] of Object.entries(p.values)) {
+          const i = document.querySelector(`#g-groups [data-key="${k}"]`); if (!i || i.disabled) continue;
+          const val = i.tagName === "SELECT" ? (/^true$/i.test(v) ? "True" : /^false$/i.test(v) ? "False" : v) : String(parseFloat(v));
+          if (i.value !== val) { i.value = val; i.classList.toggle("changed", i.value !== i.dataset.orig); n++; }
+        }
+        toast(n ? `${p.name}: ${n} value${n === 1 ? "" : "s"} filled in. Review changes to apply.` : `Already set like ${p.name}.`);
+      };
+      pr.append(b);
+    }
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
 }

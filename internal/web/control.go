@@ -377,7 +377,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			}
 			values[k] = v
 		}
-		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending})
+		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending, "presets": gamesettings.Presets})
 	}
 	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w) }))
 	plan := func(r *http.Request) (*gamesettings.File, []gamesettings.Change, string, error) {
