@@ -39,6 +39,8 @@ type Host struct {
 	OnEvent func(Event)
 	// ModsOn says whether any mods are on (for holding updates); nil = none.
 	ModsOn func() bool
+	// Alive asks the game whether it answers (the REST API); used when the process can't be seen.
+	Alive func(ctx context.Context) bool
 
 	dataDir string
 
@@ -65,7 +67,18 @@ func (h *Host) event(kind, text string) {
 // Running says whether any server process is up.
 func (h *Host) Running() bool {
 	pids, err := pidsOf(h.cfg.Abs(h.cfg.Control.Exe))
-	return err == nil && len(pids) > 0
+	if err == nil && len(pids) > 0 {
+		return true
+	}
+	// When another program runs the server, its process may be out of Warden's sight (another
+	// container, another user's session): then "running" means the game still answers. Without
+	// this, a stop looked finished at once and settings were written while the game still ran.
+	if h.cfg.Control.Mode == "external" && h.Alive != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		return h.Alive(ctx)
+	}
+	return false
 }
 
 // Status for the panel.

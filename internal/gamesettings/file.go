@@ -260,8 +260,13 @@ func Same(key, a, b string) bool {
 	o, known := Lookup(key)
 	fa, ea := format(o, known, a)
 	fb, eb := format(o, known, b)
-	if ea != nil || eb != nil {
-		return strings.TrimSpace(a) == strings.TrimSpace(b)
+	if ea != nil || eb != nil { // e.g. a number outside Warden's range: compare as numbers if they are
+		na, e1 := strconv.ParseFloat(strings.TrimSpace(a), 64)
+		nb, e2 := strconv.ParseFloat(strings.TrimSpace(b), 64)
+		if e1 == nil && e2 == nil {
+			return na == nb
+		}
+		return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 	}
 	return fa == fb
 }

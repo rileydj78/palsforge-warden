@@ -14,7 +14,7 @@ func TestCheckFile(t *testing.T) {
 		os.WriteFile(p, []byte(text), 0o644)
 		return CheckFile(p)
 	}
-	good := "[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ExpRate=2.000000,ServerName=\"A, B\",bIsPvP=True)\n"
+	good := "[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ExpRate=2.000000,ServerName=\"A, B\",bIsPvP=True,AdminPassword=\"x\",RESTAPIEnabled=True,RESTAPIPort=8212)\n"
 	if p := try(good); len(p) != 0 {
 		t.Fatalf("a good file: %v", p)
 	}

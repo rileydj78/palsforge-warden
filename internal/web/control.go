@@ -568,7 +568,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		return
 	}
 	path := config.SettingsPath(c.Cfg.ServerDir)
-	view := func(w http.ResponseWriter) {
+	view := func(w http.ResponseWriter, r *http.Request) {
 		f, err := gamesettings.Read(path)
 		if err != nil {
 			fail(w, 500, "can't read the game's settings: "+err.Error())
@@ -599,7 +599,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		// Is the file what the server is actually running with? (A world's WorldOption.sav wins
 		// over the file for almost everything.)
 		var notInEffect []map[string]string
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second) // a frozen game can't slow the page much
 		if running, err := s.Game.Settings(ctx); err == nil {
 			for k, fv := range f.Values {
 				o, ok := gamesettings.Lookup(k)
@@ -633,7 +633,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
-	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w) }))
+	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w, r) }))
 	plan := func(r *http.Request) (*gamesettings.File, []gamesettings.Change, string, error) {
 		var in struct {
 			Values  map[string]string `json:"values"`

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/backup"
@@ -262,16 +263,17 @@ func (g Game) Alive(ctx context.Context) bool {
 
 // Runner runs the routine on schedule or on request, one at a time.
 type Runner struct {
-	Cfg     config.Warden
-	Game    routine.Game
-	Host    *host.Host
-	Backups *Backups
-	Store   *store.Store
-	Notify  *notify.Notifier
-	Mods    *mods.Manager
-	mu      sync.Mutex
-	busy    bool
-	stepNow string
+	Cfg        config.Warden
+	Game       routine.Game
+	Host       *host.Host
+	Backups    *Backups
+	Store      *store.Store
+	Notify     *notify.Notifier
+	Mods       *mods.Manager
+	mu         sync.Mutex
+	busy       bool
+	stepNow    string
+	autoPaused atomic.Bool // stopped by auto-pause (not by an admin)
 }
 
 // Begin claims the server for one operation (the routine, a restore, a mod change, a restart, a
@@ -300,7 +302,7 @@ func (r *Runner) RunNow(ctx context.Context, kind string, warn []int, update boo
 		return nil, err
 	}
 	defer end()
-	p := routine.Plan{WarnMinutes: warn, Update: update}
+	p := routine.Plan{WarnMinutes: warn, Update: update, Reason: map[string]string{"update": "Server update", "manual": "Server restart"}[kind]}
 	p.BeforeStart = r.WhileStopped
 	rep := routine.Run(ctx, p, r.Game, r.Host, r.Backups)
 	r.Store.AddRun(kind, rep.Started, rep.OK, rep)
@@ -443,7 +445,7 @@ func (r *Runner) SwitchWorld(ctx context.Context, id string, warn []int) (*routi
 	}
 	defer end()
 	gate := &backupGate{Backups: r.Backups}
-	p := routine.Plan{WarnMinutes: warn}
+	p := routine.Plan{WarnMinutes: warn, Reason: "World switch"}
 	p.BeforeStart = func(ctx context.Context) (string, error) {
 		if !gate.ok {
 			worlds.Cancel(r.Backups.DataDir)

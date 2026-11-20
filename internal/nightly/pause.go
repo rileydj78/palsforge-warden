@@ -64,12 +64,14 @@ func (r *Runner) pause(ctx context.Context, minutes int) bool {
 		r.Host.ForceStop(ctx)
 	}
 	r.Store.AddEvent(time.Now(), "pause", fmt.Sprintf("paused: nobody online for %d minutes; it starts again when someone tries to join", minutes))
+	r.autoPaused.Store(true)
 	return true
 }
 
 // waitForKnock listens on the game port until a packet arrives (someone trying to join) or the
 // server is started some other way (the nightly routine, an admin), then starts it if needed.
 func (r *Runner) waitForKnock(ctx context.Context, port int) {
+	defer r.autoPaused.Store(false)
 	pc, err := net.ListenPacket("udp", ":"+strconv.Itoa(port))
 	if err != nil {
 		r.Store.AddEvent(time.Now(), "pause", "couldn't listen on the game port ("+err.Error()+"); starting the server again")
@@ -89,6 +91,17 @@ func (r *Runner) waitForKnock(ctx context.Context, port int) {
 		if _, _, err := pc.ReadFrom(buf); err == nil {
 			pc.Close() // free the port for the game
 			r.Store.AddEvent(time.Now(), "pause", "someone tried to join: starting the server")
+			for i := 0; i < 180; i++ { // never start in the middle of an update or a backup
+				if end, err := r.Begin("waking the server"); err == nil {
+					r.Host.Start(ctx)
+					end()
+					return
+				}
+				if r.Host.State().Wanted { // whatever held the lock started it
+					return
+				}
+				time.Sleep(10 * time.Second)
+			}
 			r.Host.Start(ctx)
 			return
 		}

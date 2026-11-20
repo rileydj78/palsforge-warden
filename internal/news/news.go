@@ -100,10 +100,12 @@ func (f *Feed) Fetch(ctx context.Context) (fresh []Item, err error) {
 		}
 		seen[it.ID] = true
 	}
-	f.saveSeen(seen)
 	f.mu.Lock()
 	f.items, f.at = items, time.Now()
 	f.mu.Unlock()
+	if err := f.saveSeen(seen); err != nil {
+		return fresh, fmt.Errorf("can't remember which news was seen (%v): new posts may be announced again", err)
+	}
 	return fresh, nil
 }
 
@@ -127,13 +129,13 @@ func (f *Feed) loadSeen() map[string]bool {
 	return m
 }
 
-func (f *Feed) saveSeen(m map[string]bool) {
-	if len(m) > 200 { // keep it small; old ids never come back in a 6-item feed
+func (f *Feed) saveSeen(m map[string]bool) error {
+	if len(m) > 200 { // keep it small; old ids never come back in a 6-item feed (items are current)
 		m = map[string]bool{}
 		for _, it := range f.Latest() {
 			m[it.ID] = true
 		}
 	}
 	b, _ := json.Marshal(m)
-	os.WriteFile(f.seenPath(), b, 0o600)
+	return os.WriteFile(f.seenPath(), b, 0o600)
 }

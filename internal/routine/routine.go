@@ -47,6 +47,8 @@ type Plan struct {
 	Sleep       func(ctx context.Context, d time.Duration) error
 	// BeforeStart runs while the server is stopped, just before it starts (e.g. mod changes).
 	BeforeStart func(ctx context.Context) (string, error)
+	// What players are told ("Nightly restart", "Server update", "World switch"); default nightly.
+	Reason string
 }
 
 // Step is one line of the routine's report.
@@ -110,7 +112,11 @@ func Run(ctx context.Context, p Plan, g Game, h Host, b Backups) *Report {
 	sort.Sort(sort.Reverse(sort.IntSlice(warn))) // "1, 5, 15" must still mean 15, 5, 1
 	warn = slices.Compact(warn)
 	for i, m := range warn {
-		msg := fmt.Sprintf("Nightly restart in %d minute%s. The world is saved first.", m, map[bool]string{true: "", false: "s"}[m == 1])
+		reason := p.Reason
+		if reason == "" {
+			reason = "Nightly restart"
+		}
+		msg := fmt.Sprintf("%s in %d minute%s. The world is saved first.", reason, m, map[bool]string{true: "", false: "s"}[m == 1])
 		bad(r.add("warn", g.Announce(ctx, msg), fmt.Sprintf("%d min", m)))
 		next := 0
 		if i+1 < len(warn) {

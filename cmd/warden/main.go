@@ -119,7 +119,7 @@ func main() {
 	}
 	srv.Store, srv.Auth = st2, au
 	if n, _ := au.UserCount(); n == 0 {
-		log.Printf("no remote accounts yet: on this machine, open the panel (Start menu: Palsforge Warden) and add them under Admins")
+		log.Printf("no remote accounts yet: on this machine, open the panel (on Windows: Start menu, Palsforge Warden) and add them under Admins")
 	}
 	go monitor.Run(context.Background(), game, st2)
 
@@ -149,6 +149,7 @@ func main() {
 		nt := notify.New(wcfg.Notify, st.ServerName)
 		var pin func(string) // set once the runner exists
 		h := host.New(wcfg, *dataDir)
+		h.Alive = func(ctx context.Context) bool { _, err := game.Info(ctx); return err == nil }
 		mm := &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir}
 		h.ModsOn = func() bool {
 			l, _, err := mm.List()

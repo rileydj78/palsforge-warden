@@ -100,6 +100,9 @@ func (t WebDAVTarget) SendVerified(ctx context.Context, a Archive) error {
 	resp, err := t.req(ctx, http.MethodPut, part, f, st.Size(), nil)
 	f.Close()
 	if err != nil {
+		if r, e := t.req(ctx, http.MethodDelete, part, nil, 0, nil); e == nil { // no half uploads left behind
+			r.Body.Close()
+		}
 		return fmt.Errorf("sending %s failed: %w", a.Name, err)
 	}
 	resp.Body.Close()
@@ -126,7 +129,8 @@ func (t WebDAVTarget) SendVerified(ctx context.Context, a Archive) error {
 
 // List returns the file names in the folder.
 func (t WebDAVTarget) List(ctx context.Context) ([]string, error) {
-	resp, err := t.req(ctx, "PROPFIND", t.URL, strings.NewReader(`<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>`), -1, map[string]string{"Depth": "1", "Content-Type": "application/xml"})
+	body := `<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>`
+	resp, err := t.req(ctx, "PROPFIND", t.URL, strings.NewReader(body), int64(len(body)), map[string]string{"Depth": "1", "Content-Type": "application/xml"})
 	if err != nil {
 		return nil, err
 	}

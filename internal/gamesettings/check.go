@@ -40,8 +40,8 @@ func CheckFile(path string) []string {
 			out = append(out, fmt.Sprintf("%q doesn't look like an option name (a comma or quote out of place?)", p.Key))
 			continue
 		}
-		if _, known := Lookup(p.Key); known {
-			if err := Validate(p.Key, unquote(p.Raw)); err != nil {
+		if o, known := Lookup(p.Key); known {
+			if _, err := format(o, true, unquote(p.Raw)); err != nil { // the value only: locked options are fine
 				out = append(out, err.Error())
 			}
 		}
