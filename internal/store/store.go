@@ -38,6 +38,8 @@ var schema = []string{
 		user_id TEXT PRIMARY KEY, name TEXT NOT NULL, platform TEXT, level INTEGER,
 		first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, seconds INTEGER NOT NULL DEFAULT 0,
 		banned INTEGER NOT NULL DEFAULT 0, note TEXT)`,
+	`ALTER TABLE players ADD COLUMN last_x INTEGER`,
+	`ALTER TABLE players ADD COLUMN last_y INTEGER`,
 	`CREATE INDEX IF NOT EXISTS audit_ts ON audit(ts)`,
 }
 
@@ -313,4 +315,26 @@ func (s *Store) Known(userID string) bool {
 	var n int
 	s.DB.QueryRow(`SELECT COUNT(*) FROM players WHERE user_id=?`, userID).Scan(&n)
 	return n > 0
+}
+
+// SetPosition remembers where a player was last seen on the map.
+func (s *Store) SetPosition(userID string, x, y int) {
+	s.DB.Exec(`UPDATE players SET last_x=?, last_y=? WHERE user_id=?`, x, y, userID)
+}
+
+// LastPositions returns where offline players were last seen.
+func (s *Store) LastPositions() ([]map[string]any, error) {
+	rows, err := s.DB.Query(`SELECT user_id, name, last_x, last_y, last_seen FROM players WHERE last_x IS NOT NULL ORDER BY last_seen DESC LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var id, name string
+		var x, y, seen int64
+		rows.Scan(&id, &name, &x, &y, &seen)
+		out = append(out, map[string]any{"userId": id, "name": name, "mapX": x, "mapY": y, "lastSeen": seen})
+	}
+	return out, rows.Err()
 }

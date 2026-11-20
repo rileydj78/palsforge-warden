@@ -407,8 +407,10 @@ async function drawMap() {
   if (pdConnected) { try { mapBases = (await api("/api/guilds")).flatMap((g) => (g.camps || []).map((c) => ({ x: Math.round(c.map_pos.X ?? c.map_pos.x), y: Math.round(c.map_pos.Y ?? c.map_pos.y), guild: g.name }))); } catch (e) { mapBases = []; } }
   const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
   const ps = st.players || [];
+  const on = new Set(ps.map((p) => p.userId));
+  let off = []; try { off = (await api("/api/positions")).filter((p) => !on.has(p.userId)).slice(0, 50); } catch (e) {}
   let lo = -1000, hi = 1000; // the island's usual extent; grow to fit anyone outside it
-  for (const p of [...ps, ...mapBases.map((b) => ({ mapX: b.x, mapY: b.y }))]) { lo = Math.min(lo, p.mapX - 50, p.mapY - 50); hi = Math.max(hi, p.mapX + 50, p.mapY + 50); }
+  for (const p of [...ps, ...off, ...mapBases.map((b) => ({ mapX: b.x, mapY: b.y }))]) { lo = Math.min(lo, p.mapX - 50, p.mapY - 50); hi = Math.max(hi, p.mapX + 50, p.mapY + 50); }
   const S = 800, k = S / (hi - lo), px = (v) => (v - lo) * k, py = (v) => S - (v - lo) * k;
   svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
   const line = (x1, y1, x2, y2, c) => { const l = document.createElementNS(ns, "line"); l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2); l.setAttribute("class", c); svg.append(l); };
@@ -421,6 +423,10 @@ async function drawMap() {
     const r = document.createElementNS(ns, "rect"); r.setAttribute("x", px(b.x) - 5); r.setAttribute("y", py(b.y) - 5); r.setAttribute("width", 10); r.setAttribute("height", 10); r.setAttribute("class", "base"); svg.append(r);
     text(px(b.x) + 8, py(b.y) + 4, b.guild, "baselbl");
   }
+  for (const p of off) {
+    const c = document.createElementNS(ns, "circle"); c.setAttribute("cx", px(p.mapX)); c.setAttribute("cy", py(p.mapY)); c.setAttribute("r", 5); c.setAttribute("class", "dot off"); svg.append(c);
+    const t = document.createElementNS(ns, "title"); t.textContent = `${p.name}, last seen ${when(p.lastSeen)}`; c.append(t);
+  }
   for (const p of ps) {
     const c = document.createElementNS(ns, "circle"); c.setAttribute("cx", px(p.mapX)); c.setAttribute("cy", py(p.mapY)); c.setAttribute("r", 7); c.setAttribute("class", "dot"); svg.append(c);
     text(px(p.mapX) + 10, py(p.mapY) + 4, p.name, "dotlbl");
@@ -429,6 +435,7 @@ async function drawMap() {
   const rows = $("maprows"); rows.replaceChildren();
   if (!ps.length) { const tr = el("tr"); const td = el("td", "Nobody is online.", "empty"); td.colSpan = 3; tr.append(td); rows.append(tr); }
   for (const p of ps) { const tr = el("tr"); tr.append(el("td", p.name, "strong"), el("td", `${p.mapX}, ${p.mapY}`, "num"), el("td", String(p.level), "num")); rows.append(tr); }
+  for (const p of off.slice(0, 20)) { const tr = el("tr"); tr.append(el("td", `${p.name} (offline, ${when(p.lastSeen)})`), el("td", `${p.mapX}, ${p.mapY}`, "num"), el("td", "–", "num")); rows.append(tr); }
 }
 setInterval(() => { if (me && !$("view-map").hidden) drawMap(); }, 10000);
 

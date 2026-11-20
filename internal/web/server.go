@@ -120,6 +120,11 @@ func (s *Server) status(ctx context.Context, fresh bool) *Status {
 		}
 		cancel()
 	}
+	for _, p := range st.Players {
+		if p.MapX != 0 || p.MapY != 0 {
+			s.Store.SetPosition(p.UserID, p.MapX, p.MapY)
+		}
+	}
 	s.last, s.lastAt = st, time.Now()
 	return st
 }
@@ -310,6 +315,14 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, 200, h)
+	}))
+	mux.HandleFunc("GET /api/positions", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		p, err := s.Store.LastPositions()
+		if err != nil {
+			fail(w, 500, "positions unavailable")
+			return
+		}
+		writeJSON(w, 200, p)
 	}))
 	mux.HandleFunc("GET /api/roster", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		p, err := s.Store.Roster()

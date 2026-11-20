@@ -135,3 +135,5 @@ form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; } fo
 
 .cmdgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
 .cmdgrid .card { margin: 0; }
+
+.dot.off { opacity: .45; }
