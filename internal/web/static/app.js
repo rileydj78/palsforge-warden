@@ -406,7 +406,7 @@ async function loadServer() {
       const d = el("details", null, "run"), sm = el("summary");
       sm.append(el("span", r.ok ? "Completed" : "Problems", r.ok ? "tag" : "tag bad"), el("span", ` ${r.kind} · ${when(r.started)}`));
       d.append(sm);
-      const t = el("table"), tb = el("tbody");
+      const t = el("table", null, "stack"), tb = el("tbody");
       for (const st of (r.report.steps || [])) { const tr = el("tr"); tr.append(el("td", st.ok ? "✓" : "✗", st.ok ? "" : "bad"), el("td", st.name, "strong"), el("td", st.detail || "")); tb.append(tr); }
       t.append(tb); d.append(t); box.append(d);
     }
@@ -450,7 +450,7 @@ async function loadBackups() {
       const c = el("section", null, "card");
       c.append(el("h2", i === 0 ? "On this machine" : "Second place"), el("p", p.dir, "note mono"));
       if (p.error) c.append(el("p", p.error, "problem"));
-      const t = el("table"), tb = el("tbody");
+      const t = el("table", null, "stack"), tb = el("tbody");
       const hr = el("tr"); for (const h of ["Backup", "Kind", "Made", "Size", "Checked", ""]) hr.append(el("th", h)); const th = el("thead"); th.append(hr); t.append(th);
       if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 6; tr.append(td); tb.append(tr); }
       for (const a of p.archives) {

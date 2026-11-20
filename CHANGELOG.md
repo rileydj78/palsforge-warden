@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.0-rc.3 (2026-11-20)
+
+- Linux tested with a real Palworld server in Docker (backups, settings with a restart, a full
+  restore); three sidecar problems found and fixed; the Docker guide is the tested setup.
+- Bring a world from co-op; crash hints; the settings file checked before every start.
+- "Update soon" checks at start-up and watches Pocketpair's patch announcements on Steam.
+- Status page: how to join, who can join, rules. Players: filter by recent or inactive.
+- Backups page lists the off-site places with their last copy; on phones each backup is a card.
+- Dashboard tells "paused", "stopped" and "not answering" apart.
+- A fourth security review: 11 findings, none high, all fixed.
+
 ## 1.0.0-rc.2 (2026-11-20)
 
 Everything in rc.1, plus what the needs research showed server owners struggle with most, and a

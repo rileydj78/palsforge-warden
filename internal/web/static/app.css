@@ -173,3 +173,15 @@ ul.checks li span { overflow-wrap: anywhere; }
 
 .news { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; } .news a { color: var(--accent-ink); }
 .search.narrow { width: auto; }
+ul.checks li b { overflow-wrap: anywhere; }
+/* Phones: wide tables marked .stack become one small card per row. */
+@media (max-width: 760px) {
+  ul.checks li b { display: block; }
+  table.stack thead { display: none; }
+  table.stack, table.stack tbody { display: block; width: 100%; }
+  table.stack tr { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  table.stack td { border: 0; padding: 0; white-space: normal; }
+  table.stack td:first-child { grid-column: 1 / -1; font-weight: 600; overflow-wrap: anywhere; }
+  table.stack td.acts { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
+  table.stack td.acts > * { margin-left: 0; }
+}
