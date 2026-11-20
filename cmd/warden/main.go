@@ -23,6 +23,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/kit"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
+	"github.com/rileydj78/palsforge-warden/internal/news"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
@@ -179,7 +180,12 @@ func main() {
 		pin = runner.PinLatest
 		go runner.Watch(context.Background())
 		go runner.AutoPause(context.Background())
-		go runner.UpdateSoon(context.Background())
+		var feed *news.Feed
+		if wcfg.Update.Enabled && wcfg.Update.Soon { // only then does Warden read Steam's news
+			feed = &news.Feed{DataDir: *dataDir}
+			srv.News = feed
+		}
+		go runner.UpdateSoon(context.Background(), feed)
 		if evs, err := events.Parse(wcfg.Events); err == nil {
 			go runner.RunEvents(context.Background(), evs)
 		}

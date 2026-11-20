@@ -120,7 +120,9 @@ Windows builds are not code-signed yet: SignPath Foundation's free programme ask
 established project first, so signing comes later (see [the code signing policy](docs/code-signing-policy.md)).
 Until then Windows SmartScreen shows a warning ("More info" → "Run anyway"), and Smart App
 Control, where it's turned on, blocks the program. Each release lists SHA-256 checksums of its
-files. Warden sends nothing anywhere unless you configure it to.
+files. Warden sends nothing anywhere unless you configure it to. (With "update soon" on, it reads
+Steam's public news feed for Palworld and asks Steam for the newest server build; no identifiers
+are sent.)
 
 Palworld is a trademark of Pocketpair, Inc. Palsforge Warden is an unofficial fan project and is
 not affiliated with or endorsed by Pocketpair.

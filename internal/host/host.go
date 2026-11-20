@@ -490,9 +490,14 @@ var latestCache struct {
 // LatestBuild asks Steam (through SteamCMD) for the newest public build of the server. It's
 // remembered for 20 minutes.
 func (h *Host) LatestBuild(ctx context.Context) (string, error) {
+	return h.LatestBuildWithin(ctx, 20*time.Minute)
+}
+
+// LatestBuildWithin is LatestBuild with a remembered answer at most maxAge old.
+func (h *Host) LatestBuildWithin(ctx context.Context, maxAge time.Duration) (string, error) {
 	latestCache.Lock()
 	defer latestCache.Unlock()
-	if latestCache.build != "" && time.Since(latestCache.at) < 20*time.Minute {
+	if latestCache.build != "" && time.Since(latestCache.at) < maxAge {
 		return latestCache.build, nil
 	}
 	if h.cfg.Update.SteamCMD == "" {

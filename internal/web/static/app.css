@@ -170,3 +170,5 @@ form.inline button { font: inherit; font-weight: 600; padding: 9px 16px; border-
 ul.checks li.info::before { content: "i"; color: var(--soft); font-style: italic; }
 ul.checks li span { overflow-wrap: anywhere; }
 .tablewrap td.wrap { overflow-wrap: anywhere; min-width: 12em; }
+
+.news { list-style: none; padding: 0; margin: 6px 0; display: grid; gap: 6px; } .news a { color: var(--accent-ink); }

@@ -26,6 +26,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
+	"github.com/rileydj78/palsforge-warden/internal/news"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
@@ -53,6 +54,8 @@ type Server struct {
 	Settings *Settings
 	PalDef   *paldefender.Client // nil unless PalDefender is connected
 	Public   *Public             // the read-only status page; nil when it's off
+	// News: Pocketpair's announcements (only when "update soon" is on); nil = none.
+	News *news.Feed
 	// Instances: the other Wardens on this machine (one per game server); nil = don't list.
 	Instances *InstancesInfo
 	mu        sync.Mutex
@@ -348,6 +351,16 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, 200, p)
+	}))
+	mux.HandleFunc("GET /api/news", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		items := []news.Item{}
+		if s.News != nil {
+			items = append(items, s.News.Latest()...)
+		}
+		if len(items) > 3 {
+			items = items[:3]
+		}
+		writeJSON(w, 200, map[string]any{"on": s.News != nil, "items": items})
 	}))
 	mux.HandleFunc("GET /api/keys", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		k, err := s.Auth.Keys()

@@ -13,7 +13,10 @@ accessibility scan (no WCAG 2 A/AA violations).
 - A world's WorldOption.sav silently overrides the settings file: Warden detects it, can set it
   aside, and shows any setting the running server isn't using.
 - Update soon after a new game build (optional), so players aren't turned away as
-  "incompatible version" until the night.
+  "incompatible version" until the night: checked 2 minutes after Warden starts and every 30
+  minutes, and every 5 minutes for 6 hours after Pocketpair announces a patch on Steam. New
+  patch announcements reach the admin (Discord/ntfy) with the link; the dashboard shows the
+  latest Palworld news. (Only with this option on does Warden read Steam's public news feed.)
 - REST API only: Pocketpair has deprecated RCON and says it will stop working.
 - Phones: one-row section menu, readable graphs; the last-backup tile shows the newest backup.
 

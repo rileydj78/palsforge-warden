@@ -803,6 +803,7 @@ function route() {
   if (view === "admins") loadUsers();
   if (view === "server") loadServer();
   if (view === "commands") loadCommands();
+  if (view === "dash") loadNews();
   if (view === "backups") loadBackups();
   if (view === "settings") loadSettings();
   if (view === "logs") loadLogs(true);
@@ -942,3 +943,17 @@ $("g-wo").addEventListener("click", async () => {
   if (await ask({ title: "Set WorldOption.sav aside?", text: "At the next restart Warden renames it (kept beside the world), so PalWorldSettings.ini applies. Your world itself is untouched.", ok: "Set it aside" }) == null) return;
   try { await api("/api/game-settings/world-option", {}); toast("Done at the next restart (nightly routine, or Restart on the Commands page)."); loadGame(); } catch (e) { toast(e.message); }
 });
+
+async function loadNews() {
+  try {
+    const r = await api("/api/news"); $("newscard").hidden = !r.on || !r.items.length;
+    const ul = $("newslist"); ul.replaceChildren();
+    for (const it of r.items) {
+      const li = el("li"), t = it.url && it.url.startsWith("https://") ? el("a", it.title) : el("span", it.title);
+      if (t.tagName === "A") { t.href = it.url; t.target = "_blank"; t.rel = "noopener noreferrer"; }
+      li.append(t, el("span", " · " + new Date(it.date).toLocaleDateString([], { month: "short", day: "numeric" }), "note"));
+      if (it.patch) li.append(el("span", "update", "tag"));
+      ul.append(li);
+    }
+  } catch (e) {}
+}
