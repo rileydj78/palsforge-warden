@@ -26,6 +26,27 @@ func (r *Runner) Watch(ctx context.Context) {
 			r.Notify.Send(ctx, lvl, key, title, body)
 		}
 	}
+	var autoRestarts []time.Time // automatic restarts in the last 6 hours (capped: then only alerts)
+	var lastMemRestart time.Time
+	mayRestart := func(why string) bool {
+		now := time.Now()
+		keep := autoRestarts[:0]
+		for _, t := range autoRestarts {
+			if now.Sub(t) < 6*time.Hour {
+				keep = append(keep, t)
+			}
+		}
+		autoRestarts = keep
+		if h := r.Host.State(); h.PausedTill.After(now) {
+			return false // the crash-loop pause wins
+		}
+		if len(autoRestarts) >= 3 {
+			send(notify.Urgent, "auto-cap", "Warden stopped restarting the server on its own", "It already restarted it 3 times in 6 hours ("+why+" this time). Have a look at the Server page.")
+			return false
+		}
+		autoRestarts = append(autoRestarts, now)
+		return true
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -40,8 +61,9 @@ func (r *Runner) Watch(ctx context.Context) {
 			}
 			misses, down = 0, false
 			r.checkSaves(ctx, send)
-			if limit > 0 && !planned {
-				if mem := r.Host.Memory(); mem > limit {
+			if limit > 0 && !planned && time.Since(lastMemRestart) > 6*time.Hour {
+				if mem := r.Host.Memory(); mem > limit && mayRestart("memory") {
+					lastMemRestart = time.Now()
 					msg := fmt.Sprintf("the server uses %.1f GB of memory (limit %.0f GB)", float64(mem)/(1<<30), r.Cfg.Health.MemoryLimitGB)
 					r.Store.AddEvent(time.Now(), "memory", msg+"; restarting with warnings")
 					send(notify.Warn, "memory", "Restarting: memory limit", msg+". Players get 10 minutes' warning.")
@@ -50,7 +72,7 @@ func (r *Runner) Watch(ctx context.Context) {
 			}
 			continue
 		}
-		if planned {
+		if planned || !r.Host.Running() { // not running: a crash, which the restart logic handles
 			misses = 0
 			continue
 		}
@@ -59,7 +81,7 @@ func (r *Runner) Watch(ctx context.Context) {
 			down = true
 			send(notify.Urgent, "down", "The server isn't answering", "No answer for 3 minutes.")
 		}
-		if frozen > 0 && misses >= frozen && r.Host.Running() {
+		if frozen > 0 && misses >= frozen && mayRestart("frozen") {
 			r.PinLatest("the last backup before the server froze at " + time.Now().Format("Jan 2 15:04"))
 			r.Store.AddEvent(time.Now(), "frozen", fmt.Sprintf("no answer for %d minutes but still running: restarting it", misses))
 			send(notify.Urgent, "frozen", "Restarting a frozen server", fmt.Sprintf("It was running but hadn't answered for %d minutes.", misses))
@@ -97,7 +119,12 @@ func (r *Runner) Restart(ctx context.Context, why string, warn []int) error {
 		r.Host.ForceStop(ctx)
 		r.Host.WaitStopped(ctx, time.Minute)
 	}
-	r.WhileStopped(ctx)
+	if sum, werr := r.WhileStopped(ctx); werr != nil {
+		r.Store.AddEvent(time.Now(), "settings", fmt.Sprintf("%s; %v", sum, werr))
+		if r.Notify != nil {
+			r.Notify.Send(ctx, notify.Warn, "", "Some waiting changes weren't applied", werr.Error())
+		}
+	}
 	err = r.Host.Start(ctx)
 	r.Store.AddEvent(time.Now(), "restart", fmt.Sprintf("restarted (%s): %v", why, err))
 	return err

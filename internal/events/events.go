@@ -100,8 +100,10 @@ func Parse(text string) ([]Event, error) {
 
 // State remembers which event is on and the normal values it replaced (survives restarts).
 type State struct {
-	Active string            `json:"active"`
-	Normal map[string]string `json:"normal"`
+	Active    string            `json:"active"`
+	Normal    map[string]string `json:"normal"`    // the values the event replaced
+	Applied   map[string]string `json:"applied"`   // the event's values, to tell later edits apart
+	Switching bool              `json:"switching"` // a switch is queued but its restart hasn't happened yet
 }
 
 func statePath(dataDir string) string { return filepath.Join(dataDir, "events-state.json") }

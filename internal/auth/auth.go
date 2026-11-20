@@ -53,6 +53,7 @@ type Auth struct {
 	mu       sync.Mutex
 	sessions map[string]*Session
 	attempts map[string]*attempt
+	codeLock map[string]*codeLock
 }
 
 // SessionLife is how long a sign-in lasts.
@@ -227,9 +228,30 @@ func (a *Auth) LoginFrom(name, pw, source, code string) (string, *Session, error
 		if code == "" {
 			return "", nil, ErrNeedCode
 		}
-		if !totpOK(secret, code, time.Now()) {
-			return "", nil, errors.New("that two-step code isn't right")
+		key := strings.ToLower(name)
+		if a.codeLock == nil {
+			a.codeLock = map[string]*codeLock{}
 		}
+		cl := a.codeLock[key]
+		if cl == nil {
+			cl = &codeLock{}
+			a.codeLock[key] = cl
+		}
+		if time.Now().Before(cl.until) {
+			return "", nil, errors.New("too many wrong two-step codes; this account is locked for a while (the owner can turn two-step off for it)")
+		}
+		step, ok := totpStep(secret, code, time.Now())
+		if !ok || step <= cl.lastStep { // wrong, or already used once
+			cl.fails++
+			switch {
+			case cl.fails >= 10:
+				cl.until = time.Now().Add(24 * time.Hour)
+			case cl.fails >= 5:
+				cl.until = time.Now().Add(time.Hour)
+			}
+			return "", nil, errors.New("that two-step code isn't right (each code works once)")
+		}
+		cl.fails, cl.lastStep = 0, step
 	}
 	for _, k := range keys {
 		if at := a.attempts[k]; at != nil {
@@ -246,6 +268,12 @@ func (a *Auth) LoginFrom(name, pw, source, code string) (string, *Session, error
 	a.sessions[tok] = s
 	a.DB.Exec(`UPDATE users SET last_login=? WHERE name=?`, time.Now().Unix(), name)
 	return tok, s, nil
+}
+
+type codeLock struct {
+	fails    int
+	until    time.Time
+	lastStep int64 // the last accepted 30-second step: a code works once
 }
 
 type attempt struct {

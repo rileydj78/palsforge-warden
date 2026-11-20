@@ -179,6 +179,16 @@ func (r *Runner) PinLatest(why string) {
 				break
 			}
 		}
+		// Keep only the newest 3 automatic pins, so a server that crashes often can't fill the disk.
+		list, _ = backup.ListTag(dir, r.Cfg.Backups.Tag)
+		n := 0
+		for _, a := range list {
+			if strings.HasPrefix(a.Pinned, "the last backup before") {
+				if n++; n > 3 {
+					backup.Unpin(dir, a.Name)
+				}
+			}
+		}
 	}
 }
 
@@ -327,7 +337,20 @@ func (r *Runner) Schedule(ctx context.Context) {
 			return
 		case <-time.After(time.Until(begin)):
 		}
-		r.RunNow(ctx, "nightly", r.Cfg.Nightly.WarnMinutes, r.Cfg.Update.Enabled)
+		ran := false
+		for try := 0; try < 90 && !ran; try++ { // another operation may hold the server: wait for it
+			if _, err := r.RunNow(ctx, "nightly", r.Cfg.Nightly.WarnMinutes, r.Cfg.Update.Enabled); err == nil {
+				ran = true
+				break
+			}
+			time.Sleep(time.Minute)
+		}
+		if !ran {
+			r.Store.AddEvent(time.Now(), "nightly", "the nightly routine didn't run: the server was busy for 90 minutes")
+			if r.Notify != nil {
+				r.Notify.Send(ctx, notify.Urgent, "", "The nightly routine didn't run", "The server was busy with something else for 90 minutes, so there's no backup or update tonight.")
+			}
+		}
 		time.Sleep(time.Minute) // never twice in the same minute
 	}
 }

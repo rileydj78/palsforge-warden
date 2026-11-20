@@ -83,3 +83,16 @@ func TestPresetsAreValid(t *testing.T) {
 		}
 	}
 }
+
+func TestBadPendingIsSetAsideNotBlocking(t *testing.T) {
+	p, data := write(t), t.TempDir()
+	AddPending(data, map[string]string{"ExpRate": "4", "NotAnOption": "1", "bIsPvP": "maybe"})
+	sum, err := ApplyPending(p, data)
+	if err == nil || !strings.Contains(sum, "1 changed") {
+		t.Fatalf("the good change applies and the bad ones are reported: %q %v", sum, err)
+	}
+	f, _ := Read(p)
+	if f.Values["ExpRate"] != "4.000000" || len(LoadPending(data)) != 0 {
+		t.Fatal("nothing may be left blocking the queue")
+	}
+}

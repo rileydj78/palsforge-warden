@@ -245,3 +245,23 @@ func Validate(key, value string) error {
 	_, err := format(o, known, value)
 	return err
 }
+
+// ValidateKnown is Validate for options Warden explains only (events and presets must not guess
+// option names: a typo would never apply).
+func ValidateKnown(key, value string) error {
+	if _, ok := Lookup(key); !ok {
+		return fmt.Errorf("%s isn't an option Warden knows (check the spelling on the Game settings page)", key)
+	}
+	return Validate(key, value)
+}
+
+// Same says two values mean the same setting (2 and 2.000000, true and True).
+func Same(key, a, b string) bool {
+	o, known := Lookup(key)
+	fa, ea := format(o, known, a)
+	fb, eb := format(o, known, b)
+	if ea != nil || eb != nil {
+		return strings.TrimSpace(a) == strings.TrimSpace(b)
+	}
+	return fa == fb
+}

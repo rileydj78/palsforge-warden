@@ -171,7 +171,7 @@ func (w *Warden) Check() error {
 	} else {
 		for _, e := range evs {
 			for k, v := range e.Settings {
-				if err := gamesettings.Validate(k, v); err != nil {
+				if err := gamesettings.ValidateKnown(k, v); err != nil {
 					bad = append(bad, "event "+e.Name+": "+err.Error())
 				}
 			}

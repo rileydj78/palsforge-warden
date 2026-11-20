@@ -357,7 +357,10 @@ async function loadBackups() {
         const tr = el("tr"), acts = el("td", null, "acts");
         if (me.role !== "moderator") { const d = el("a", "Download", "small"); d.href = `/api/backups/download?place=${i}&name=${encodeURIComponent(a.name)}`; d.setAttribute("download", a.name); acts.append(d); }
         if (me.role === "owner" && a.kind === "data") { const b = el("button", "Restore…", "small warn"); b.onclick = () => restore(i, a.name); acts.append(b); }
-        if (a.pinned) acts.prepend(el("span", "kept", "tag"));
+        if (a.pinned) {
+          const tag = el("span", "kept", "tag"); tag.title = a.pinned; acts.prepend(tag);
+          if (me.role === "owner") { const u = el("button", "Stop keeping", "small"); u.onclick = async () => { try { await api("/api/backups/unpin", { place: i, name: a.name }); toast("Retention handles it again."); loadBackups(); } catch (e) { toast(e.message); } }; acts.append(u); }
+        }
         tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–"), acts); tb.append(tr);
       }
       t.append(tb); const w = el("div", null, "tablewrap"); w.append(t); c.append(w); box.append(c);

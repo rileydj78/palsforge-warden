@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -70,5 +71,12 @@ func TestClient(t *testing.T) {
 	}
 	if New(Config{}) != nil {
 		t.Fatal("no token means no client")
+	}
+}
+
+func TestScrubRemovesAddresses(t *testing.T) {
+	got := string(Scrub([]byte(`{"Name":"Moss","IP":"73.1.2.3","Equipment":[{"Note":"from 10.0.0.9"}],"PlayerIP":"x"}`)))
+	if strings.Contains(got, "73.1.2.3") || strings.Contains(got, "10.0.0.9") || strings.Contains(got, "PlayerIP") || !strings.Contains(got, "Equipment") {
+		t.Fatal(got)
 	}
 }

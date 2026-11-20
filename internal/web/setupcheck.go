@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,10 +51,14 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 		}
 		open := host.OpenPorts()
 		exposed := []string{}
-		for port, name := range map[int]string{8212: "the game's REST API (8212)", 25575: "RCON (25575)", 17993: "PalDefender's API (17993)"} {
-			if ini != nil && port == 8212 && ini.RESTPort != 8212 {
-				port = ini.RESTPort
+		rest, rcon := 8212, 25575
+		if ini != nil {
+			rest = ini.RESTPort
+			if p, err := strconv.Atoi(ini.All["RCONPort"]); err == nil && p > 0 {
+				rcon = p
 			}
+		}
+		for port, name := range map[int]string{rest: fmt.Sprintf("the game's REST API (%d)", rest), rcon: fmt.Sprintf("RCON (%d)", rcon), 17993: "PalDefender's API (17993)"} {
 			if open[port] {
 				exposed = append(exposed, name)
 			}
@@ -63,7 +68,7 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 			if len(exposed) == 1 {
 				verb, them = "listens", "it"
 			}
-			add("Exposure", false, true, "%s %s on every network, not only this machine. Make sure the firewall blocks %s from outside: anyone who reaches it can control the server.", strings.Join(exposed, ", "), verb, them)
+			add("Exposure", false, true, "%s %s beyond this machine. Make sure the firewall blocks %s from outside: anyone who reaches it can control the server.", strings.Join(exposed, ", "), verb, them)
 		} else {
 			add("Exposure", true, false, "The admin APIs only listen on this machine.")
 		}

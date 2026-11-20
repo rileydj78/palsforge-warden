@@ -5,6 +5,7 @@ package host
 import (
 	"encoding/csv"
 	"fmt"
+	"net"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -95,28 +96,34 @@ func memOf(exe string) (int64, error) {
 	return total, nil
 }
 
-// openPorts lists the TCP ports listening on every network (not only this machine).
+// openPorts lists the TCP ports listening on an address other than this machine's own loopback.
+// Listening sockets are told apart by their foreign address (0.0.0.0:0 / [::]:0), not by the
+// localized "LISTENING" word.
 func openPorts() map[int]bool {
-	cmd := exec.Command("netstat", "-ano", "-p", "TCP")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	out, err := cmd.Output()
 	open := map[int]bool{}
-	if err != nil {
-		return open
-	}
-	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 4 && strings.EqualFold(f[3], "LISTENING") {
+	for _, proto := range []string{"TCP", "TCPv6"} {
+		cmd := exec.Command("netstat", "-ano", "-p", proto)
+		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+		out, err := cmd.Output()
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(out), "\n") {
+			f := strings.Fields(line)
+			if len(f) < 4 || (f[2] != "0.0.0.0:0" && f[2] != "[::]:0") {
+				continue
+			}
 			addr := f[1]
 			i := strings.LastIndex(addr, ":")
 			if i < 0 {
 				continue
 			}
-			host, port := addr[:i], addr[i+1:]
-			if host == "0.0.0.0" || host == "[::]" {
-				if p, err := strconv.Atoi(port); err == nil {
-					open[p] = true
-				}
+			host := strings.Trim(addr[:i], "[]")
+			if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+				continue
+			}
+			if p, err := strconv.Atoi(addr[i+1:]); err == nil {
+				open[p] = true
 			}
 		}
 	}

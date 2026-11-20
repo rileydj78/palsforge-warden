@@ -72,7 +72,7 @@ func memOf(exe string) (int64, error) {
 	return total, nil
 }
 
-// openPorts lists the TCP ports listening on every network (not only this machine).
+// openPorts lists the TCP ports listening on an address other than this machine's loopback.
 func openPorts() map[int]bool {
 	open := map[int]bool{}
 	for _, f := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
@@ -90,10 +90,16 @@ func openPorts() map[int]bool {
 			if i < 0 {
 				continue
 			}
-			if strings.Trim(local[:i], "0") == "" { // 0.0.0.0 or ::
-				if p, err := strconv.ParseInt(local[i+1:], 16, 32); err == nil {
-					open[int(p)] = true
-				}
+			hexIP := local[:i]
+			loop := hexIP == "0100007F" || hexIP == "00000000000000000000000001000000" // 127.0.0.1, ::1
+			if strings.HasSuffix(hexIP, "7F") && len(hexIP) == 8 {
+				loop = true // 127.x.x.x (little-endian)
+			}
+			if loop {
+				continue
+			}
+			if p, err := strconv.ParseInt(local[i+1:], 16, 32); err == nil {
+				open[int(p)] = true
 			}
 		}
 	}

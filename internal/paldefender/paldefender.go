@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -214,8 +215,7 @@ type Guild struct {
 		ID     string `json:"id"`
 		MapPos Loc    `json:"map_pos"`
 	} `json:"camps"`
-	MemberCount int             `json:"member_count"`
-	Members     json.RawMessage `json:"members"`
+	MemberCount int `json:"member_count"`
 }
 
 // Guilds lists every guild with its bases.
@@ -261,9 +261,45 @@ func (c *Client) Detail(ctx context.Context, userID string) PlayerDetail {
 			d.Errors = append(d.Errors, msg)
 			continue
 		}
-		*part.dst = raw[part.key]
+		*part.dst = Scrub(raw[part.key])
 	}
 	return d
+}
+
+var ipLike = regexp.MustCompile(`\b(?:\d{1,3}\.){3}\d{1,3}\b|\b(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b`)
+
+// Scrub removes anything that looks like an IP address (fields named IP, and IP-like text) from
+// PalDefender's data: the panel never shows addresses, whatever a PalDefender version includes.
+func Scrub(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return raw
+	}
+	var v any
+	if json.Unmarshal(raw, &v) != nil {
+		return nil
+	}
+	var walk func(any) any
+	walk = func(x any) any {
+		switch t := x.(type) {
+		case map[string]any:
+			for k, val := range t {
+				if strings.Contains(strings.ToLower(k), "ip") && !strings.Contains(strings.ToLower(k), "equip") && !strings.Contains(strings.ToLower(k), "ship") {
+					delete(t, k)
+					continue
+				}
+				t[k] = walk(val)
+			}
+		case []any:
+			for i := range t {
+				t[i] = walk(t[i])
+			}
+		case string:
+			return ipLike.ReplaceAllString(t, "(address)")
+		}
+		return x
+	}
+	b, _ := json.Marshal(walk(v))
+	return b
 }
 
 // GiveItems gives a player items (ItemID → count).

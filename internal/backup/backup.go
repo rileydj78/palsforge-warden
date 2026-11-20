@@ -444,3 +444,15 @@ func Pin(dir, name, why string) error {
 	}
 	return os.WriteFile(filepath.Join(dir, name+".keep"), []byte(why+"\n"), 0o640)
 }
+
+// Unpin lets retention handle a backup again.
+func Unpin(dir, name string) error {
+	if !nameRe.MatchString(name) {
+		return errors.New("not a backup name")
+	}
+	err := os.Remove(filepath.Join(dir, name+".keep"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	return err
+}

@@ -161,6 +161,28 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		fail(w, 404, "no such log")
 	}))
+	mux.HandleFunc("POST /api/backups/unpin", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			Place int    `json:"place"`
+			Name  string `json:"name"`
+		}
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		dirs := append([]string{c.Runner.Backups.LocalDir()}, c.Cfg.Backups.Offsite...)
+		if in.Place < 0 || in.Place >= len(dirs) {
+			fail(w, 400, "no such place")
+			return
+		}
+		err := backup.Unpin(dirs[in.Place], in.Name)
+		s.Store.Audit(ses.User.Name, "stop keeping backup", in.Name, "", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("GET /api/backups/download", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
 		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))
@@ -716,7 +738,7 @@ func (s *Server) banRoutes(mux *http.ServeMux) {
 		default:
 			err = errors.New("unknown ban list")
 		}
-		if err == nil {
+		if err == nil && !s.stillBanned(in.ID, c.Cfg.ServerDir) { // another list may still hold them
 			s.Store.SetBanned(in.ID, false)
 		}
 		s.Store.Audit(ses.User.Name, "unban", in.ID, in.Source, err == nil)
@@ -769,7 +791,7 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			UserID, Name, Kind, ID, Reason string
 			Count, Level                   int
 		}
-		if readJSON(r, &in) != nil || in.UserID == "" || !idRe.MatchString(in.ID) {
+		if readJSON(r, &in) != nil || in.UserID == "" || len(in.UserID) > 100 || !idRe.MatchString(in.ID) {
 			fail(w, 400, "say which player and which item or Pal (its game ID, e.g. Money or Anubis)")
 			return
 		}
@@ -799,7 +821,7 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			fail(w, 400, "give an item or a Pal")
 			return
 		}
-		s.Store.Audit(ses.User.Name, "give", in.Name+" ("+in.UserID+")", what+"; "+cleanText(in.Reason, 120), err == nil)
+		s.Store.Audit(ses.User.Name, "give", cleanText(in.Name, 64)+" ("+cleanText(in.UserID, 100)+")", what+"; "+cleanText(in.Reason, 120), err == nil)
 		if err != nil {
 			fail(w, 502, err.Error())
 			return
@@ -809,3 +831,23 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 }
 
 var idRe = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
+
+// stillBanned says whether the game's own list or PalDefender's still bans a user id.
+func (s *Server) stillBanned(id, serverDir string) bool {
+	if b, err := os.ReadFile(filepath.Join(serverDir, "Pal", "Saved", "SaveGames", "banlist.txt")); err == nil {
+		for _, line := range strings.Split(string(b), "\n") {
+			if strings.TrimSpace(line) == id {
+				return true
+			}
+		}
+	}
+	users, _, _ := paldefender.Banlist(context.Background(), nil, serverDir)
+	for _, e := range users {
+		for _, k := range []string{"UserId", "UserID", "userId", "SteamId", "Id"} {
+			if fmt.Sprint(e[k]) == id {
+				return true
+			}
+		}
+	}
+	return false
+}

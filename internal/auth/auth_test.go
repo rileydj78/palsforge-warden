@@ -93,6 +93,9 @@ func TestTwoStepSignIn(t *testing.T) {
 	if _, _, err := a.LoginFrom("moss", "correct horse battery", "x", totpAt(secret, time.Now().Unix()/30)); err != nil {
 		t.Fatal(err)
 	}
+	if _, _, err := a.LoginFrom("moss", "correct horse battery", "y", totpAt(secret, time.Now().Unix()/30)); err == nil {
+		t.Fatal("a code must not work twice")
+	}
 	a.DisableTOTP("moss")
 	if _, _, err := a.Login("moss", "correct horse battery"); err != nil {
 		t.Fatal("off again")

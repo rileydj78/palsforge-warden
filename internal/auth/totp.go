@@ -30,19 +30,25 @@ func totpAt(secret []byte, step int64) string {
 	return fmt.Sprintf("%06d", code)
 }
 
-// totpOK accepts the current code and the ones either side (clocks drift).
-func totpOK(secretB32, code string, now time.Time) bool {
+// totpStep accepts the current code and the ones either side (clocks drift) and says which
+// 30-second step matched.
+func totpStep(secretB32, code string, now time.Time) (int64, bool) {
 	secret, err := b32.DecodeString(strings.ToUpper(secretB32))
 	if err != nil || len(code) != 6 {
-		return false
+		return 0, false
 	}
 	step := now.Unix() / 30
 	for d := int64(-1); d <= 1; d++ {
 		if subtle.ConstantTimeCompare([]byte(totpAt(secret, step+d)), []byte(code)) == 1 {
-			return true
+			return step + d, true
 		}
 	}
-	return false
+	return 0, false
+}
+
+func totpOK(secretB32, code string, now time.Time) bool {
+	_, ok := totpStep(secretB32, code, now)
+	return ok
 }
 
 // StartTOTP makes a new secret for an account (not active until ConfirmTOTP). It returns the key
