@@ -149,8 +149,12 @@ func install(args []string) error {
 		run = append(run, "-listen", l)
 	}
 	if runtime.GOOS != "windows" {
-		fmt.Printf(`On Linux, run Warden as a systemd service. Save this as /etc/systemd/system/warden.service,
-then: systemctl enable --now warden
+		unit := "warden"
+		if name != "" {
+			unit = "warden-" + name
+		}
+		fmt.Printf(`On Linux, run Warden as a systemd service. Save this as /etc/systemd/system/`+unit+`.service,
+then: systemctl enable --now `+unit+`
 
 [Unit]
 Description=Palsforge Warden

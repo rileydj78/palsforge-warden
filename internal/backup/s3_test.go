@@ -32,7 +32,7 @@ func TestS3AgainstARealServer(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	n, err := tg.Mirror(ctx, "pal", map[string]bool{filepath.Base(keep): true})
+	n, err := tg.Mirror(ctx, "pal", func([]string) map[string]bool { return map[string]bool{filepath.Base(keep): true} })
 	if err != nil || n != 1 {
 		t.Fatalf("retention should remove exactly the old one: %d %v", n, err)
 	}

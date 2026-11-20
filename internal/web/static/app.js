@@ -428,7 +428,7 @@ async function loadBackups() {
       if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 6; tr.append(td); tb.append(tr); }
       for (const a of p.archives) {
         const tr = el("tr"), acts = el("td", null, "acts");
-        if (me.role !== "moderator") { const d = el("a", "Download", "small"); d.href = `/api/backups/download?place=${i}&name=${encodeURIComponent(a.name)}`; d.setAttribute("download", a.name); acts.append(d); }
+        if (me.role === "owner") { const d = el("a", "Download", "small"); d.href = `/api/backups/download?place=${i}&name=${encodeURIComponent(a.name)}`; d.setAttribute("download", a.name); acts.append(d); }
         if (me.role === "owner" && a.kind === "data") { const b = el("button", "Restore…", "small warn"); b.onclick = () => restore(i, a.name); acts.append(b); }
         if (a.pinned) {
           const tag = el("span", "kept", "tag"); tag.title = a.pinned; acts.prepend(tag);

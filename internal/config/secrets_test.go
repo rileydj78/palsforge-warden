@@ -28,6 +28,13 @@ func TestSecretsNeverLeaveAndSurviveASave(t *testing.T) {
 	if back.PalDef.Token != "pd-secret" || back.Notify.DiscordWebhook != w.Notify.DiscordWebhook || back.Backups.S3[0].SecretKey != "s3-secret" {
 		t.Fatal("an unchanged placeholder keeps the saved secret")
 	}
+	w.Notify.NtfyURL, w.Notify.NtfyToken = "https://ntfy.sh/mine", "ntfy-secret"
+	moved := w.Masked()
+	moved.Notify.NtfyURL = "http://attacker.example/x"
+	moved.KeepSecrets(w)
+	if moved.Notify.NtfyToken != "" {
+		t.Fatal("a saved token must never follow a changed address")
+	}
 	back2 := w.Masked()
 	back2.Backups.S3[0].Endpoint = "https://evil.example.com"
 	back2.KeepSecrets(w)

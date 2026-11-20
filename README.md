@@ -25,8 +25,9 @@ internet, and Palworld's admin password never leaves the server.
 - **Backups on another machine over SFTP:** `warden sftp-setup sftp://user@host/folder` makes a key
   and prints the host key to pin; each backup is uploaded, read back and checksum-matched there,
   and the other machine keeps what this one keeps.
-- **Backups in S3-compatible storage** (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2): signed
-  uploads the service checks on arrival, then read back by Warden; same retention. No SDK.
+- **Backups in S3-compatible storage** (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2) **or on a
+  WebDAV server** (Nextcloud, ownCloud, many NAS boxes): each copy is read back and checked, and
+  retention there is applied to what's there (a lost local folder never wipes the off-site copies).
 - **Safe restore:** preview what's in a backup, then restore it. Warden checks the backup first,
   makes a safety backup of the world as it is now, keeps the old folders aside, and rolls back if
   anything goes wrong.

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -129,11 +130,13 @@ type Backups struct {
 	SFTP []backup.SFTPTarget `json:"sftp"`
 	// Copies in S3-compatible storage (Amazon S3, Backblaze B2, Wasabi, Cloudflare R2...), each
 	// checked by the service on arrival and read back by Warden; same retention as here.
-	S3     []backup.S3Target `json:"s3"`
-	Image  string            `json:"image"` // whole-server image: "daily", "weekly" (Sundays) or "off"
-	Daily  int               `json:"keepDaily"`
-	Weekly int               `json:"keepWeekly"`
-	Tag    string            `json:"tag"` // file name prefix, e.g. "pal"
+	S3 []backup.S3Target `json:"s3"`
+	// Copies on WebDAV servers (Nextcloud, ownCloud, many NAS boxes); same checks and retention.
+	WebDAV []backup.WebDAVTarget `json:"webdav"`
+	Image  string                `json:"image"` // whole-server image: "daily", "weekly" (Sundays) or "off"
+	Daily  int                   `json:"keepDaily"`
+	Weekly int                   `json:"keepWeekly"`
+	Tag    string                `json:"tag"` // file name prefix, e.g. "pal"
 }
 
 // Update is the game update through SteamCMD during the nightly routine.
@@ -176,6 +179,11 @@ var (
 // Check reports what's wrong with a configuration, in words an admin can act on.
 func (w *Warden) Check() error {
 	var bad []string
+	if u := w.PalDef.URL; u != "" {
+		if p, err := url.Parse(u); err != nil || (p.Hostname() != "127.0.0.1" && p.Hostname() != "localhost") {
+			bad = append(bad, "PalDefender's address must be on this machine (http://127.0.0.1:17993)")
+		}
+	}
 	if _, err := ParseKit(w.StarterKit.Items); err != nil {
 		bad = append(bad, "starter kit items: "+err.Error())
 	}
@@ -226,6 +234,11 @@ func (w *Warden) Check() error {
 		}
 	}
 	for _, t := range w.Backups.S3 {
+		if err := t.Check(); err != nil {
+			bad = append(bad, err.Error())
+		}
+	}
+	for _, t := range w.Backups.WebDAV {
 		if err := t.Check(); err != nil {
 			bad = append(bad, err.Error())
 		}
@@ -310,4 +323,19 @@ func (w *Warden) Abs(p string) string {
 		return p
 	}
 	return filepath.Join(w.ServerDir, p)
+}
+
+// Remotes are the backup places on other machines and in cloud storage.
+func (b Backups) Remotes() []backup.Remote {
+	var out []backup.Remote
+	for _, t := range b.SFTP {
+		out = append(out, t)
+	}
+	for _, t := range b.S3 {
+		out = append(out, t)
+	}
+	for _, t := range b.WebDAV {
+		out = append(out, t)
+	}
+	return out
 }

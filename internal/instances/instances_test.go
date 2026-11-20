@@ -25,7 +25,17 @@ func TestAnnounceListAndPorts(t *testing.T) {
 	if loc == "127.0.0.1:8292" || loc == "" || adm == "" || pub == "" {
 		t.Fatalf("a new instance must not take a known instance's ports: %s %s %s", loc, adm, pub)
 	}
-	if ValidName("PvP Server") == nil || ValidName("pvp-2") != nil {
+	if ValidName("PvP Server") == nil || ValidName("pvp-2") != nil || ValidName("main") == nil {
 		t.Fatal("names")
+	}
+	Announce(d, Entry{Name: "evil", Local: "127.0.0.1:8402", Admin: "127.0.0.1:8403", Remote: "https://evil.example/"})
+	Announce(d, Entry{Name: "evil2", Local: "evil.example:80", Admin: "127.0.0.1:8413"})
+	for _, e := range List(d) {
+		if e.Name == "evil" || e.Name == "evil2" {
+			t.Fatalf("an entry pointing anywhere but this machine or a Tailscale address is ignored: %+v", e)
+		}
+	}
+	if Tag("pvp-2") != "palpvp2" {
+		t.Fatal(Tag("pvp-2"))
 	}
 }

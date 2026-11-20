@@ -15,6 +15,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 )
 
@@ -79,10 +80,17 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 				add("PalDefender", false, true, "Installed but not connected. Connect it on this page for guilds, map positions, messages and IP bans.")
 			}
 		}
-		if len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP)+len(c.Cfg.Backups.S3) == 0 {
+		if len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()) == 0 {
 			add("Backups", false, false, "Backups are only on this machine. Add a second place in Settings so a dead disk can't take them.")
 		} else {
-			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP)+len(c.Cfg.Backups.S3))
+			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()))
+		}
+		if s.Instances != nil {
+			for _, e := range instances.List(s.Instances.MainData) {
+				if e.Name != s.Instances.Self && e.Tag == c.Cfg.Backups.Tag {
+					add("Backups", false, false, "Another server on this machine (%s) names its backups %q too: if they share a backup place, each could prune the other's. Give one a different backups.tag.", map[bool]string{true: "the main one", false: e.Name}[e.Name == ""], e.Tag)
+				}
+			}
 		}
 		if list, _ := backup.ListTag(c.Runner.Backups.LocalDir(), c.Cfg.Backups.Tag); len(list) == 0 {
 			add("Last backup", false, true, "No backup yet.")

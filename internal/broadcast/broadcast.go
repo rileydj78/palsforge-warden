@@ -62,7 +62,8 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 			return
 		case <-tick.C:
 		}
-		if busy != nil && busy() {
+		quiet := busy != nil && busy() // during a restart or backup: no messages, but the gate still runs
+		if quiet && gate == nil {
 			continue
 		}
 		c, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -89,7 +90,7 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 			if _, was := seen[p.UserID]; !first && !was {
 				joined = append(joined, p.Name)
 			}
-			if _, was := seen[p.UserID]; !first && !was && cfg.Welcome != "" {
+			if _, was := seen[p.UserID]; !quiet && !first && !was && cfg.Welcome != "" {
 				msg := clean(strings.ReplaceAll(cfg.Welcome, "{name}", p.Name))
 				c, cancel := context.WithTimeout(ctx, 10*time.Second)
 				if private != nil {
@@ -115,7 +116,7 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 			seenFn(joined, left)
 		}
 		seen, first = now, false
-		if len(ps) > 0 && len(cfg.Messages) > 0 && time.Now().After(next) {
+		if !quiet && len(ps) > 0 && len(cfg.Messages) > 0 && time.Now().After(next) {
 			c, cancel := context.WithTimeout(ctx, 10*time.Second)
 			if err := g.Announce(c, clean(cfg.Messages[idx%len(cfg.Messages)])); err != nil {
 				log.Printf("broadcast: %v", err)

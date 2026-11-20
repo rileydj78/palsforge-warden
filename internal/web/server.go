@@ -34,7 +34,14 @@ import (
 //go:embed static
 var staticFiles embed.FS
 
-const cookieName = "warden_session"
+// cookieName is per instance: browsers share cookies across ports, so several Wardens on one
+// machine (one per server) would otherwise sign each other out.
+func (s *Server) cookieName() string {
+	if s.Instances != nil && s.Instances.Self != "" {
+		return "warden_session_" + strings.ReplaceAll(s.Instances.Self, "-", "_")
+	}
+	return "warden_session"
+}
 
 // Server is the panel.
 type Server struct {
@@ -193,7 +200,7 @@ func (s *Server) session(r *http.Request) *auth.Session {
 	if onLocalPort(r) { // whoever is at the server machine is its rightful operator
 		return s.localSession()
 	}
-	c, err := r.Cookie(cookieName)
+	c, err := r.Cookie(s.cookieName())
 	if err != nil {
 		return nil
 	}
@@ -312,10 +319,10 @@ func (s *Server) Handler() http.Handler {
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 	mux.HandleFunc("POST /api/logout", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
-		if c, err := r.Cookie(cookieName); err == nil {
+		if c, err := r.Cookie(s.cookieName()); err == nil {
 			s.Auth.Logout(c.Value)
 		}
-		http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
+		http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode})
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 
@@ -578,7 +585,7 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, name, pw, code s
 		return
 	}
 	secureCookie := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
-	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: tok, Path: "/", HttpOnly: true, Secure: secureCookie,
+	http.SetCookie(w, &http.Cookie{Name: s.cookieName(), Value: tok, Path: "/", HttpOnly: true, Secure: secureCookie,
 		SameSite: http.SameSiteStrictMode, MaxAge: int(auth.SessionLife / time.Second)})
 	s.Store.Audit(name, "sign in", "", "", true)
 	writeJSON(w, 200, map[string]any{"user": ses.User, "csrf": ses.CSRF})

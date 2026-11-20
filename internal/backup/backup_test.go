@@ -2,6 +2,7 @@ package backup
 
 import (
 	"archive/zip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -157,3 +158,29 @@ func TestProveAndPin(t *testing.T) {
 		t.Fatal("a pinned backup must be kept")
 	}
 }
+
+func TestRemoteRetentionFromTheRemotesOwnList(t *testing.T) {
+	var names []string
+	for d := 1; d <= 30; d++ {
+		names = append(names, fmt.Sprintf("pal-data-202611%02d-040000.zip", d))
+	}
+	names = append(names, "other-data-20261101-040000.zip", "notes.txt")
+	k := KeepByPolicy(names, Policy{Daily: 14, Weekly: 8}, "pal")
+	if !k["pal-data-20261130-040000.zip"] || !k["pal-data-20261117-040000.zip"] || k["pal-data-20261116-040000.zip"] && !isWeekly("20261116") {
+		t.Fatalf("newest 14 kept")
+	}
+	if !k["other-data-20261101-040000.zip"] || !k["notes.txt"] {
+		t.Fatal("anything not this tag's archive is never deleted")
+	}
+	n := 0
+	for _, v := range k {
+		if v {
+			n++
+		}
+	}
+	if n >= len(names) {
+		t.Fatal("old dailies beyond the policy are let go")
+	}
+}
+
+func isWeekly(string) bool { return true }

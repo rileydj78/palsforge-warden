@@ -456,3 +456,53 @@ func Unpin(dir, name string) error {
 	}
 	return err
 }
+
+// KeepByPolicy applies a retention policy to archive names alone (for places Warden can only
+// list, like another machine or a bucket): the newest p.Daily of each kind, plus the newest of
+// each of the last p.Weekly weeks. Names that aren't this tag's archives are always kept.
+func KeepByPolicy(names []string, p Policy, tag string) map[string]bool {
+	keep := map[string]bool{}
+	type item struct {
+		name string
+		when time.Time
+	}
+	byKind := map[string][]item{}
+	for _, n := range names {
+		m := nameRe.FindStringSubmatch(n)
+		if m == nil || m[1] != tag {
+			keep[n] = true
+			continue
+		}
+		layout := "20060102150405"
+		if len(m[4]) == 4 {
+			layout = "200601021504"
+		}
+		t, err := time.ParseInLocation(layout, m[3]+m[4], time.Local)
+		if err != nil {
+			keep[n] = true
+			continue
+		}
+		byKind[m[2]] = append(byKind[m[2]], item{n, t})
+	}
+	for _, list := range byKind {
+		sort.Slice(list, func(i, j int) bool { return list[i].when.After(list[j].when) })
+		for i, a := range list {
+			if i < p.Daily {
+				keep[a.name] = true
+			}
+		}
+		weeks := map[string]bool{}
+		for _, a := range list {
+			y, w := a.when.ISOWeek()
+			k := fmt.Sprintf("%d-%d", y, w)
+			if len(weeks) >= p.Weekly && !weeks[k] {
+				break
+			}
+			if !weeks[k] {
+				weeks[k] = true
+				keep[a.name] = true
+			}
+		}
+	}
+	return keep
+}

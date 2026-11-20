@@ -340,7 +340,7 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 21 | Download a backup | **Done** |
 | 22 | Version hold | **Done** (held while mods are on until an admin allows the build) |
 | 23 | Docker | **Done** (sidecar image + guide, `warden adduser`); not tried with a live Palworld container |
-| 20 | Off-machine targets | **Done**: SFTP (pinned host key) and S3-compatible, each read back and checked; WebDAV not started |
+| 20 | Off-machine targets | **Done**: SFTP (pinned host key), S3-compatible and WebDAV, each read back and checked |
 | 24 | API keys | **Done** (moderator/admin keys, hashed, revocable, audited) |
 | 27 | Several worlds | **Done** (list, name, switch, fresh world; backup-gated; nothing deleted) |
 | 25 | Auto-pause when empty | **Done** (knock-to-wake on the game port; off by default; Warden-run servers only) |

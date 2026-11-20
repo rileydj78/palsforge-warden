@@ -122,9 +122,19 @@ func main() {
 	}
 	go monitor.Run(context.Background(), game, st2)
 
+	for _, d := range []string{*dataDir, store.DefaultDir()} { // secrets, keys, the instance list
+		if os.MkdirAll(d, 0o700) == nil {
+			protectDir(d)
+		}
+	}
 	wcfg, found, err := config.Load(*dataDir, *serverDir)
 	if err != nil {
 		log.Fatalf("Warden's settings: %v", err)
+	}
+	if *name != "" && wcfg.Backups.Tag == "pal" {
+		// Each instance names its backups after itself, so instances sharing a backup folder or
+		// bucket never count (or delete) each other's archives.
+		wcfg.Backups.Tag = instances.Tag(*name)
 	}
 	if !found {
 		wcfg.Nightly.Enabled = false // nothing runs on its own until the admin has looked at the settings
@@ -261,7 +271,7 @@ func main() {
 	srv.Instances = &web.InstancesInfo{MainData: store.DefaultDir(), Self: *name}
 	go func() { // tell the other Wardens on this machine where this one is
 		for {
-			e := instances.Entry{Name: *name, ServerDir: *serverDir, Local: *listen, Admin: *adminListen, Public: *publicListen}
+			e := instances.Entry{Name: *name, ServerDir: *serverDir, Local: *listen, Admin: *adminListen, Public: *publicListen, Tag: wcfg.Backups.Tag}
 			if b, err := os.ReadFile(filepath.Join(*dataDir, "remote-url.txt")); err == nil {
 				e.Remote = strings.TrimSpace(string(b))
 			}

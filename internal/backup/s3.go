@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -47,9 +48,16 @@ func (t S3Target) Check() error {
 	return nil
 }
 
+var cgnat = &net.IPNet{IP: net.IPv4(100, 64, 0, 0), Mask: net.CIDRMask(10, 32)} // Tailscale's addresses
+
+// privateHost: an IP address on this machine, a private network or Tailscale (names don't count:
+// "10.example.com" is public).
 func privateHost(h string) bool {
-	return h == "localhost" || strings.HasPrefix(h, "127.") || strings.HasPrefix(h, "10.") || strings.HasPrefix(h, "192.168.") ||
-		strings.HasPrefix(h, "100.") || (strings.HasPrefix(h, "172.") && len(h) > 6)
+	if h == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && (ip.IsLoopback() || ip.IsPrivate() || cgnat.Contains(ip))
 }
 
 // Name is the place for messages (no keys).
@@ -277,11 +285,12 @@ func (t S3Target) List(ctx context.Context) ([]string, error) {
 
 // Mirror deletes this tag's archives in the bucket that are no longer kept here. It only ever
 // touches objects named like Warden's backups, directly under the prefix.
-func (t S3Target) Mirror(ctx context.Context, tag string, keep map[string]bool) (int, error) {
+func (t S3Target) Mirror(ctx context.Context, tag string, keepFn func(names []string) map[string]bool) (int, error) {
 	names, err := t.List(ctx)
 	if err != nil {
 		return 0, err
 	}
+	keep := keepFn(names)
 	n := 0
 	for _, name := range names {
 		if strings.Contains(name, "/") || !nameRe.MatchString(name) || !strings.HasPrefix(name, tag+"-") || keep[name] {

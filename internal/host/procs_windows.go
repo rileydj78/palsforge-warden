@@ -19,6 +19,9 @@ func pidsOf(exe string) ([]int, error) {
 	// Match the full path, not just the program name: with several servers on one machine,
 	// each Warden must see (and stop) only its own.
 	want := filepath.Clean(exe)
+	if r, err := filepath.EvalSymlinks(want); err == nil { // a junction, subst drive or link
+		want = r
+	}
 	snap, _, err := procSnapshot.Call(th32csSnapProcess, 0)
 	if snap == uintptr(syscall.InvalidHandle) {
 		return nil, fmt.Errorf("process list: %v", err)
@@ -32,7 +35,11 @@ func pidsOf(exe string) ([]int, error) {
 		if strings.ToLower(syscall.UTF16ToString(e.ExeFile[:])) != name {
 			continue
 		}
-		if p := imagePath(e.ProcessID); p != "" && strings.EqualFold(filepath.Clean(p), want) {
+		p := imagePath(e.ProcessID)
+		if r, err := filepath.EvalSymlinks(p); err == nil && p != "" {
+			p = r
+		}
+		if p != "" && strings.EqualFold(filepath.Clean(p), want) {
 			pids = append(pids, int(e.ProcessID))
 		}
 	}

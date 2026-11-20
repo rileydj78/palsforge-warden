@@ -186,7 +186,7 @@ func (t SFTPTarget) SendVerified(ctx context.Context, a Archive) error {
 
 // Mirror deletes this tag's archives there that are no longer kept here, so the other machine
 // follows the same retention. It only ever touches files named like Warden's backups.
-func (t SFTPTarget) Mirror(ctx context.Context, tag string, keep map[string]bool) (int, error) {
+func (t SFTPTarget) Mirror(ctx context.Context, tag string, keepFn func(names []string) map[string]bool) (int, error) {
 	sc, fc, dir, err := t.dial(ctx)
 	if err != nil {
 		return 0, err
@@ -197,10 +197,16 @@ func (t SFTPTarget) Mirror(ctx context.Context, tag string, keep map[string]bool
 	if err != nil {
 		return 0, err
 	}
-	n := 0
+	var names []string
 	for _, e := range ents {
-		name := e.Name()
-		if e.IsDir() || !nameRe.MatchString(name) || !strings.HasPrefix(name, tag+"-") || keep[name] {
+		if !e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	keep := keepFn(names)
+	n := 0
+	for _, name := range names {
+		if !nameRe.MatchString(name) || !strings.HasPrefix(name, tag+"-") || keep[name] {
 			continue
 		}
 		if fc.Remove(path.Join(dir, name)) == nil {

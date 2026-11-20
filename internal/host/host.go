@@ -48,6 +48,7 @@ type Host struct {
 	crashes []time.Time
 	pausedT time.Time // after too many crashes, wait until this time
 	cmd     *exec.Cmd
+	exited  chan struct{} // closed when the process Warden started exits
 }
 
 // New returns a Host. dataDir is where the server's console log goes in supervise mode.
@@ -205,11 +206,19 @@ func (h *Host) launch() error {
 			}
 			// The game resets its own CPU affinity while it starts up, so set it again once
 			// it has (seen live: an affinity set at launch was gone a minute later).
+			exited := make(chan struct{})
+			h.mu.Lock()
+			h.exited = exited
+			h.mu.Unlock()
 			go func() {
 				for _, d := range []time.Duration{5 * time.Second, 25 * time.Second, time.Minute} {
-					time.Sleep(d)
+					select {
+					case <-exited: // never touch a reused process ID
+						return
+					case <-time.After(d):
+					}
 					if err := setAffinity(pid, mask); err != nil {
-						return // the process is gone
+						return
 					}
 				}
 			}()
@@ -219,8 +228,15 @@ func (h *Host) launch() error {
 	h.cmd, h.started = cmd, time.Now()
 	h.mu.Unlock()
 	h.event("start", fmt.Sprintf("started the server (process %d)", cmd.Process.Pid))
+	h.mu.Lock()
+	ex := h.exited
+	h.exited = nil
+	h.mu.Unlock()
 	go func() {
 		err := cmd.Wait()
+		if ex != nil {
+			close(ex)
+		}
 		logf.Close()
 		h.mu.Lock()
 		wanted := h.want

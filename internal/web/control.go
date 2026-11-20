@@ -42,7 +42,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		busy, _ := c.Runner.Busy()
 		runs, _ := s.Store.Runs(1)
 		out := map[string]any{"host": c.Host.State(), "build": c.Host.BuildID(), "routineRunning": busy, "memory": c.Host.Memory(), "machine": host.MachineLoad(), "disk": host.DiskOf(c.Cfg.ServerDir), "health": c.Cfg.Health, "proof": nightly.LastProof(c.Runner.Backups.DataDir),
-			"nightly": c.Cfg.Nightly, "update": c.Cfg.Update.Enabled, "offsite": len(c.Cfg.Backups.Offsite) + len(c.Cfg.Backups.SFTP) + len(c.Cfg.Backups.S3)}
+			"nightly": c.Cfg.Nightly, "update": c.Cfg.Update.Enabled, "offsite": len(c.Cfg.Backups.Offsite) + len(c.Cfg.Backups.Remotes())}
 		if c.Cfg.Nightly.Enabled {
 			out["nextRun"] = nightly.NextRun(c.Cfg.Nightly.Time, time.Now())
 		}
@@ -299,7 +299,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
-	mux.HandleFunc("GET /api/backups/download", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+	mux.HandleFunc("GET /api/backups/download", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
 		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))
 		if err != nil {
@@ -333,7 +333,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
-	mux.HandleFunc("GET /api/backups/preview", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+	mux.HandleFunc("GET /api/backups/preview", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
 		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))
 		if err != nil {
@@ -400,7 +400,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		b := *c.Runner.Backups
 		b.Cfg.Backups.Image = "off"
 		names, err := b.MakeAll(ctx)
-		if err == nil && len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.SFTP)+len(c.Cfg.Backups.S3) > 0 {
+		if err == nil && len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()) > 0 {
 			err = b.CopyAndVerify(ctx, names)
 		}
 		s.Store.Audit(ses.User.Name, "back up now", "", "", err == nil)
@@ -444,7 +444,10 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 				in.DiscordWebhook = saved.Notify.DiscordWebhook
 			}
 			if in.NtfyToken == config.Unchanged {
-				in.NtfyToken = saved.Notify.NtfyToken
+				in.NtfyToken = ""
+				if in.NtfyURL == saved.Notify.NtfyURL { // the saved token only goes to the saved address
+					in.NtfyToken = saved.Notify.NtfyToken
+				}
 			}
 		}
 		if err := in.Check(); err != nil {

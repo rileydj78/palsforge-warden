@@ -279,10 +279,13 @@ func (s *Store) Allow(userID, by string, on bool) error {
 	return err
 }
 
-// Allowed says whether a player is on the allow-list.
+// Allowed says whether a player is on the allow-list. If the list can't be read, it says yes:
+// a database hiccup must never kick the server's own players.
 func (s *Store) Allowed(userID string) bool {
 	var n int
-	s.DB.QueryRow(`SELECT COUNT(*) FROM allowed WHERE user_id=?`, userID).Scan(&n)
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM allowed WHERE user_id=?`, userID).Scan(&n); err != nil {
+		return true
+	}
 	return n > 0
 }
 
