@@ -281,6 +281,8 @@
         <label class="check"><input type="checkbox" id="s-p-on"> A read-only status page (server name, online, player count) on its own port, 127.0.0.1:8284</label>
         <label class="check"><input type="checkbox" id="s-p-names"> Also list who's online (names only)</label>
         <label for="s-p-inv">Link on the page (optional, e.g. your Discord invite)</label><input id="s-p-inv" placeholder="https://discord.gg/..." autocomplete="off">
+        <label for="s-p-addr">Address for joining directly (optional; shown as you write it)</label><input id="s-p-addr" placeholder="play.example.com:8211" autocomplete="off" spellcheck="false">
+        <label for="s-p-rules">Rules, one per line (optional)</label><textarea id="s-p-rules" rows="4"></textarea>
         <p class="note">It stays on this machine until you run <code>warden remote public on</code>, which publishes only this page to the internet through Tailscale Funnel.</p>
         <h2>Server messages</h2>
         <label class="check"><input type="checkbox" id="s-m-on"> Send messages in the game</label>

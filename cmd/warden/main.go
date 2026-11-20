@@ -273,7 +273,17 @@ func main() {
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
 		if wcfg.StatusPage.On {
-			srv.Public = &web.Public{ShowNames: wcfg.StatusPage.ShowNames, Invite: wcfg.StatusPage.Invite}
+			pub := &web.Public{ShowNames: wcfg.StatusPage.ShowNames, Invite: wcfg.StatusPage.Invite, Address: wcfg.StatusPage.Address}
+			for _, l := range strings.Split(wcfg.StatusPage.Rules, "\n") {
+				if l = strings.TrimSpace(l); l != "" && len(pub.Rules) < 30 {
+					pub.Rules = append(pub.Rules, l)
+				}
+			}
+			if ini, err := config.ReadSettings(config.SettingsPath(wcfg.ServerDir)); err == nil {
+				pub.Platforms = strings.ReplaceAll(strings.Trim(ini.All["CrossplayPlatforms"], "()"), ",", ", ")
+				pub.Password = strings.Trim(ini.All["ServerPassword"], `"`) != ""
+			}
+			srv.Public = pub
 			log.Printf("status page on http://%s/ (read-only)", *publicListen)
 		}
 		go h.Supervise(context.Background())

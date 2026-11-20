@@ -16,6 +16,10 @@ import (
 type Public struct {
 	ShowNames bool
 	Invite    string // e.g. a Discord invite shown as a link
+	Address   string // how to join directly
+	Rules     []string
+	Platforms string // who can join (CrossplayPlatforms)
+	Password  bool   // a join password is set (never the password itself)
 	mu        sync.Mutex
 	cache     *publicView
 	at        time.Time
@@ -23,6 +27,9 @@ type Public struct {
 
 type publicView struct {
 	Name, Description, Version, Invite string
+	Address, Platforms                 string
+	Password                           bool
+	Rules                              []string
 	Online                             bool
 	Players, Max, Day                  int
 	Uptime                             string
@@ -38,7 +45,7 @@ func (s *Server) publicView(ctx context.Context) *publicView {
 		return p.cache
 	}
 	st := s.status(ctx, false)
-	v := &publicView{Online: st.Online, Invite: p.Invite, Checked: time.Now().UTC().Format("15:04 UTC")}
+	v := &publicView{Online: st.Online, Invite: p.Invite, Address: p.Address, Platforms: p.Platforms, Password: p.Password, Rules: p.Rules, Checked: time.Now().UTC().Format("15:04 UTC")}
 	if st.Server != nil {
 		v.Name, v.Description, v.Version = st.Server.ServerName, st.Server.Description, st.Server.Version
 	}
@@ -66,12 +73,12 @@ var publicPage = template.Must(template.New("p").Parse(`<!doctype html>
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 main{max-width:640px;margin:0 auto;padding:32px 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
-h1{font-size:22px;margin:0 0 4px;overflow-wrap:anywhere}.desc{color:var(--soft);margin:0 0 16px;overflow-wrap:anywhere}
+h1,h2{font-size:22px;margin:0 0 4px;overflow-wrap:anywhere}.desc{color:var(--soft);margin:0 0 16px;overflow-wrap:anywhere}
 .state{font-weight:600}.state::before{content:"";display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:var(--off)}
 .state.on::before{background:var(--on)}
 dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:16px 0 0}
 dt{color:var(--soft);font-size:13px}dd{margin:0;font-size:20px;font-weight:600}
-ul{margin:8px 0 0;padding-left:20px}a{color:var(--on)}footer{color:var(--soft);font-size:13px}
+ul,ol{margin:8px 0 0;padding-left:20px}li{margin:4px 0}h2{font-size:18px}a{color:var(--on)}footer{color:var(--soft);font-size:13px}
 </style></head><body><main>
 <section class="card"><h1>{{if .Name}}{{.Name}}{{else}}Palworld server{{end}}</h1>
 {{if .Description}}<p class="desc">{{.Description}}</p>{{end}}
@@ -82,7 +89,13 @@ ul{margin:8px 0 0;padding-left:20px}a{color:var(--on)}footer{color:var(--soft);f
 {{if .Version}}<div><dt>Version</dt><dd>{{.Version}}</dd></div>{{end}}</dl>
 {{if .Names}}<ul>{{range .Names}}<li>{{.}}</li>{{end}}</ul>{{end}}{{end}}
 {{if .Invite}}<p><a href="{{.Invite}}" rel="noopener">Join the community</a></p>{{end}}
-</section><footer>Checked {{.Checked}} · refreshes every minute · Palsforge Warden</footer>
+</section>
+<section class="card"><h2>How to join</h2><ol>
+<li>In Palworld: <b>Join Multiplayer Game</b> → <b>Community Servers</b>, and search for <b>{{if .Name}}{{.Name}}{{else}}the server's name{{end}}</b>.</li>
+{{if .Address}}<li>Or join directly (PC): enter <b>{{.Address}}</b> at the bottom of that screen.</li>{{end}}
+{{if .Password}}<li>It asks for a password: ask in the community{{if .Invite}} (link above){{end}}.</li>{{end}}
+</ol>{{if .Platforms}}<p class="desc">Who can join: {{.Platforms}}. Console players join from the Community Servers list.</p>{{end}}</section>
+{{if .Rules}}<section class="card"><h2>Rules</h2><ul>{{range .Rules}}<li>{{.}}</li>{{end}}</ul></section>{{end}}<footer>Checked {{.Checked}} · refreshes every minute · Palsforge Warden</footer>
 </main></body></html>`))
 
 // PublicHandler serves only the status page and its JSON.

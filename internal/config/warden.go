@@ -48,6 +48,8 @@ type StatusPage struct {
 	On        bool   `json:"on"`
 	ShowNames bool   `json:"showNames"` // list who's online (names only)
 	Invite    string `json:"invite"`    // a link shown on the page, e.g. a Discord invite
+	Address   string `json:"address"`   // how players join directly, e.g. play.example.com:8211 (shown as is)
+	Rules     string `json:"rules"`     // one per line
 }
 
 // StarterKit is given once to each player the first time Warden sees them.

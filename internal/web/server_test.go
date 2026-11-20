@@ -202,7 +202,7 @@ func TestPublicPageShowsOnlyStatus(t *testing.T) {
 	st, _ := store.Open(t.TempDir())
 	au, _ := auth.New(st.DB)
 	fg := &fakeGame{}
-	s := &Server{Game: fg.start(t), Store: st, Auth: au, Version: "test", Public: &Public{Invite: "https://discord.gg/x"}}
+	s := &Server{Game: fg.start(t), Store: st, Auth: au, Version: "test", Public: &Public{Invite: "https://discord.gg/x", Rules: []string{"<script>alert(1)</script>"}, Password: true, Address: "play.example.com:8211"}}
 	ts := httptest.NewServer(s.PublicHandler())
 	t.Cleanup(ts.Close)
 	resp, _ := http.Get(ts.URL + "/")
@@ -211,6 +211,9 @@ func TestPublicPageShowsOnlyStatus(t *testing.T) {
 	page := b.String()
 	if !strings.Contains(page, "Test") || !strings.Contains(page, "Online") || strings.Contains(page, "Moss") || strings.Contains(page, "10.0.0.9") || strings.Contains(page, "steam_1") {
 		t.Fatalf("name and state only; no names unless asked, never IPs or IDs: %s", page)
+	}
+	if strings.Contains(page, "<script>alert") || !strings.Contains(page, "&lt;script&gt;") || !strings.Contains(page, "play.example.com:8211") || !strings.Contains(page, "asks for a password") {
+		t.Fatal("rules are text, the address is shown, the password is only mentioned")
 	}
 	for _, p := range []string{"/api/me", "/api/status", "/api/users", "/index.html"} {
 		if r, _ := http.Get(ts.URL + p); r.StatusCode != 404 {

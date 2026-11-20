@@ -780,7 +780,7 @@ async function loadSettings() {
     const hl = cfg.health || {};
     $("s-h-frozen").value = hl.restartFrozenMinutes ?? 5; $("s-h-mem").value = hl.memoryLimitGB || 0; $("s-h-pause").value = hl.pauseEmptyMinutes || 0;
     const sk = cfg.starterKit || {}; $("s-k-on").checked = !!sk.on; $("s-k-items").value = sk.items || ""; $("s-k-pals").value = sk.pals || ""; $("s-k-msg").value = sk.message || "";
-    const sp = cfg.statusPage || {}; $("s-p-on").checked = !!sp.on; $("s-p-names").checked = !!sp.showNames; $("s-p-inv").value = sp.invite || "";
+    const sp = cfg.statusPage || {}; $("s-p-on").checked = !!sp.on; $("s-p-names").checked = !!sp.showNames; $("s-p-inv").value = sp.invite || ""; $("s-p-addr").value = sp.address || ""; $("s-p-rules").value = sp.rules || "";
     const al = cfg.allowList || {}; $("s-a-on").checked = !!al.on; $("s-a-msg").value = al.message || "";
     const b = cfg.broadcasts || {};
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
@@ -801,7 +801,7 @@ $("setform").addEventListener("submit", async (e) => {
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0, pauseEmptyMinutes: parseInt($("s-h-pause").value, 10) || 0 };
   c.starterKit = { on: $("s-k-on").checked, items: $("s-k-items").value.trim(), pals: $("s-k-pals").value.trim(), message: $("s-k-msg").value.trim() };
-  c.statusPage = { on: $("s-p-on").checked, showNames: $("s-p-names").checked, invite: $("s-p-inv").value.trim() };
+  c.statusPage = { on: $("s-p-on").checked, showNames: $("s-p-names").checked, invite: $("s-p-inv").value.trim(), address: $("s-p-addr").value.trim().slice(0, 100), rules: $("s-p-rules").value.slice(0, 3000) };
   c.allowList = { on: $("s-a-on").checked, message: $("s-a-msg").value.trim() };
   c.broadcasts = { enabled: $("s-m-on").checked, messages: lines($("s-m-list").value), everyMinutes: parseInt($("s-m-every").value, 10) || 0, welcome: $("s-m-welcome").value.trim() };
   Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
