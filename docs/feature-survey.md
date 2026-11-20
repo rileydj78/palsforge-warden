@@ -314,7 +314,7 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | Supercraft | Web RCON console, **character recovery**, allow/block list management, Thunderstore mods | – |
 | CubeCoders AMP | Scheduler triggers, backups incl. S3, RCON console; several forum reports of Palworld backup and RCON failures | Roles/audit details (KB not readable) |
 
-## Where the gaps stand (updated 2026-11-20, 0.1.0-rc19)
+## Where the gaps stand (updated 2026-11-20, 0.1.0-rc21)
 
 | # | Gap | Status |
 |---|---|---|
@@ -328,9 +328,9 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 9 | More than one server | Not started (0.3 plan) |
 | 10 | Translations | Not started |
 | 11 | Two-factor sign-in | **Done** (TOTP, escalating lock, codes work once) |
-| 12 | Public status page | **Partly**: the Discord live status; a web page not started |
-| 13 | Install the server from scratch | Not started |
-| 14 | Host metrics | **Partly**: CPU and RAM in history; disk and network not started |
+| 12 | Public status page | **Done** (own read-only port; Funnel publishes only it) + the Discord live status |
+| 13 | Install the server from scratch | **Done** (SteamCMD + server + first settings; tested on Windows) |
+| 14 | Host metrics | **Mostly**: CPU and RAM in history, disk free with a warning; network not started |
 | 15 | Settings extras | **Partly**: presets, import/export; Engine.ini and launch arguments not started |
 | 16 | Scheduled events | **Done** (weekly events, admin edits kept, survive restarts) |
 | 17 | Timed broadcasts / MOTD | **Done** (rotating messages, private welcome) |
@@ -338,11 +338,14 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 19 | Anti-cheat review | Not started |
 | 20 | S3 / WebDAV / SFTP targets | Not started |
 | 21 | Download a backup | **Done** |
-| 22–25, 27–30 | Version hold, Docker, API keys, auto-pause, worlds, self-update, console, files | Not started |
+| 22 | Version hold | **Partly**: updates can be turned off; no "hold until mods catch up" yet |
+| 23 | Docker | **Done** (sidecar image + guide, `warden adduser`); not tried with a live Palworld container |
+| 24–25, 27–30 | API keys, auto-pause, worlds, self-update, console, files | Not started |
 | 26 | Player notes | **Done** |
 
-Not release-ready until the "Not started" items that matter most to owners (8, 9, 10, 13, 22,
-23) are decided: built, or consciously left out of 1.0 and said so.
+Not release-ready until the "Not started" items that matter most to owners (8, 9, 10) are
+decided: built, or consciously left out of 1.0 and said so. Character migration (8) needs a save
+parser for Oodle-compressed 1.0 saves: the largest single piece of work left.
 
 ## Parity gaps (others have it, Warden doesn't)
 
