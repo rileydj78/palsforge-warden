@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,6 +164,7 @@ func Load(dataDir, serverDir string) (Warden, bool, error) {
 	if err != nil {
 		return w, false, err
 	}
+	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf")) // Notepad and PowerShell add a byte-order mark
 	if err := json.Unmarshal(b, &w); err != nil {
 		return w, true, fmt.Errorf("warden.json isn't valid: %w", err)
 	}

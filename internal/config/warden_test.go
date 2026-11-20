@@ -53,3 +53,12 @@ func TestCheckExplainsMistakes(t *testing.T) {
 		}
 	}
 }
+
+func TestByteOrderMarkIsFine(t *testing.T) {
+	data := t.TempDir()
+	os.WriteFile(ConfigPath(data), []byte("\xef\xbb\xbf{\"nightly\": {\"time\": \"05:15\"}}"), 0o600)
+	w, _, err := Load(data, t.TempDir())
+	if err != nil || w.Nightly.Time != "05:15" {
+		t.Fatalf("a file saved by Notepad must load: %v", err)
+	}
+}
