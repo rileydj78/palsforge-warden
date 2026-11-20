@@ -71,7 +71,7 @@ button { font: inherit; }
 .seg button { border: 0; background: var(--card); color: var(--muted); padding: 6px 12px; cursor: pointer; font-size: 13px; }
 .seg button[aria-pressed="true"] { background: var(--accent-bg); color: var(--accent-ink); font-weight: 600; }
 .chart { margin-top: 12px; }
-.chart svg { width: 100%; height: 120px; display: block; }
+.chart svg { width: 100%; height: 96px; display: block; }
 .chartlabel { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--soft); }
 .axis { font: 11px var(--mono); fill: var(--soft); }
 .note { font-size: 13px; color: var(--muted); }
@@ -209,3 +209,6 @@ details.passed summary::before { content: "✓ "; color: var(--accent); font-wei
 @media (max-width: 760px) {
   .tablewrap td[data-label]::before { content: attr(data-label); display: block; font-family: var(--font); font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--soft); }
 }
+
+/* Dashboard graphs: two by two on wide screens, shorter; one column on phones. */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 4px 28px; }

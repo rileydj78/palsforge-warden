@@ -177,7 +177,7 @@ function render(st) {
 
 // Small SVG line chart drawn from the samples; gaps where the server was down.
 function chart(box, samples, key, label, color, maxHint) {
-  const W = Math.max(280, Math.round(box.clientWidth || 760)), H = 120, P = 28; // 1 unit = 1 px: labels stay readable
+  const W = Math.max(260, Math.round(box.clientWidth || 760)), H = 96, P = 28; // 1 unit = 1 px: labels stay readable
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`); svg.setAttribute("preserveAspectRatio", "none");
@@ -1041,3 +1041,6 @@ function labelCells(root) {
 }
 new MutationObserver((ms) => { for (const m of ms) if (m.target.closest && m.target.closest(".tablewrap")) { labelCells(m.target.closest(".tablewrap")); } }).observe(document.body, { childList: true, subtree: true });
 labelCells(document);
+// Graphs are drawn at their real width: redraw them when the window changes size.
+let resizeTimer = 0;
+window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if (!$("view-dash").hidden) history(); }, 250); });
