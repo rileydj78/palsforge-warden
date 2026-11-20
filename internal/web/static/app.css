@@ -96,3 +96,5 @@ details.run table { margin-top: 8px; }
 .form h2 { margin-top: 14px; }
 .form textarea { font: 13px var(--mono); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); }
 .check { display: flex; gap: 8px; align-items: center; }
+.stat.warn { border-color: #E3A66A; background: var(--warn-bg); }
+.stat.warn .value { color: var(--warn-ink); }

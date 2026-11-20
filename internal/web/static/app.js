@@ -349,7 +349,19 @@ function route() {
   if (view === "settings") loadSettings();
 }
 window.addEventListener("hashchange", route);
-async function refresh() { try { render(await api("/api/status")); } catch (e) {} }
+async function refresh() {
+  try { render(await api("/api/status")); } catch (e) {}
+  try { // safety facts first: when was the world last backed up, and when is the next run
+    const s = await api("/api/server");
+    $("st-backup").hidden = false; $("st-next").hidden = false;
+    const lr = s.lastRun;
+    $("lastbk").textContent = lr ? when(lr.started) : "Never";
+    $("lastbknote").textContent = lr ? (lr.ok ? `${lr.kind} run completed` : `${lr.kind} run had problems: see Server`) : "No backup has run yet";
+    $("st-backup").classList.toggle("warn", !lr || !lr.ok || Date.now() / 1000 - lr.started > 36 * 3600);
+    $("nextrun").textContent = s.nextRun ? when2(s.nextRun) : "Off";
+    $("nextrunnote").textContent = s.nextRun ? (s.offsite ? "Backups copied to a second place" : "No second place for backups yet") : "Turn it on in Settings";
+  } catch (e) {}
+}
 
 (async function start() {
   try {
