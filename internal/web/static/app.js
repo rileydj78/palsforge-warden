@@ -515,20 +515,53 @@ async function loadGame() {
     const pr = $("g-presets"); pr.replaceChildren();
     for (const p of game.presets || []) {
       const b = el("button", null, "preset"); b.type = "button"; b.append(el("strong", p.name), el("span", p.about, "note"));
-      b.onclick = () => {
-        let n = 0;
-        for (const [k, v] of Object.entries(p.values)) {
-          const i = document.querySelector(`#g-groups [data-key="${k}"]`); if (!i || i.disabled) continue;
-          const val = i.tagName === "SELECT" ? (/^true$/i.test(v) ? "True" : /^false$/i.test(v) ? "False" : v) : String(parseFloat(v));
-          if (i.value !== val) { i.value = val; i.classList.toggle("changed", i.value !== i.dataset.orig); n++; }
-        }
-        toast(n ? `${p.name}: ${n} value${n === 1 ? "" : "s"} filled in. Review changes to apply.` : `Already set like ${p.name}.`);
-      };
+      b.onclick = () => fillGame(p.values, p.name);
       pr.append(b);
     }
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
 }
+function fillGame(values, from) {
+  let n = 0, skipped = 0;
+  for (const [k, v] of Object.entries(values)) {
+    const i = document.querySelector(`#g-groups [data-key="${CSS.escape(k)}"]`);
+    if (!i || i.disabled || i.type === "password") { skipped++; continue; }
+    const val = i.tagName === "SELECT" ? (/^true$/i.test(v) ? "True" : /^false$/i.test(v) ? "False" : String(v)) : (i.inputMode === "decimal" && !isNaN(parseFloat(v)) ? String(parseFloat(v)) : String(v).replace(/^"|"$/g, ""));
+    if (i.value !== val) { i.value = val; i.classList.toggle("changed", i.value !== i.dataset.orig); n++; }
+  }
+  toast(`${from}: ${n} value${n === 1 ? "" : "s"} filled in${skipped ? ` (${skipped} skipped)` : ""}. Review changes to apply.`);
+}
+// OptionSettings=(A=1,B="x, y",...) → {A: "1", B: "x, y"}
+function parseIni(text) {
+  const m = text.match(/OptionSettings=\(([\s\S]*)\)/); if (!m) return null;
+  const out = {}; let key = "", val = "", inKey = true, q = false, depth = 0;
+  const flush = () => { if (key.trim()) out[key.trim()] = val.trim(); key = ""; val = ""; inKey = true; };
+  for (const ch of m[1]) {
+    if (inKey) { if (ch === "=") inKey = false; else if (ch !== ",") key += ch; continue; }
+    if (ch === '"') q = !q;
+    if (!q && ch === "(") depth++;
+    if (!q && ch === ")") depth--;
+    if (!q && depth === 0 && ch === ",") { flush(); continue; }
+    val += ch;
+  }
+  flush(); return out;
+}
+$("g-export").addEventListener("click", () => {
+  if (!game) return;
+  const out = {};
+  for (const o of game.catalog) if (o.type !== "secret" && !o.locked && game.values[o.key] != null) out[o.key] = game.values[o.key];
+  const a = el("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ palworldSettings: out }, null, 2)], { type: "application/json" }));
+  a.download = "palworld-settings.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+document.querySelector('label[for="g-import"]').addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("g-import").click(); } });
+$("g-import").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  if (f.size > 1 << 20) { toast("That file is too big to be a settings file."); return; }
+  const text = await f.text(); let values = null;
+  try { const j = JSON.parse(text); values = j.palworldSettings || j; } catch (_) { values = parseIni(text); }
+  if (!values || typeof values !== "object") { toast("That isn't a settings file Warden understands (JSON from here, or PalWorldSettings.ini)."); return; }
+  fillGame(values, f.name);
+});
 function gameEdits() {
   const out = {};
   for (const i of document.querySelectorAll("#g-groups [data-key]")) {

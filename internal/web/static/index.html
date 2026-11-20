@@ -150,7 +150,9 @@
         <div class="hero"><h1>Game settings</h1><p class="sub" id="g-sub"></p></div>
         <div class="actions"><button class="btn primary" id="g-review">Review changes</button></div>
       </div>
-      <section class="card"><h2>Start from a preset</h2><p class="note">Fills in the form below; nothing changes until you review and apply.</p><div class="presets" id="g-presets"></div></section>
+      <section class="card"><h2>Start from a preset</h2><p class="note">Fills in the form below; nothing changes until you review and apply.</p><div class="presets" id="g-presets"></div>
+        <div class="row"><button type="button" class="small" id="g-export">Export these settings</button><label class="small" for="g-import" tabindex="0" role="button">Import a file…</label><input type="file" id="g-import" accept=".json,.ini,.txt" hidden></div>
+        <p class="note">Import takes a file exported here or any PalWorldSettings.ini (from another server or a settings generator). Passwords are never exported or imported.</p></section>
       <div id="g-groups"></div>
       <section class="card" id="g-unknown-card" hidden><h2>Other options</h2><p class="note">Options Warden doesn't explain yet. They're kept exactly as they are.</p><p class="mono" id="g-unknown"></p></section>
     </section>
