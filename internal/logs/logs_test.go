@@ -8,6 +8,9 @@ import (
 )
 
 func TestCleanMasksIPsAndSecrets(t *testing.T) {
+	if c := Clean(`notify: Post "https://discord.com/api/webhooks/123/abcSECRET": timeout from 2601:44:8100:1a2::5`); strings.Contains(c, "abcSECRET") || strings.Contains(c, "8100") {
+		t.Fatalf("leaked: %s", c)
+	}
 	got := Clean("[2026.11.19] Moss joined from 73.12.44.9:52133 AdminPassword=hunter2 local 127.0.0.1")
 	if strings.Contains(got, "73.12.44.9") || strings.Contains(got, "hunter2") {
 		t.Fatalf("leaked: %s", got)

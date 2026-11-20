@@ -124,6 +124,10 @@ func (s *Server) status(ctx context.Context, fresh bool) *Status {
 
 func secure(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !hostOK(r.Host) {
+			http.Error(w, "Open Warden at http://127.0.0.1 or through your Tailscale name.", http.StatusMisdirectedRequest)
+			return
+		}
 		h := w.Header()
 		h.Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
 		h.Set("X-Frame-Options", "DENY")
@@ -219,12 +223,13 @@ func (s *Server) Handler() http.Handler {
 			fail(w, 400, "bad request")
 			return
 		}
-		if err := s.Auth.CreateOwner(strings.TrimSpace(in.Code), strings.TrimSpace(in.Name), in.Password); err != nil {
+		name := strings.TrimSpace(in.Name)
+		if err := s.Auth.CreateOwner(strings.TrimSpace(in.Code), name, in.Password); err != nil {
 			fail(w, 400, err.Error())
 			return
 		}
-		s.Store.Audit(in.Name, "setup", "", "created the owner account", true)
-		s.signIn(w, r, in.Name, in.Password)
+		s.Store.Audit(name, "setup", "", "created the owner account", true)
+		s.signIn(w, r, name, in.Password)
 	})
 	mux.HandleFunc("POST /api/login", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Name, Password string }
@@ -396,6 +401,9 @@ func (s *Server) Handler() http.Handler {
 		if in.Message == "" {
 			in.Message = "The server is shutting down."
 		}
+		if s.Control != nil {
+			s.Control.Host.PlanStop(ctx) // on purpose: not a crash, and it stays off
+		}
 		return s.Game.Shutdown(ctx, in.Seconds, in.Message)
 	}, none)
 	s.controlRoutes(mux)
@@ -407,7 +415,7 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) signIn(w http.ResponseWriter, r *http.Request, name, pw string) {
-	tok, ses, err := s.Auth.Login(name, pw)
+	tok, ses, err := s.Auth.LoginFrom(name, pw, clientAddr(r))
 	if err != nil {
 		s.Store.Audit(name, "sign in", "", "failed", false)
 		fail(w, 401, err.Error())
@@ -418,6 +426,32 @@ func (s *Server) signIn(w http.ResponseWriter, r *http.Request, name, pw string)
 		SameSite: http.SameSiteStrictMode, MaxAge: int(auth.SessionLife / time.Second)})
 	s.Store.Audit(name, "sign in", "", "", true)
 	writeJSON(w, 200, map[string]any{"user": ses.User, "csrf": ses.CSRF})
+}
+
+// clientAddr is who's asking: the tailnet address tailscale serve passes on, or the direct one.
+func clientAddr(r *http.Request) string {
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		if f := strings.TrimSpace(strings.Split(r.Header.Get("X-Forwarded-For"), ",")[0]); f != "" {
+			return f
+		}
+	}
+	return host
+}
+
+// hostOK refuses requests addressed to any other name (DNS rebinding): only this machine and
+// its own Tailscale name may be used.
+func hostOK(h string) bool {
+	host := h
+	if hh, _, err := net.SplitHostPort(h); err == nil {
+		host = hh
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	if host == "localhost" || strings.HasSuffix(host, ".ts.net") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	return ip != nil && ip.IsLoopback()
 }
 
 // Listen serves on addr, which must be a loopback address.

@@ -51,7 +51,7 @@ func TestPlanApplyRoundTrip(t *testing.T) {
 
 func TestPlanRefusesBadValues(t *testing.T) {
 	f, _ := Read(write(t))
-	for k, v := range map[string]string{"ExpRate": "500", "bIsPvP": "maybe", "DeathPenalty": "Everything", "AdminPassword": "new", "ServerName": `evil",AdminPassword="x`, "FutureOption": "1,2"} {
+	for k, v := range map[string]string{"ExpRate": "500", "bIsPvP": "maybe", "DeathPenalty": "Everything", "AdminPassword": "new", "ServerName": `evil",AdminPassword="x`, "FutureOption": "1,2", "X=1,AdminPassword": "mine", "NotThere": "1", "FutureOption ": "(a))"} {
 		if _, err := f.Plan(map[string]string{k: v}); err == nil {
 			t.Fatalf("%s=%s should be refused", k, v)
 		}

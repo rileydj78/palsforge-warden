@@ -19,7 +19,7 @@ func (r *Runner) FindArchive(place int, name string) (backup.Archive, error) {
 	if place < 0 || place >= len(dirs) {
 		return backup.Archive{}, errors.New("no such backup place")
 	}
-	list, err := backup.List(dirs[place])
+	list, err := backup.ListTag(dirs[place], r.Cfg.Backups.Tag)
 	if err != nil {
 		return backup.Archive{}, err
 	}
@@ -36,14 +36,11 @@ func (r *Runner) FindArchive(place int, name string) (backup.Archive, error) {
 // and start the server. If unpacking fails, the moved folders are put back. The server is always
 // started again at the end.
 func (r *Runner) Restore(ctx context.Context, a backup.Archive, by string) (*routine.Report, error) {
-	r.mu.Lock()
-	if r.busy {
-		r.mu.Unlock()
-		return nil, errors.New("another run is in progress")
+	end, err := r.Begin("a restore")
+	if err != nil {
+		return nil, err
 	}
-	r.busy = true
-	r.mu.Unlock()
-	defer func() { r.mu.Lock(); r.busy = false; r.mu.Unlock() }()
+	defer end()
 
 	rep := &routine.Report{Started: time.Now(), OK: true, Backups: []string{a.Name}}
 	step := func(name string, err error, detail string) bool {

@@ -102,7 +102,11 @@ After=network-online.target
 
 [Service]
 ExecStart=%s %s
-Restart=on-failure
+# Warden restarts itself by exiting after a settings change; systemd starts it again.
+Restart=always
+RestartSec=2
+# Only Warden is stopped when it restarts, never the game server it supervises.
+KillMode=process
 User=%s
 
 [Install]
@@ -236,6 +240,10 @@ func pauseIfDoubleClicked() {
 // restartSelf starts a fresh copy of Warden with the same arguments and exits, so new settings
 // apply exactly as at startup.
 func restartSelf() {
+	if os.Getenv("INVOCATION_ID") != "" { // under systemd: exit and let it restart Warden (KillMode=process keeps the game running)
+		fmt.Fprintln(os.Stderr, "warden: settings changed; restarting")
+		os.Exit(3)
+	}
 	exe, err := os.Executable()
 	if err != nil {
 		return

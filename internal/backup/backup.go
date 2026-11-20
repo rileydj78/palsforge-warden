@@ -35,17 +35,18 @@ const (
 type Archive struct {
 	Name   string    `json:"name"`
 	Kind   string    `json:"kind"`
+	Tag    string    `json:"tag"`
 	Path   string    `json:"-"`
 	Size   int64     `json:"size"`
 	SHA256 string    `json:"sha256"`
 	When   time.Time `json:"when"`
 }
 
-var nameRe = regexp.MustCompile(`^([a-z0-9]+)-(data|server)-(\d{8})-(\d{4})\.zip$`)
+var nameRe = regexp.MustCompile(`^([a-z0-9]+)-(data|server)-(\d{8})-(\d{6}|\d{4})\.zip$`)
 
 // FileName is the archive name for a server tag, kind and time.
 func FileName(tag, kind string, t time.Time) string {
-	return fmt.Sprintf("%s-%s-%s.zip", tag, kind, t.Format("20060102-1504"))
+	return fmt.Sprintf("%s-%s-%s.zip", tag, kind, t.Format("20060102-150405"))
 }
 
 // Make zips the given paths (files or folders, relative to root) into dir/name. It writes
@@ -56,8 +57,14 @@ func Make(dir, name, root string, paths []string, skip func(string) bool) (*Arch
 		return nil, err
 	}
 	final := filepath.Join(dir, name)
+	if _, err := os.Stat(final); err == nil {
+		return nil, fmt.Errorf("a backup named %s already exists; nothing was overwritten", name)
+	}
 	part := final + ".part"
-	f, err := os.Create(part)
+	f, err := os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o640)
+	if err != nil {
+		return nil, fmt.Errorf("another backup is being written right now: %w", err)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -208,12 +215,16 @@ func List(dir string) ([]Archive, error) {
 		if m == nil {
 			continue
 		}
-		t, err := time.ParseInLocation("20060102-1504", m[3]+"-"+m[4], time.Local)
+		layout := "20060102-150405"
+		if len(m[4]) == 4 { // older names: to the minute
+			layout = "20060102-1504"
+		}
+		t, err := time.ParseInLocation(layout, m[3]+"-"+m[4], time.Local)
 		if err != nil {
 			continue
 		}
 		info, _ := e.Info()
-		a := Archive{Name: e.Name(), Kind: m[2], Path: filepath.Join(dir, e.Name()), When: t}
+		a := Archive{Name: e.Name(), Kind: m[2], Tag: m[1], Path: filepath.Join(dir, e.Name()), When: t}
 		if info != nil {
 			a.Size = info.Size()
 		}
@@ -235,9 +246,22 @@ type Policy struct {
 // DefaultPolicy keeps 14 daily and 8 weekly.
 var DefaultPolicy = Policy{Daily: 14, Weekly: 8}
 
-// Prune removes archives in dir that the policy doesn't keep. Returns the names removed.
-func Prune(dir string, p Policy) ([]string, error) {
+// ListTag is List for one server's backups (a shared folder may hold several servers').
+func ListTag(dir, tag string) ([]Archive, error) {
 	all, err := List(dir)
+	var out []Archive
+	for _, a := range all {
+		if a.Tag == tag {
+			out = append(out, a)
+		}
+	}
+	return out, err
+}
+
+// Prune removes archives with this tag in dir that the policy doesn't keep; other servers'
+// backups in the same folder are never touched. Returns the names removed.
+func Prune(dir string, p Policy, tag string) ([]string, error) {
+	all, err := ListTag(dir, tag)
 	if err != nil {
 		return nil, err
 	}

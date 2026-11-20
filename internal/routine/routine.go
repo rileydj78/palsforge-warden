@@ -9,6 +9,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 )
@@ -105,6 +107,8 @@ func Run(ctx context.Context, p Plan, g Game, h Host, b Backups) *Report {
 
 	// 1. Warnings, longest first, then the remaining wait.
 	warn := append([]int(nil), p.WarnMinutes...)
+	sort.Sort(sort.Reverse(sort.IntSlice(warn))) // "1, 5, 15" must still mean 15, 5, 1
+	warn = slices.Compact(warn)
 	for i, m := range warn {
 		msg := fmt.Sprintf("Nightly restart in %d minute%s. The world is saved first.", m, map[bool]string{true: "", false: "s"}[m == 1])
 		bad(r.add("warn", g.Announce(ctx, msg), fmt.Sprintf("%d min", m)))

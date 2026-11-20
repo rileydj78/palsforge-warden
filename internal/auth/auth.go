@@ -54,8 +54,7 @@ type Auth struct {
 	SetupCode string // shown on the console until the owner exists
 	mu        sync.Mutex
 	sessions  map[string]*Session
-	fails     int
-	lockUntil time.Time
+	attempts  map[string]*attempt
 }
 
 // SessionLife is how long a sign-in lasts.
@@ -167,29 +166,66 @@ func (a *Auth) addUser(name, pw, role string) error {
 }
 
 // Login checks a password and starts a session. Returns the session token.
-func (a *Auth) Login(name, pw string) (string, *Session, error) {
+func (a *Auth) Login(name, pw string) (string, *Session, error) { return a.LoginFrom(name, pw, "") }
+
+// verifySlots limits how many Argon2id checks (64 MB each) run at once.
+var verifySlots = make(chan struct{}, 3)
+
+// LoginFrom checks a password. Failures are counted per name and per source address before the
+// slow check runs, so parallel guesses can't slip past the limit, and one attacker can't lock the
+// owner out from everywhere.
+func (a *Auth) LoginFrom(name, pw, source string) (string, *Session, error) {
+	keys := []string{"name:" + strings.ToLower(name), "src:" + source}
 	a.mu.Lock()
-	if time.Now().Before(a.lockUntil) {
-		a.mu.Unlock()
-		return "", nil, errors.New("too many wrong passwords; wait a minute")
+	if a.attempts == nil {
+		a.attempts = map[string]*attempt{}
+	}
+	now := time.Now()
+	for _, k := range keys {
+		at := a.attempts[k]
+		if at == nil {
+			at = &attempt{}
+			a.attempts[k] = at
+		}
+		if now.Before(at.until) {
+			a.mu.Unlock()
+			return "", nil, errors.New("too many wrong passwords; wait a minute")
+		}
+		if at.n >= 5 { // five wrong already: lock for a minute
+			at.n, at.until = 0, now.Add(time.Minute)
+			a.mu.Unlock()
+			return "", nil, errors.New("too many wrong passwords; wait a minute")
+		}
+	}
+	for _, k := range keys {
+		a.attempts[k].n++ // reserve the attempt before the slow check; a success takes it back
+	}
+	if len(a.attempts) > 10000 { // forget old entries
+		for k, at := range a.attempts {
+			if now.After(at.until) && at.n == 0 {
+				delete(a.attempts, k)
+			}
+		}
 	}
 	a.mu.Unlock()
+	verifySlots <- struct{}{}
 	var stored, role string
 	err := a.DB.QueryRow(`SELECT hash, role FROM users WHERE name=?`, name).Scan(&stored, &role)
 	ok := err == nil && verify(pw, stored)
 	if err != nil {
 		verify(pw, hash("x", make([]byte, 16))) // same work either way: no hint whether the name exists
 	}
+	<-verifySlots
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if !ok {
-		a.fails++
-		if a.fails >= 5 {
-			a.fails, a.lockUntil = 0, time.Now().Add(time.Minute)
-		}
 		return "", nil, errors.New("that name and password don't match")
 	}
-	a.fails = 0
+	for _, k := range keys {
+		if at := a.attempts[k]; at != nil {
+			at.n = 0
+		}
+	}
 	tok := token(32)
 	s := &Session{User: User{Name: name, Role: role}, CSRF: token(24), Expires: time.Now().Add(SessionLife)}
 	for t, old := range a.sessions {
@@ -200,6 +236,11 @@ func (a *Auth) Login(name, pw string) (string, *Session, error) {
 	a.sessions[tok] = s
 	a.DB.Exec(`UPDATE users SET last_login=? WHERE name=?`, time.Now().Unix(), name)
 	return tok, s, nil
+}
+
+type attempt struct {
+	n     int
+	until time.Time
 }
 
 // Session returns the live session for a token, or nil.

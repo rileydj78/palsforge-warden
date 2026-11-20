@@ -110,7 +110,7 @@ func (n *Notifier) post(ctx context.Context, u string, body []byte, h map[string
 	}
 	resp, err := n.HTTP.Do(req)
 	if err != nil {
-		log.Printf("notify: %v", err)
+		log.Printf("notify: couldn't reach %s", req.URL.Host) // never the full address: it is the secret
 		return
 	}
 	resp.Body.Close()

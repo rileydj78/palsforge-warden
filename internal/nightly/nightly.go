@@ -119,7 +119,7 @@ func (b *Backups) Prune(ctx context.Context) error {
 	p := backup.Policy{Daily: b.Cfg.Backups.Daily, Weekly: b.Cfg.Backups.Weekly}
 	var errs []error
 	for _, dir := range append([]string{b.LocalDir()}, b.Cfg.Backups.Offsite...) {
-		if _, err := backup.Prune(dir, p); err != nil {
+		if _, err := backup.Prune(dir, p, b.Cfg.Backups.Tag); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -155,6 +155,18 @@ type Runner struct {
 	stepNow string
 }
 
+// Begin claims the server for one operation (the routine, a restore, a mod change, a restart, a
+// backup). Only one runs at a time; the second gets a clear "busy" error.
+func (r *Runner) Begin(what string) (func(), error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.busy {
+		return nil, fmt.Errorf("busy: %s is in progress; try again when it's done", r.stepNow)
+	}
+	r.busy, r.stepNow = true, what
+	return func() { r.mu.Lock(); r.busy, r.stepNow = false, ""; r.mu.Unlock() }, nil
+}
+
 // Busy reports whether a run is in progress and which step it's on.
 func (r *Runner) Busy() (bool, string) {
 	r.mu.Lock()
@@ -164,14 +176,11 @@ func (r *Runner) Busy() (bool, string) {
 
 // RunNow runs the routine once (kind "nightly" or "manual"). warn overrides the warnings.
 func (r *Runner) RunNow(ctx context.Context, kind string, warn []int, update bool) (*routine.Report, error) {
-	r.mu.Lock()
-	if r.busy {
-		r.mu.Unlock()
-		return nil, errors.New("a run is already in progress")
+	end, err := r.Begin("the " + kind + " routine")
+	if err != nil {
+		return nil, err
 	}
-	r.busy = true
-	r.mu.Unlock()
-	defer func() { r.mu.Lock(); r.busy = false; r.stepNow = ""; r.mu.Unlock() }()
+	defer end()
 	p := routine.Plan{WarnMinutes: warn, Update: update}
 	if r.Mods != nil {
 		p.BeforeStart = func(context.Context) (string, error) {
@@ -222,7 +231,7 @@ func (r *Runner) Schedule(ctx context.Context) {
 	if !r.Cfg.Nightly.Enabled {
 		return
 	}
-	lead := 0
+	lead := 0 // the longest warning, whatever order they were typed in
 	for _, m := range r.Cfg.Nightly.WarnMinutes {
 		lead = max(lead, m)
 	}

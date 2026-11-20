@@ -96,7 +96,7 @@ func (m *Manager) Install(zipPath, name string) (string, error) {
 }
 
 func (m *Manager) unpackDir(z *zip.ReadCloser, kind, root, folder string) (string, error) {
-	if folder == "" || folder == "." {
+	if strings.Trim(folder, ". ") == "" {
 		return "", errors.New("the mod's folder has no usable name")
 	}
 	dst := filepath.Join(m.off(kind), folder)

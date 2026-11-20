@@ -28,7 +28,10 @@ type File struct {
 	Values map[string]string // unquoted values
 }
 
-var openRe = regexp.MustCompile(`OptionSettings=\(`)
+var (
+	openRe = regexp.MustCompile(`OptionSettings=\(`)
+	keyRe  = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,63}$`)
+)
 
 // Read parses the file.
 func Read(path string) (*File, error) {
@@ -97,7 +100,15 @@ func (f *File) Plan(want map[string]string) ([]Change, error) {
 	var out []Change
 	var bad []string
 	for k, v := range want {
+		if !keyRe.MatchString(k) {
+			bad = append(bad, fmt.Sprintf("%q isn't an option name", k))
+			continue
+		}
 		old, exists := f.Values[k]
+		if _, known := Lookup(k); !known && !exists {
+			bad = append(bad, fmt.Sprintf("%s isn't an option this server has", k))
+			continue
+		}
 		o, known := Lookup(k)
 		if known && o.Locked {
 			if v != old {
@@ -134,8 +145,8 @@ func (f *File) Plan(want map[string]string) ([]Change, error) {
 func format(o Option, known bool, v string) (string, error) {
 	v = strings.TrimSpace(v)
 	if !known {
-		if strings.ContainsAny(v, `"`) || (strings.ContainsAny(v, ",()") && !strings.HasPrefix(v, "(")) {
-			return "", fmt.Errorf("the value for an unknown option can't contain quotes, commas or brackets")
+		if strings.ContainsAny(v, "\",()\r\n") {
+			return "", fmt.Errorf("the value for an option Warden doesn't know can't contain quotes, commas or brackets (edit those in the file)")
 		}
 		return v, nil
 	}

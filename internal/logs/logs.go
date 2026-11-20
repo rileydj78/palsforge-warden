@@ -66,11 +66,15 @@ func newest(dir string) string {
 var (
 	ipv4   = regexp.MustCompile(`\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\b`)
 	secret = regexp.MustCompile(`(?i)(admin ?password|password|token|webhook)(["']?\s*[:=]\s*["']?)[^\s,"')]+`)
+	hook   = regexp.MustCompile(`(?i)https?://[^\s"']*/(?:api/)?webhooks/[^\s"']+|https?://ntfy\.[^\s"']+`)
+	ipv6   = regexp.MustCompile(`\b(?:[0-9a-fA-F]{1,4}:){3,7}[0-9a-fA-F]{1,4}\b`)
 )
 
 // Clean masks IP addresses (except loopback and private ranges the admin owns) and secrets.
 func Clean(line string) string {
 	line = secret.ReplaceAllString(line, "${1}${2}(hidden)")
+	line = hook.ReplaceAllString(line, "(hidden address)")
+	line = ipv6.ReplaceAllStringFunc(line, func(ip string) string { return ip[:strings.IndexByte(ip, ':')] + ":x:x" })
 	return ipv4.ReplaceAllStringFunc(line, func(ip string) string {
 		if strings.HasPrefix(ip, "127.") || strings.HasPrefix(ip, "0.") {
 			return ip

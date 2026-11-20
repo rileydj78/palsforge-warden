@@ -80,11 +80,15 @@ func TestPruneKeepsDailyAndWeekly(t *testing.T) {
 		name := FileName("pal", Data, start.AddDate(0, 0, i))
 		os.WriteFile(filepath.Join(dir, name), []byte("x"), 0o644)
 	}
-	removed, err := Prune(dir, DefaultPolicy)
+	os.WriteFile(filepath.Join(dir, "pvp-data-20260601-0400.zip"), []byte("x"), 0o644) // another server's
+	removed, err := Prune(dir, DefaultPolicy, "pal")
 	if err != nil {
 		t.Fatal(err)
 	}
-	left, _ := List(dir)
+	if _, err := os.Stat(filepath.Join(dir, "pvp-data-20260601-0400.zip")); err != nil {
+		t.Fatal("another server's backup must never be pruned")
+	}
+	left, _ := ListTag(dir, "pal")
 	if len(left)+len(removed) != 90 {
 		t.Fatal("counts don't add up")
 	}

@@ -71,7 +71,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		var places []place
 		for _, d := range append([]string{c.Runner.Backups.LocalDir()}, c.Cfg.Backups.Offsite...) {
-			a, err := backup.List(d)
+			a, err := backup.ListTag(d, c.Cfg.Backups.Tag)
 			p := place{Dir: d, Archives: a}
 			if p.Archives == nil {
 				p.Archives = []backup.Archive{}
@@ -87,13 +87,15 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 	// Changes. Each is audited; long ones run in the background and land in the run history.
 	do := func(path, min, what string, f func(ctx context.Context) error) {
 		mux.HandleFunc("POST "+path, s.guard(min, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
-			if busy, _ := c.Runner.Busy(); busy {
-				fail(w, 409, "the nightly routine is running; wait for it to finish")
+			end, err := c.Runner.Begin(what)
+			if err != nil {
+				fail(w, 409, err.Error())
 				return
 			}
+			defer end()
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 			defer cancel()
-			err := f(ctx)
+			err = f(ctx)
 			s.Store.Audit(ses.User.Name, what, "", "", err == nil)
 			if err != nil {
 				fail(w, 502, err.Error())
@@ -211,10 +213,12 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		writeJSON(w, 202, map[string]bool{"started": true})
 	}))
 	mux.HandleFunc("POST /api/backups/now", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
-		if busy, _ := c.Runner.Busy(); busy {
-			fail(w, 409, "the nightly routine is running")
+		end, err := c.Runner.Begin("a backup")
+		if err != nil {
+			fail(w, 409, err.Error())
 			return
 		}
+		defer end()
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
 		s.Game.Save(ctx) // a live backup: save the world first (best effort; the server may be off)
@@ -376,8 +380,9 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			fail(w, 400, "nothing changed")
 			return
 		}
-		if busy, _ := c.Runner.Busy(); busy {
-			fail(w, 409, "the nightly routine is running; try again after it")
+		end, err := c.Runner.Begin("a settings change")
+		if err != nil {
+			fail(w, 409, err.Error())
 			return
 		}
 		bak, err := f.Apply(ch)
@@ -387,19 +392,24 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		}
 		s.Store.Audit(ses.User.Name, "change game settings", "", strings.Join(names, "; "), err == nil)
 		if err != nil {
+			end()
 			fail(w, 500, err.Error())
 			return
 		}
-		if restart == "now" {
+		if restart != "now" {
+			end()
+		} else {
 			go func() { // a restart with a minute's warning; the settings apply as the server starts
+				defer end()
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 				defer cancel()
 				s.Game.Announce(ctx, "The server restarts in 1 minute to apply new settings.")
-				s.Game.Shutdown(ctx, 60, "Restarting to apply new settings.")
-				if c.Host.WaitStopped(ctx, 4*time.Minute) {
-					time.Sleep(5 * time.Second)
-					c.Host.Start(ctx)
+				c.Host.PlanStop(ctx) // on purpose: not a crash
+				if err := s.Game.Shutdown(ctx, 60, "Restarting to apply new settings."); err != nil || !c.Host.WaitStopped(ctx, 4*time.Minute) {
+					c.Host.ForceStop(ctx)
+					c.Host.WaitStopped(ctx, time.Minute)
 				}
+				c.Host.Start(ctx)
 			}()
 		}
 		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "backup": bak})
@@ -441,7 +451,13 @@ func (s *Server) modRoutes(mux *http.ServeMux) {
 			return
 		}
 		if !c.Host.Running() { // stopped: apply straight away
+			end, err := c.Runner.Begin("a mod change")
+			if err != nil {
+				writeJSON(w, 200, map[string]any{"queued": true, "note": err.Error()})
+				return
+			}
 			done, err := m.ApplyPending()
+			end()
 			if err != nil {
 				fail(w, 500, err.Error())
 				return
@@ -478,19 +494,24 @@ func (s *Server) modRoutes(mux *http.ServeMux) {
 			return
 		}
 		if !c.Host.Running() {
-			m.ApplyPending()
-			writeJSON(w, 200, map[string]any{"id": id, "applied": true})
-			return
+			if end, err := c.Runner.Begin("a mod change"); err == nil {
+				m.ApplyPending()
+				end()
+				writeJSON(w, 200, map[string]any{"id": id, "applied": true})
+				return
+			}
 		}
 		writeJSON(w, 200, map[string]any{"id": id, "queued": true})
 	}))
 	mux.HandleFunc("POST /api/mods/apply-now", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
-		if busy, _ := c.Runner.Busy(); busy {
-			fail(w, 409, "the nightly routine is running; it applies mod changes itself")
+		end, err := c.Runner.Begin("a mod change")
+		if err != nil {
+			fail(w, 409, err.Error())
 			return
 		}
 		s.Store.Audit(ses.User.Name, "apply mod changes now", "", "restart", true)
 		go func() {
+			defer end()
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 			defer cancel()
 			s.Game.Announce(ctx, "The server restarts in 1 minute to change mods.")
@@ -530,6 +551,10 @@ func (s *Server) palDefRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/paldefender/connect", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		if s.Settings == nil {
 			fail(w, 500, "settings unavailable")
+			return
+		}
+		if busy, what := c.Runner.Busy(); busy {
+			fail(w, 409, "busy: "+what+" is in progress; Warden can't restart until it's done")
 			return
 		}
 		pd, err := paldefender.Connect(c.Cfg.ServerDir)

@@ -149,10 +149,22 @@ func (h *Host) Start(ctx context.Context) error {
 			return nil
 		}
 		c := h.cfg.Control.StartCommand
-		cmd := exec.CommandContext(ctx, c[0], c[1:]...)
+		cmd := exec.Command(c[0], c[1:]...) // not tied to ctx: it may be the server itself
+		var out strings.Builder
+		cmd.Stdout, cmd.Stderr = &out, &out
 		hideWindow(cmd)
-		if out, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("the start command failed: %v: %s", err, strings.TrimSpace(string(out)))
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("the start command failed: %v", err)
+		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case err := <-done:
+			if err != nil {
+				return fmt.Errorf("the start command failed: %v: %s", err, strings.TrimSpace(out.String()))
+			}
+		case <-time.After(30 * time.Second):
+			// still running: it's probably the server in the foreground; leave it be
 		}
 		h.event("start", "asked the server to start")
 		return nil
