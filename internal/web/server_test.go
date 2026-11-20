@@ -221,3 +221,13 @@ func TestPublicPageShowsOnlyStatus(t *testing.T) {
 		t.Fatal("the public port is read-only")
 	}
 }
+
+func TestModeratorCannotRestart(t *testing.T) {
+	c, _, au := setup(t)
+	au.AddUser("mod", "another long password", auth.Moderator)
+	_, out := c.do("POST", "/api/login", map[string]string{"name": "mod", "password": "another long password"}, false)
+	c.csrf = out["csrf"].(string)
+	if code, _ := c.do("POST", "/api/server/restart", map[string]int{"minutes": 0}, true); code < 400 { // 403 with server control; no route at all without it
+		t.Fatalf("a moderator must not restart the server, got %d", code)
+	}
+}

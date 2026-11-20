@@ -115,6 +115,31 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		return nil
 	})
+	mux.HandleFunc("POST /api/server/restart", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			Minutes int `json:"minutes"`
+		}
+		if readJSON(r, &in) != nil || in.Minutes < 0 || in.Minutes > 60 {
+			fail(w, 400, "warn 0 to 60 minutes ahead")
+			return
+		}
+		if busy, what := c.Runner.Busy(); busy {
+			fail(w, 409, "busy with "+what)
+			return
+		}
+		var warn []int
+		for _, m := range []int{30, 15, 10, 5, 1} {
+			if m <= in.Minutes {
+				warn = append(warn, m)
+			}
+		}
+		if in.Minutes > 0 && (len(warn) == 0 || warn[0] != in.Minutes) {
+			warn = append([]int{in.Minutes}, warn...)
+		}
+		s.Store.Audit(ses.User.Name, "restart server", "", fmt.Sprintf("warning %d min", in.Minutes), true)
+		go c.Runner.Restart(context.Background(), "restart by "+ses.User.Name, warn)
+		writeJSON(w, 202, map[string]bool{"started": true})
+	}))
 	mux.HandleFunc("POST /api/routine/run", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		var in struct {
 			Warn   bool `json:"warn"`

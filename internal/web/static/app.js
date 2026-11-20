@@ -704,13 +704,14 @@ $("setform").addEventListener("submit", async (e) => {
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
   const vv = v.split("?")[0];
-  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods", "guilds", "player"].includes(vv) ? vv : "dash";
+  const view = ["commands", "players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods", "guilds", "player"].includes(vv) ? vv : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
   if (view === "activity") loadAudit();
   if (view === "admins") loadUsers();
   if (view === "server") loadServer();
+  if (view === "commands") loadCommands();
   if (view === "backups") loadBackups();
   if (view === "settings") loadSettings();
   if (view === "logs") loadLogs(true);
@@ -744,3 +745,44 @@ async function refresh() {
   setInterval(() => { if (me && !$("layout").hidden) refresh(); }, 10000);
   setInterval(() => { if (me && !$("layout").hidden) history(); }, 60000);
 })();
+
+// ---- commands: every action in one place
+let people = [];
+async function loadCommands() {
+  for (const f of document.querySelectorAll("#view-commands .admin-only")) f.hidden = me.role === "moderator";
+  try {
+    const [r, st] = await Promise.all([api("/api/roster").catch(() => []), api("/api/status").catch(() => ({ players: [] }))]);
+    const online = new Set((st.players || []).map((p) => p.userId));
+    people = r.map((p) => ({ name: p.name, userId: p.userId, online: online.has(p.userId) }));
+    const dl = $("c-people"); dl.replaceChildren();
+    for (const p of people) { const o = el("option"); o.value = p.name; o.label = p.online ? "online" : p.userId; dl.append(o); }
+  } catch (e) {}
+}
+// A typed name becomes that player's ID; anything else is taken as an ID.
+function whoOf(id) {
+  const v = $(id).value.trim(), p = people.find((x) => x.name === v);
+  return p ? { userId: p.userId, name: p.name } : { userId: v, name: "" };
+}
+function cmd(form, run) {
+  $(form).addEventListener("submit", async (e) => { e.preventDefault(); const b = e.submitter; if (b) b.disabled = true; try { await run(); } finally { if (b) b.disabled = false; } });
+}
+cmd("c-announce", async () => { await doAction("announce", { message: $("c-an-msg").value.trim() }, "Announced."); $("c-an-msg").value = ""; });
+cmd("c-msg", async () => { await doAction("message", { ...whoOf("c-msg-who"), message: $("c-msg-text").value.trim() }, "Sent."); $("c-msg-text").value = ""; });
+cmd("c-kick", () => doAction("kick", { ...whoOf("c-kick-who"), message: $("c-kick-why").value.trim() }, "Kicked."));
+cmd("c-ban", async () => {
+  const w = whoOf("c-ban-who");
+  if (await ask({ title: `Ban ${w.name || w.userId}?`, text: "They can't join until someone unbans them.", ok: "Ban" }) == null) return;
+  await doAction("ban", { ...w, message: $("c-ban-why").value.trim(), ip: $("c-ban-ip").checked }, "Banned.");
+});
+cmd("c-unban", () => doAction("unban", whoOf("c-unban-who"), "Unbanned."));
+cmd("c-give", async () => {
+  const w = whoOf("c-give-who"), n = parseInt($("c-give-n").value, 10) || 1, pal = $("c-give-kind").value === "pal";
+  try { await api("/api/action/give", { ...w, kind: pal ? "pal" : "item", id: $("c-give-id").value.trim(), count: pal ? 0 : n, level: pal ? n : 0 }); toast("Given."); } catch (e) { toast(e.message); }
+});
+cmd("c-restart", async () => {
+  const m = parseInt($("c-rs-min").value, 10) || 0;
+  if (await ask({ title: "Restart the server?", text: m ? `Players are warned ${m} minute${m === 1 ? "" : "s"} ahead; the world is saved first.` : "It restarts now; the world is saved first.", ok: "Restart" }) == null) return;
+  try { await api("/api/server/restart", { minutes: m }); toast(m ? `Restarting in ${m} minute${m === 1 ? "" : "s"}.` : "Restarting."); } catch (e) { toast(e.message); }
+});
+$("c-save").addEventListener("click", () => doAction("save", {}, "World saved."));
+$("c-backup").addEventListener("click", async () => { toast("Backing up…"); try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${(r.made || []).join(", ")}`); } catch (e) { toast(e.message); } });

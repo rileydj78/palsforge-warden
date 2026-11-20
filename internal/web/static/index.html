@@ -31,6 +31,7 @@
     <a href="#/game" data-view="game" id="gamenav" hidden>Game settings</a>
     <a href="#/mods" data-view="mods" id="modsnav" hidden>Mods</a>
     <a href="#/logs" data-view="logs" id="logsnav" hidden>Logs</a>
+    <a href="#/commands" data-view="commands">Commands</a>
     <a href="#/activity" data-view="activity">Activity</a>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Accounts</a>
     <a href="#/settings" data-view="settings" id="settingsnav" hidden>Settings</a>
@@ -184,6 +185,22 @@
         <label class="check"><input type="checkbox" id="lg-follow" checked> Follow</label>
       </div>
       <pre class="log" id="lg-out" tabindex="0"></pre>
+    </section>
+
+    <section id="view-commands" class="view" hidden>
+      <h1>Commands</h1>
+      <p class="sub">Every admin action in one place. Each one is written to the activity log.</p>
+      <datalist id="c-people"></datalist>
+      <div class="cmdgrid">
+        <form class="card form" id="c-announce"><h2>Announce</h2><label for="c-an-msg">Message to everyone in the game</label><input id="c-an-msg" maxlength="200" required><div class="row"><button>Send</button></div></form>
+        <form class="card form" id="c-msg"><h2>Message a player</h2><label for="c-msg-who">Player</label><input id="c-msg-who" list="c-people" required autocomplete="off"><label for="c-msg-text">Message (only they see it; needs PalDefender)</label><input id="c-msg-text" maxlength="200" required><div class="row"><button>Send</button></div></form>
+        <form class="card form" id="c-kick"><h2>Kick</h2><label for="c-kick-who">Player</label><input id="c-kick-who" list="c-people" required autocomplete="off"><label for="c-kick-why">Reason (they see it)</label><input id="c-kick-why" maxlength="200"><div class="row"><button>Kick</button></div></form>
+        <form class="card form admin-only" id="c-ban"><h2>Ban</h2><label for="c-ban-who">Player (name, or an ID for someone offline)</label><input id="c-ban-who" list="c-people" required autocomplete="off"><label for="c-ban-why">Reason (they see it)</label><input id="c-ban-why" maxlength="200"><label class="check"><input type="checkbox" id="c-ban-ip"> Their IP address too (needs PalDefender)</label><div class="row"><button class="danger">Ban</button></div></form>
+        <form class="card form admin-only" id="c-unban"><h2>Unban</h2><label for="c-unban-who">Player name or ID</label><input id="c-unban-who" list="c-people" required autocomplete="off"><div class="row"><button>Unban</button></div></form>
+        <form class="card form admin-only" id="c-give"><h2>Give</h2><label for="c-give-who">Player (online; needs PalDefender)</label><input id="c-give-who" list="c-people" required autocomplete="off"><label for="c-give-kind">What</label><select id="c-give-kind"><option value="item">An item</option><option value="pal">A Pal</option></select><label for="c-give-id">Game ID (e.g. PalSphere, Money, Anubis)</label><input id="c-give-id" required autocomplete="off" spellcheck="false"><label for="c-give-n">Count, or the Pal's level</label><input id="c-give-n" type="number" min="1" max="9999" value="1"><div class="row"><button>Give</button></div></form>
+        <form class="card form admin-only" id="c-restart"><h2>Restart the server</h2><label for="c-rs-min">Warn players this many minutes ahead (0 = now)</label><input id="c-rs-min" type="number" min="0" max="60" value="5"><div class="row"><button class="danger">Restart</button></div></form>
+        <section class="card form admin-only"><h2>World</h2><p class="note">Save writes the world to disk now. A backup saves first, then copies the world to your backup places.</p><div class="row"><button type="button" id="c-save">Save the world</button><button type="button" id="c-backup">Back up now</button></div></section>
+      </div>
     </section>
 
     <section id="view-activity" class="view" hidden>

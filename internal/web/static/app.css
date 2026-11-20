@@ -132,3 +132,6 @@ ul.checks li.bad { background: #FBE3DF; color: #6B1A12; } ul.checks li.bad::befo
 a.todo { display: block; padding: 12px 16px; border-radius: 10px; background: var(--warn-bg); color: var(--warn-ink); text-decoration: none; font-weight: 600; }
 a.todo:hover { text-decoration: underline; }
 form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; } form.inline input { flex: 1 1 240px; min-width: 0; }
+
+.cmdgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 16px; align-items: start; }
+.cmdgrid .card { margin: 0; }
