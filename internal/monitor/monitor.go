@@ -37,11 +37,11 @@ func SampleOnce(ctx context.Context, game *palworld.Client, st *store.Store) {
 	m, err := game.Metrics(ctx)
 	if err != nil {
 		ml := host.MachineLoad()
-		st.AddSample(store.Sample{TS: now, Online: false, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal)})
+		st.AddSample(store.Sample{TS: now, Online: false, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal), NetIn: ml.NetIn / 1024, NetOut: ml.NetOut / 1024})
 		return
 	}
 	ml := host.MachineLoad()
-	st.AddSample(store.Sample{TS: now, Online: true, Players: m.CurrentPlayers, FPS: m.ServerFPS, FrameTime: m.ServerFrameTime, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal)})
+	st.AddSample(store.Sample{TS: now, Online: true, Players: m.CurrentPlayers, FPS: m.ServerFPS, FrameTime: m.ServerFrameTime, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal), NetIn: ml.NetIn / 1024, NetOut: ml.NetOut / 1024})
 	ps, err := game.Players(ctx)
 	if err != nil {
 		return

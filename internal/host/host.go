@@ -408,11 +408,15 @@ type Machine struct {
 	CPUPercent float64 `json:"cpuPercent"`
 	MemUsed    uint64  `json:"memUsed"`
 	MemTotal   uint64  `json:"memTotal"`
+	NetIn      float64 `json:"netIn"`  // bytes per second received since the last call
+	NetOut     float64 `json:"netOut"` // bytes per second sent
 }
 
 var lastCPU struct {
 	sync.Mutex
 	idle, total uint64
+	rx, tx      uint64
+	netAt       time.Time
 }
 
 // MachineLoad returns CPU use since the previous call (the first call measures over 500 ms) and
@@ -431,6 +435,11 @@ func MachineLoad() Machine {
 	}
 	lastCPU.idle, lastCPU.total = i, t
 	m.MemUsed, m.MemTotal = machineMem()
+	rx, tx := netBytes()
+	if secs := time.Since(lastCPU.netAt).Seconds(); !lastCPU.netAt.IsZero() && secs > 0 && rx >= lastCPU.rx && tx >= lastCPU.tx {
+		m.NetIn, m.NetOut = float64(rx-lastCPU.rx)/secs, float64(tx-lastCPU.tx)/secs
+	}
+	lastCPU.rx, lastCPU.tx, lastCPU.netAt = rx, tx, time.Now()
 	return m
 }
 

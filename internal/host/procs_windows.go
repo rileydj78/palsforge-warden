@@ -175,3 +175,26 @@ func diskFree(path string) (free, total uint64) {
 	}
 	return avail, tot
 }
+
+// netBytes returns bytes received and sent on all interfaces so far ("netstat -e": the first
+// line with two numbers is the byte count, whatever the language).
+func netBytes() (rx, tx uint64) {
+	cmd := exec.Command("netstat", "-e")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, 0
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 3 {
+			continue
+		}
+		a, e1 := strconv.ParseUint(f[len(f)-2], 10, 64)
+		b, e2 := strconv.ParseUint(f[len(f)-1], 10, 64)
+		if e1 == nil && e2 == nil {
+			return a, b
+		}
+	}
+	return 0, 0
+}

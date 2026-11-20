@@ -200,6 +200,7 @@ async function history() {
     chart($("chart-players"), h, "players", "Players online", "var(--accent)", 4);
     chart($("chart-fps"), h, "fps", "Server FPS", "var(--chart2)", 60);
     chart($("chart-cpu"), h, "cpu", "The machine's CPU, %", "var(--soft)", 100);
+    chart($("chart-net"), h, "netOut", "Sent to players, KB/s", "var(--chart2)", 10);
     const down = h.filter((s) => !s.online).length;
     $("histnote").textContent = down ? `The server didn't answer for about ${down} minute${down === 1 ? "" : "s"} in this period.` : "";
   } catch (e) {}

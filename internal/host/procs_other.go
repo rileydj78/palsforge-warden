@@ -154,3 +154,25 @@ func diskFree(path string) (free, total uint64) {
 	}
 	return st.Bavail * uint64(st.Bsize), st.Blocks * uint64(st.Bsize)
 }
+
+// netBytes returns bytes received and sent on all interfaces except loopback so far.
+func netBytes() (rx, tx uint64) {
+	b, err := os.ReadFile("/proc/net/dev")
+	if err != nil {
+		return 0, 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		name, rest, ok := strings.Cut(line, ":")
+		if !ok || strings.TrimSpace(name) == "lo" {
+			continue
+		}
+		f := strings.Fields(rest)
+		if len(f) < 9 {
+			continue
+		}
+		r, _ := strconv.ParseUint(f[0], 10, 64)
+		t, _ := strconv.ParseUint(f[8], 10, 64)
+		rx, tx = rx+r, tx+t
+	}
+	return rx, tx
+}

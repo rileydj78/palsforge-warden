@@ -31,6 +31,8 @@ var schema = []string{
 	`CREATE TABLE IF NOT EXISTS kits (user_id TEXT PRIMARY KEY, given INTEGER)`,
 	`CREATE TABLE IF NOT EXISTS allowed (user_id TEXT PRIMARY KEY, added INTEGER, by TEXT)`,
 	`ALTER TABLE samples ADD COLUMN mem REAL`,
+	`ALTER TABLE samples ADD COLUMN netin REAL`,
+	`ALTER TABLE samples ADD COLUMN netout REAL`,
 	`ALTER TABLE users ADD COLUMN totp_pending TEXT`,
 	`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, kind TEXT, started INTEGER, ok INTEGER, report TEXT)`,
 	`CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts INTEGER, kind TEXT, text TEXT)`,
@@ -108,20 +110,22 @@ type Sample struct {
 	Players   int     `json:"players"`
 	FPS       float64 `json:"fps"`
 	FrameTime float64 `json:"frametime"`
-	CPU       float64 `json:"cpu"` // the machine's CPU use, %
-	Mem       float64 `json:"mem"` // the machine's memory use, %
+	CPU       float64 `json:"cpu"`    // the machine's CPU use, %
+	Mem       float64 `json:"mem"`    // the machine's memory use, %
+	NetIn     float64 `json:"netIn"`  // KB/s received
+	NetOut    float64 `json:"netOut"` // KB/s sent
 }
 
 // AddSample stores one history point.
 func (s *Store) AddSample(p Sample) {
-	s.DB.Exec(`INSERT OR REPLACE INTO samples(ts,online,players,fps,frametime,cpu,mem) VALUES(?,?,?,?,?,?,?)`,
-		p.TS, p.Online, p.Players, p.FPS, p.FrameTime, p.CPU, p.Mem)
+	s.DB.Exec(`INSERT OR REPLACE INTO samples(ts,online,players,fps,frametime,cpu,mem,netin,netout) VALUES(?,?,?,?,?,?,?,?,?)`,
+		p.TS, p.Online, p.Players, p.FPS, p.FrameTime, p.CPU, p.Mem, p.NetIn, p.NetOut)
 }
 
 // History returns samples since a time, and drops ones older than 30 days.
 func (s *Store) History(since time.Time) ([]Sample, error) {
 	s.DB.Exec(`DELETE FROM samples WHERE ts < ?`, time.Now().Add(-30*24*time.Hour).Unix())
-	rows, err := s.DB.Query(`SELECT ts,online,COALESCE(players,0),COALESCE(fps,0),COALESCE(frametime,0),COALESCE(cpu,0),COALESCE(mem,0) FROM samples WHERE ts >= ? ORDER BY ts`, since.Unix())
+	rows, err := s.DB.Query(`SELECT ts,online,COALESCE(players,0),COALESCE(fps,0),COALESCE(frametime,0),COALESCE(cpu,0),COALESCE(mem,0),COALESCE(netin,0),COALESCE(netout,0) FROM samples WHERE ts >= ? ORDER BY ts`, since.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +133,7 @@ func (s *Store) History(since time.Time) ([]Sample, error) {
 	out := []Sample{}
 	for rows.Next() {
 		var p Sample
-		rows.Scan(&p.TS, &p.Online, &p.Players, &p.FPS, &p.FrameTime, &p.CPU, &p.Mem)
+		rows.Scan(&p.TS, &p.Online, &p.Players, &p.FPS, &p.FrameTime, &p.CPU, &p.Mem, &p.NetIn, &p.NetOut)
 		out = append(out, p)
 	}
 	return out, rows.Err()
