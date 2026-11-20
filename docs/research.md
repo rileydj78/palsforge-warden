@@ -69,8 +69,8 @@ Sources are at the end; check each project's own page for its latest state.
    (or reboot), with a fallback if any step fails. Today admins write this themselves.
 4. **Settings with explanations.** Every option described in plain words, with sane ranges and a
    preview of what changes on the next restart.
-5. **Phone-first.** Admins check on their server from the couch or the road; the panel should be
-   comfortable on a phone.
+5. **Easy to reach safely.** A local window on the server, and the same panel over Tailscale from
+   anywhere, without exposing anything to the internet.
 6. **An audit log** of who did what, which the multi-admin panels mostly lack.
 7. **Windows and Linux** from day one, without Node.js or Docker as a requirement.
 

@@ -5,13 +5,22 @@ discuss. The research behind it is in [research.md](research.md).
 
 ## 1. What it is
 
-**One program on the machine that runs the Palworld server** (Windows first, Linux too), plus a
-**web panel** served by that program, plus later a **small desktop launcher** **(decided: both)**.
+**One program on the machine that runs the Palworld server** (Windows first, Linux too), used in
+exactly two ways **(decided 2026-11-19)**:
+
+1. **Local administration:** on the server machine itself, `warden.exe` opens its own window (the
+   same panel, in a native window; no browser needed).
+2. **Remote administration:** the same panel as a **web page reached over Tailscale only**
+   (`tailscale serve`, HTTPS, visible only on the admin's own tailnet).
+
+There is **no phone app**. The web page still works in a phone's browser over Tailscale, but
+that is the web page, not a separate app.
 
 ```
- phone / laptop browser ─┐                    ┌─ Palworld REST API (127.0.0.1:8212, never exposed)
-                         ├─ Warden web panel ─┤─ PalDefender REST (127.0.0.1:17993, optional)
- desktop launcher (later)┘   (HTTPS, logins)  ├─ server files: saves, PalWorldSettings.ini, logs
+ warden.exe window (local) ─┐                  ┌─ Palworld REST API (127.0.0.1:8212, never exposed)
+                            ├─ Warden panel ───┤─ PalDefender REST (127.0.0.1:17993, optional)
+ browser over Tailscale ────┘  (127.0.0.1 +    ├─ server files: saves, PalWorldSettings.ini, logs
+   (remote, tailnet only)       tailscale serve)
                                               ├─ the server process (start, stop, watchdog)
                                               └─ SteamCMD (updates), backup targets
 ```
@@ -73,8 +82,7 @@ Warden must not assume the Palsforge setup. It has to fit how people actually ru
 See §2b.
 
 ### Version 0.3 and later
-11. **Desktop launcher:** a small app that remembers your servers and opens each panel in its own
-    window, with a tray icon showing their state.
+11. **Tray icon** for the local window: the server's state at a glance, with a click to open.
 12. **More than one server** in one panel.
 13. **Linux packages and a Docker image.**
 
@@ -115,9 +123,9 @@ What Warden does with them:
 
 - Palworld's admin API stays on `127.0.0.1`; Warden is the only thing that talks to it and keeps
   its password on the server. Warden never offers to expose port 8212.
-- The panel listens on the local network only by default, over HTTPS (a certificate it makes on
-  first run, or Tailscale's when the admin uses `tailscale serve`). The setup guide recommends
-  Tailscale or a VPN for use away from home, not port forwarding.
+- The panel listens on **127.0.0.1 only**. Remote use is **through Tailscale only**: the setup
+  wizard turns on `tailscale serve` for it (HTTPS with Tailscale's certificate, visible only to the
+  admin's tailnet). Warden never opens a port on the network or the router.
 - Logins: passwords hashed (Argon2id), optional two-factor codes (TOTP), sessions in HttpOnly
   cookies, a CSRF token on every change, rate-limited sign-in.
 - Destructive actions (ban, restore, stop) need a second tap and are always in the audit log.
@@ -131,7 +139,7 @@ What Warden does with them:
 | Server program | **Go**, one file per platform (`warden.exe`, `warden`), runs as a Windows service or a systemd service | No runtime to install; small; easy for admins; good at long-running services and file work |
 | Web panel | **Svelte** (built to static files embedded in the program) | Fast and small on phones; no Node.js needed on the server |
 | Local data | **SQLite** (history, players seen, audit log, settings of Warden itself) | One file, easy to back up |
-| Desktop launcher | **Tauri** (later) | Small native app around the same web panel |
+| Local window | The same panel in a native webview window opened by `warden.exe` (e.g. Go's webview bindings; Tauri only if needed) | One program, no browser needed on the server machine |
 | Releases | GitHub Releases, signed; a download page on palsforge.com | Free and transparent |
 
 Alternative considered: Python (faster for us to write, but admins would need Python installed or
@@ -146,7 +154,7 @@ switches to Warden once version 0.1 does the same job.
 
 ## 6. Open questions
 
-1. Confirm the stack (Go + Svelte + SQLite; Tauri for the launcher later).
+1. Confirm the stack (Go + Svelte + SQLite; a native window from the same program).
 2. Allow-list: Palworld has none of its own; use PalDefender's when present, and the server
    password otherwise?
 3. Which second places for backups in 0.1: folder and network share for sure; SFTP too?

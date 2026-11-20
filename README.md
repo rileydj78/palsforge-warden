@@ -8,8 +8,8 @@ A free, open-source admin tool for **Palworld dedicated servers**, from the peop
 
 ## What it will do
 
-One install on the machine that runs your Palworld server, and a web panel you open from any
-browser, including your phone:
+One install on the machine that runs your Palworld server. Use it **locally** in its own window on
+that machine, or **remotely** as a web page over **Tailscale** (nothing is opened to the internet):
 
 - **See the server at a glance:** online or not, players, FPS, uptime, history.
 - **Look after players:** kick, ban, unban, an allow-list, announcements.
@@ -20,8 +20,6 @@ browser, including your phone:
   the next restart.
 - **Stay up to date:** game updates through SteamCMD, as part of the nightly restart.
 - **Know who did what:** an audit log of every admin action.
-
-A small desktop launcher comes later, for admins who prefer an app to a browser tab.
 
 ## Principles
 
