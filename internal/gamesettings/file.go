@@ -97,7 +97,7 @@ type Change struct {
 
 // Plan checks requested values and returns the changes that would really be made.
 func (f *File) Plan(want map[string]string) ([]Change, error) {
-	var out []Change
+	out := []Change{} // never null in JSON: the panel reads .length
 	var bad []string
 	for k, v := range want {
 		if !keyRe.MatchString(k) {

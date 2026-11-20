@@ -351,7 +351,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		return f, ch, in.Restart, err
 	}
 	mask := func(ch []gamesettings.Change) []gamesettings.Change {
-		out := append([]gamesettings.Change(nil), ch...)
+		out := append(make([]gamesettings.Change, 0, len(ch)), ch...) // [] not null for the panel
 		for n, c := range out {
 			if o, ok := gamesettings.Lookup(c.Key); ok && o.Type == "secret" {
 				out[n].Old, out[n].New = "(hidden)", "(changed)"
