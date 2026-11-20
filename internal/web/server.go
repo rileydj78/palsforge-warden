@@ -25,6 +25,7 @@ import (
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
+	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 )
@@ -42,6 +43,7 @@ type Server struct {
 	Version  string
 	Control  *Control
 	Settings *Settings
+	PalDef   *paldefender.Client // nil unless PalDefender is connected
 	mu       sync.Mutex
 	last     *Status
 	lastAt   time.Time
@@ -54,7 +56,8 @@ type PlayerView struct {
 	Ping     float64 `json:"ping"`
 	Platform string  `json:"platform"`
 	UserID   string  `json:"userId"`
-	MapX     int     `json:"mapX"` // the coordinates players see on their in-game map
+	Guild    string  `json:"guild,omitempty"` // from PalDefender
+	MapX     int     `json:"mapX"`            // the coordinates players see on their in-game map
 	MapY     int     `json:"mapY"`
 }
 
@@ -96,6 +99,24 @@ func (s *Server) status(ctx context.Context, fresh bool) *Status {
 				st.Players = append(st.Players, PlayerView{Name: p.Name, Level: p.Level, Ping: p.Ping, Platform: monitor.Platform(p.UserID), UserID: p.UserID, MapX: mx, MapY: my})
 			}
 		}
+	}
+	if s.PalDef != nil && len(st.Players) > 0 { // PalDefender knows guilds and exact map positions
+		pctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		if pd, err := s.PalDef.Players(pctx); err == nil {
+			by := map[string]paldefender.Player{}
+			for _, p := range pd {
+				by[p.UserID] = p
+			}
+			for i, p := range st.Players {
+				if d, ok := by[p.UserID]; ok {
+					st.Players[i].Guild = d.GuildName
+					if d.MapLocation.X != 0 || d.MapLocation.Y != 0 {
+						st.Players[i].MapX, st.Players[i].MapY = int(math.Round(d.MapLocation.X)), int(math.Round(d.MapLocation.Y))
+					}
+				}
+			}
+		}
+		cancel()
 	}
 	s.last, s.lastAt = st, time.Now()
 	return st
@@ -280,6 +301,7 @@ func (s *Server) Handler() http.Handler {
 		Name    string `json:"name"`
 		Message string `json:"message"`
 		Seconds int    `json:"seconds"`
+		IP      bool   `json:"ip"` // ban: the player's IP address too (needs PalDefender)
 	}
 	act := func(min, name string, do func(context.Context, actIn) error, target func(actIn) string) {
 		mux.HandleFunc("POST /api/action/"+name, s.guard(min, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
@@ -330,7 +352,15 @@ func (s *Server) Handler() http.Handler {
 		if err := needID(in); err != nil {
 			return err
 		}
-		err := s.Game.Ban(ctx, in.UserID, in.Message)
+		var err error
+		if in.IP {
+			if s.PalDef == nil {
+				return errors.New("banning an IP address needs PalDefender connected")
+			}
+			err = s.PalDef.Ban(ctx, in.UserID, in.Message, true)
+		} else {
+			err = s.Game.Ban(ctx, in.UserID, in.Message)
+		}
 		if err == nil {
 			s.Store.SetBanned(in.UserID, true)
 		}
@@ -346,6 +376,18 @@ func (s *Server) Handler() http.Handler {
 		}
 		return err
 	}, who)
+	act(auth.Moderator, "message", func(ctx context.Context, in actIn) error {
+		if err := needID(in); err != nil {
+			return err
+		}
+		if s.PalDef == nil {
+			return errors.New("private messages need PalDefender connected")
+		}
+		if in.Message == "" {
+			return errors.New("write a message first")
+		}
+		return s.PalDef.Message(ctx, in.UserID, in.Message)
+	}, who)
 	act(auth.Admin, "save", func(ctx context.Context, _ actIn) error { return s.Game.Save(ctx) }, none)
 	act(auth.Admin, "shutdown", func(ctx context.Context, in actIn) error {
 		if in.Seconds < 10 || in.Seconds > 3600 {
@@ -360,6 +402,7 @@ func (s *Server) Handler() http.Handler {
 	s.settingsRoutes(mux)
 	s.gameSettingsRoutes(mux)
 	s.modRoutes(mux)
+	s.palDefRoutes(mux)
 	return secure(mux)
 }
 

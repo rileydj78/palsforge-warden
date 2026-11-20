@@ -12,17 +12,19 @@ import (
 	"strings"
 
 	"github.com/rileydj78/palsforge-warden/internal/notify"
+	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 )
 
 // Warden is Warden's own configuration, kept in warden.json in its data folder. Everything has a
 // sensible default, so a new install only needs the server folder.
 type Warden struct {
-	ServerDir string        `json:"serverDir"`
-	Control   Control       `json:"control"`
-	Nightly   Nightly       `json:"nightly"`
-	Backups   Backups       `json:"backups"`
-	Update    Update        `json:"update"`
-	Notify    notify.Config `json:"notify"`
+	ServerDir string             `json:"serverDir"`
+	Control   Control            `json:"control"`
+	Nightly   Nightly            `json:"nightly"`
+	Backups   Backups            `json:"backups"`
+	Update    Update             `json:"update"`
+	Notify    notify.Config      `json:"notify"`
+	PalDef    paldefender.Config `json:"palDefender"`
 }
 
 // Control says how Warden starts and stops the game server.

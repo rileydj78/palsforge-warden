@@ -64,6 +64,7 @@ function signedIn(out) {
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
   api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; $("modsnav").hidden = me.role === "moderator"; }).catch(() => {});
+  api("/api/paldefender").then((pd) => { pdConnected = pd.connected && !pd.error; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -102,9 +103,16 @@ async function kick(p) {
   const m = await ask({ title: `Kick ${p.name}?`, text: "They can join again straight away.", label: "Reason (they see it)", ok: "Kick" });
   if (m != null) doAction("kick", { userId: p.userId, name: p.name, message: m }, `${p.name} was kicked.`);
 }
+let pdConnected = false;
 async function ban(p) {
-  const m = await ask({ title: `Ban ${p.name}?`, text: "They can't join until someone unbans them.", label: "Reason (they see it)", ok: "Ban" });
-  if (m != null) doAction("ban", { userId: p.userId, name: p.name, message: m }, `${p.name} was banned.`);
+  const m = await ask({ title: `Ban ${p.name}?`, text: "They can't join until someone unbans them." + (pdConnected ? " Start the reason with IP: to ban their IP address too (for players who come back on new accounts)." : ""), label: "Reason (they see it)", ok: "Ban" });
+  if (m == null) return;
+  const ip = pdConnected && /^ip:/i.test(m.trim());
+  doAction("ban", { userId: p.userId, name: p.name, message: m.trim().replace(/^ip:\s*/i, ""), ip }, `${p.name} was banned${ip ? " (and their IP address)" : ""}.`);
+}
+async function message(p) {
+  const m = await ask({ title: `Message ${p.name}`, text: "Only they see it, in their chat.", label: "Message", ok: "Send", required: true });
+  if (m) doAction("message", { userId: p.userId, name: p.name, message: m }, "Sent.");
 }
 async function unban(p) { doAction("unban", { userId: p.userId, name: p.name }, `${p.name} was unbanned.`); }
 
@@ -130,13 +138,14 @@ function render(st) {
   $("daysnote").textContent = m.days != null ? `Day ${m.days} in the world` : "";
   $("bases").textContent = m.basecampnum ?? "–";
   const rows = $("playerrows"); rows.replaceChildren();
-  if (n === 0) { const tr = el("tr"); const td = el("td", "Nobody is online.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+  if (n === 0) { const tr = el("tr"); const td = el("td", "Nobody is online.", "empty"); td.colSpan = 6; tr.append(td); rows.append(tr); }
   for (const p of st.players) {
     const tr = el("tr");
     const acts = el("td", null, "acts");
+    if (pdConnected) { const msg = el("button", "Message", "small"); msg.onclick = () => message(p); acts.append(msg); }
     const k = el("button", "Kick", "small warn"); k.onclick = () => kick(p); acts.append(k);
     if (me.role !== "moderator") { const b = el("button", "Ban", "small danger"); b.onclick = () => ban(p); acts.append(b); }
-    tr.append(el("td", p.name, "strong"), el("td", String(p.level), "num"), el("td", p.platform), el("td", `${Math.round(p.ping)} ms`, "num"), acts);
+    tr.append(el("td", p.name, "strong"), el("td", p.guild || "–"), el("td", String(p.level), "num"), el("td", p.platform), el("td", `${Math.round(p.ping)} ms`, "num"), acts);
     rows.append(tr);
   }
 }
@@ -242,6 +251,13 @@ async function loadServer() {
     $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
     $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";
     $("srv-sub").textContent = s.offsite ? "" : "Backups are kept on this machine only. Add a second place (backups.offsite) so a dead disk can't take them.";
+    try {
+      const pd = await api("/api/paldefender");
+      $("pd-card").hidden = !pd.installed && !pd.connected;
+      pdConnected = pd.connected && !pd.error;
+      $("pd-state").textContent = pd.connected ? (pd.error ? `Connected, but: ${pd.error}` : `Connected: ${pd.version}. Guilds, exact map positions, private messages and IP bans are on.`) : "Installed, not connected. Connecting turns its API on for this machine only and gives Warden its own token; it takes effect after the server's next restart.";
+      $("pd-connect").hidden = pd.connected || me.role !== "owner";
+    } catch (e) {}
     const runs = await api("/api/runs"), box = $("runs"); box.replaceChildren();
     if (!runs.length) box.append(el("p", "No runs yet.", "note"));
     for (const r of runs.slice(0, 10)) {
@@ -257,6 +273,11 @@ async function loadServer() {
     for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts)), el("td", e.kind, "strong"), el("td", e.text)); rows.append(tr); }
   } catch (e) {}
 }
+$("pd-connect").addEventListener("click", async () => {
+  const ok = await ask({ title: "Connect PalDefender?", text: "Warden turns PalDefender's API on (this machine only), creates its own token, and restarts itself. PalDefender picks it up at the server's next restart.", label: "Type CONNECT to confirm", confirmWord: "CONNECT", ok: "Connect" });
+  if (ok == null) return;
+  try { await api("/api/paldefender/connect", {}); toast("Connected. Warden is restarting."); setTimeout(() => location.reload(), 4000); } catch (e) { toast(e.message); }
+});
 $("b-start").addEventListener("click", async () => { try { await api("/api/server/start", {}); toast("Starting the server."); setTimeout(loadServer, 3000); } catch (e) { toast(e.message); } });
 $("b-stop").addEventListener("click", async () => {
   const ok = await ask({ title: "Stop the server?", text: "Players are told it is stopping. It stays off until someone starts it.", label: "Type STOP to confirm", confirmWord: "STOP", ok: "Stop" });

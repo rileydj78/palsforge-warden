@@ -19,6 +19,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
+	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 )
 
 // Control is the server-control side of the panel (nil when Warden only watches).
@@ -503,5 +504,50 @@ func (s *Server) modRoutes(mux *http.ServeMux) {
 			c.Host.Start(ctx)
 		}()
 		writeJSON(w, 202, map[string]bool{"started": true})
+	}))
+}
+
+// ---- PalDefender
+
+func (s *Server) palDefRoutes(mux *http.ServeMux) {
+	c := s.Control
+	if c == nil {
+		return
+	}
+	mux.HandleFunc("GET /api/paldefender", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		out := map[string]any{"installed": paldefender.Installed(c.Cfg.ServerDir), "connected": s.PalDef != nil}
+		if s.PalDef != nil {
+			ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+			defer cancel()
+			if v, err := s.PalDef.Version(ctx); err != nil {
+				out["error"] = err.Error()
+			} else {
+				out["version"] = v.VersionLong
+			}
+		}
+		writeJSON(w, 200, out)
+	}))
+	mux.HandleFunc("POST /api/paldefender/connect", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		if s.Settings == nil {
+			fail(w, 500, "settings unavailable")
+			return
+		}
+		pd, err := paldefender.Connect(c.Cfg.ServerDir)
+		if err == nil {
+			cfg, _, lerr := config.Load(s.Settings.DataDir, "")
+			if err = lerr; err == nil {
+				cfg.PalDef = pd
+				err = config.Save(s.Settings.DataDir, cfg)
+			}
+		}
+		s.Store.Audit(ses.User.Name, "connect PalDefender", "", "REST API on (127.0.0.1), Warden token created", err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+		if s.Settings.Restart != nil {
+			go func() { time.Sleep(500 * time.Millisecond); s.Settings.Restart() }()
+		}
 	}))
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
+	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 	"github.com/rileydj78/palsforge-warden/internal/web"
@@ -115,6 +116,7 @@ func main() {
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
 		go runner.WatchDown(context.Background())
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
+		srv.PalDef = paldefender.New(wcfg.PalDef)
 		go h.Supervise(context.Background())
 		go runner.Schedule(context.Background())
 		log.Printf("server control: %s mode; nightly routine %s", wcfg.Control.Mode, map[bool]string{true: "at " + wcfg.Nightly.Time, false: "off"}[wcfg.Nightly.Enabled])

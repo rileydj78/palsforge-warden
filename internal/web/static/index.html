@@ -64,7 +64,7 @@
       <section class="card" aria-labelledby="pl">
         <h2 id="pl">Players online</h2>
         <div class="tablewrap"><table>
-          <thead><tr><th>Player</th><th>Level</th><th>Platform</th><th>Ping</th><th><span class="sr">Actions</span></th></tr></thead>
+          <thead><tr><th>Player</th><th>Guild</th><th>Level</th><th>Platform</th><th>Ping</th><th><span class="sr">Actions</span></th></tr></thead>
           <tbody id="playerrows"></tbody></table></div>
       </section>
     </section>
@@ -100,6 +100,8 @@
         <div class="stat"><span class="label">Next nightly run</span><span class="value" id="srv-next">–</span><span class="note" id="srv-nightly"></span></div>
         <div class="stat"><span class="label">Crashes, 24 h</span><span class="value" id="srv-crashes">–</span><span class="note" id="srv-paused"></span></div>
       </section>
+      <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>
+        <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
       <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
       <section class="card"><h2>Server events</h2><div class="tablewrap"><table>
         <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>
