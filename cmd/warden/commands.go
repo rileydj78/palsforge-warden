@@ -10,6 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/store"
 )
 
 const taskName = "Palsforge Warden"
@@ -30,6 +33,8 @@ func subcommand(args []string) bool {
 		err = openPanel(listenFrom(args[1:]))
 	case "remote":
 		err = remote(args[1:])
+	case "adduser":
+		err = addUserCmd(args[1:])
 	case "help", "-h", "--help":
 		fmt.Print(usage)
 	default:
@@ -48,6 +53,7 @@ const usage = `Palsforge Warden: an admin panel for a Palworld dedicated server.
   warden install -server <folder>    start Warden with Windows (a background task)
   warden uninstall                   stop starting it with Windows
   warden open                        open the panel in its own window
+  warden adduser <name> <role>       make a remote admin account (moderator, admin or owner); reads the password from input
   warden remote on|off               let remote admins sign in over your Tailscale network (never the internet)
 
 Options: -data <folder> (Warden's own data), -listen 127.0.0.1:<port> (local, no sign-in),
@@ -326,4 +332,44 @@ func firstRun() {
 	time.Sleep(3 * time.Second)
 	openPanel("127.0.0.1:8282")
 	time.Sleep(2 * time.Second)
+}
+
+// addUserCmd makes an account from the command line (for Docker and headless Linux, where there
+// is no browser on the machine).
+func addUserCmd(args []string) error {
+	var pos []string
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-") {
+			i++ // a flag's value
+			continue
+		}
+		pos = append(pos, args[i])
+	}
+	if len(pos) != 2 {
+		return errors.New("use: warden adduser <name> <moderator|admin|owner> [-data <folder>], then type the password")
+	}
+	dir := flagValue(args, "data")
+	if dir == "" {
+		dir = store.DefaultDir()
+	}
+	st, err := store.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer st.DB.Close()
+	au, err := auth.New(st.DB)
+	if err != nil {
+		return err
+	}
+	fmt.Fprint(os.Stderr, "Password (at least 10 characters): ")
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && line == "" {
+		return errors.New("no password given")
+	}
+	if err := au.AddUser(pos[0], strings.TrimRight(line, "\r\n"), pos[1]); err != nil {
+		return err
+	}
+	st.Audit("command line", "add admin", pos[0], pos[1], true)
+	fmt.Fprintf(os.Stderr, "Made %s (%s). They can sign in now.\n", pos[0], pos[1])
+	return nil
 }

@@ -60,6 +60,12 @@ stops the server with warnings and starts it again with your command.
 Build or download `warden-linux-amd64`, then run `warden install -server /path/to/PalServer`:
 it prints a systemd unit to install. Everything else is the same.
 
+## Docker
+
+A `Dockerfile` builds Warden as a sidecar for a Palworld server container; see
+[docs/docker.md](docs/docker.md) (compose example with a Tailscale sidecar, and
+`warden adduser` for accounts without a browser).
+
 ## Build from source
 
 Go 1.27 or newer, no C compiler needed:
