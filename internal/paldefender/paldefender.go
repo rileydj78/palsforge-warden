@@ -177,3 +177,41 @@ func (c *Client) Message(ctx context.Context, userID, msg string) error {
 func (c *Client) Ban(ctx context.Context, userID, reason string, ip bool) error {
 	return c.do(ctx, http.MethodPost, "ban/"+url.PathEscape(userID), map[string]any{"Reason": reason, "IP": ip}, nil)
 }
+
+// BanEntry is one PalDefender ban, shown as found (its fields vary by version).
+type BanEntry map[string]any
+
+// Banlist reads PalDefender's ban list: from its API when connected, else from Banlist.json.
+func Banlist(ctx context.Context, c *Client, serverDir string) (users, ips []BanEntry, err error) {
+	var raw struct {
+		UserEntries []BanEntry `json:"UserEntries"`
+		IPEntries   []BanEntry `json:"IPEntries"`
+	}
+	if c != nil {
+		if err = c.do(ctx, http.MethodGet, "banlist", nil, &raw); err == nil {
+			return raw.UserEntries, raw.IPEntries, nil
+		}
+	}
+	b, ferr := os.ReadFile(filepath.Join(Dir(serverDir), "Banlist.json"))
+	if ferr != nil {
+		if err == nil {
+			err = ferr
+		}
+		return nil, nil, err
+	}
+	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
+	if jerr := json.Unmarshal(b, &raw); jerr != nil {
+		return nil, nil, jerr
+	}
+	return raw.UserEntries, raw.IPEntries, nil
+}
+
+// Unban lifts a PalDefender user ban.
+func (c *Client) Unban(ctx context.Context, userID string) error {
+	return c.do(ctx, http.MethodPost, "unban/"+url.PathEscape(userID), map[string]any{"Reason": "unbanned in Warden"}, nil)
+}
+
+// UnbanIP lifts a PalDefender IP ban.
+func (c *Client) UnbanIP(ctx context.Context, ip string) error {
+	return c.do(ctx, http.MethodPost, "unbanip/"+url.PathEscape(ip), map[string]any{"Reason": "unbanned in Warden"}, nil)
+}

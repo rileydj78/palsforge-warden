@@ -2,10 +2,12 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -605,5 +607,88 @@ func (s *Server) palDefRoutes(mux *http.ServeMux) {
 		if s.Settings.Restart != nil {
 			go func() { time.Sleep(500 * time.Millisecond); s.Settings.Restart() }()
 		}
+	}))
+}
+
+// ---- every ban in one place: Warden's, Palworld's own banlist.txt, PalDefender's (users and IPs)
+
+func (s *Server) banRoutes(mux *http.ServeMux) {
+	c := s.Control
+	if c == nil {
+		return
+	}
+	mux.HandleFunc("GET /api/bans", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		type ban struct {
+			Source string `json:"source"`
+			ID     string `json:"id"`
+			Name   string `json:"name,omitempty"`
+			Reason string `json:"reason,omitempty"`
+			IP     bool   `json:"ip,omitempty"`
+		}
+		out := []ban{}
+		names := map[string]string{}
+		if roster, err := s.Store.Roster(); err == nil {
+			for _, p := range roster {
+				names[p.UserID] = p.Name
+			}
+		}
+		// Palworld's own list: one user id per line.
+		if b, err := os.ReadFile(filepath.Join(c.Cfg.ServerDir, "Pal", "Saved", "SaveGames", "banlist.txt")); err == nil {
+			for _, line := range strings.Split(string(b), "\n") {
+				if id := strings.TrimSpace(line); id != "" {
+					out = append(out, ban{Source: "palworld", ID: id, Name: names[id]})
+				}
+			}
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		users, ips, _ := paldefender.Banlist(ctx, s.PalDef, c.Cfg.ServerDir)
+		pick := func(e map[string]any, keys ...string) string {
+			for _, k := range keys {
+				if v, ok := e[k]; ok && v != nil {
+					return fmt.Sprint(v)
+				}
+			}
+			return ""
+		}
+		for _, e := range users {
+			id := pick(e, "UserId", "UserID", "userId", "SteamId", "Id")
+			out = append(out, ban{Source: "paldefender", ID: id, Name: pick(e, "Name", "PlayerName"), Reason: pick(e, "Reason", "reason")})
+		}
+		for range ips { // IP bans: counted, never shown (the panel never shows IP addresses)
+			out = append(out, ban{Source: "paldefender", ID: "(an IP address)", IP: true})
+		}
+		writeJSON(w, 200, out)
+	}))
+	mux.HandleFunc("POST /api/bans/lift", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Source, ID string }
+		if readJSON(r, &in) != nil || in.ID == "" || len(in.ID) > 100 {
+			fail(w, 400, "bad request")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		var err error
+		switch in.Source {
+		case "palworld":
+			err = s.Game.Unban(ctx, in.ID)
+		case "paldefender":
+			if s.PalDef == nil {
+				err = errors.New("lifting a PalDefender ban needs PalDefender connected (Server page)")
+			} else {
+				err = s.PalDef.Unban(ctx, in.ID)
+			}
+		default:
+			err = errors.New("unknown ban list")
+		}
+		if err == nil {
+			s.Store.SetBanned(in.ID, false)
+		}
+		s.Store.Audit(ses.User.Name, "unban", in.ID, in.Source, err == nil)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 }

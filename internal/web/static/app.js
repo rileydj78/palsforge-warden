@@ -209,7 +209,24 @@ function renderRoster() {
     rows.append(tr);
   }
 }
-async function loadRoster() { try { roster = await api("/api/roster"); renderRoster(); } catch (e) {} }
+async function loadRoster() { try { roster = await api("/api/roster"); renderRoster(); } catch (e) {} loadBans(); }
+const SRC = { palworld: "The game", paldefender: "PalDefender" };
+async function loadBans() {
+  try {
+    const bans = await api("/api/bans"), rows = $("banrows"); rows.replaceChildren();
+    if (!bans.length) { const tr = el("tr"); const td = el("td", "Nobody is banned.", "empty"); td.colSpan = 4; tr.append(td); rows.append(tr); }
+    for (const b of bans) {
+      const tr = el("tr"), acts = el("td", null, "acts");
+      if (me.role !== "moderator" && !b.ip) {
+        const u = el("button", "Unban", "small");
+        u.onclick = async () => { try { await api("/api/bans/lift", { source: b.source, id: b.id }); toast("Unbanned."); loadRoster(); } catch (e) { toast(e.message); } };
+        acts.append(u);
+      }
+      tr.append(el("td", b.name || b.id, "strong"), el("td", SRC[b.source] || b.source), el("td", b.ip ? "IP address ban (lift it in PalDefender)" : (b.reason || "–")), acts);
+      rows.append(tr);
+    }
+  } catch (e) {}
+}
 $("rsearch").addEventListener("input", renderRoster);
 async function loadAudit() {
   try {
