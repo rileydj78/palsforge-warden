@@ -596,6 +596,7 @@ function tree(v, depth = 0) {
 }
 let detailFor = null;
 async function loadPlayer(id) {
+  if (!roster.find((p) => p.userId === id)) { try { roster = await api("/api/roster"); } catch (e) {} } // opened straight from a link
   detailFor = roster.find((p) => p.userId === id) || { userId: id, name: id };
   loadGiveInfo();
   $("pd-name").textContent = detailFor.name; $("pd-sub").textContent = "Loading from PalDefender…";
