@@ -1,0 +1,242 @@
+// Package auth: admin accounts, sign-in and sessions.
+//
+//   - Passwords are hashed with Argon2id; only the hash is stored.
+//   - The very first account (the owner) can only be created with a one-time setup code that
+//     Warden prints on the server's console and log, so nobody who merely reaches the panel first
+//     can claim it.
+//   - Sessions are random tokens in an HttpOnly, SameSite=Strict cookie; every change also needs
+//     the session's CSRF token in a header.
+//   - Five wrong passwords in a row lock sign-in for a minute.
+package auth
+
+import (
+	"crypto/rand"
+	"crypto/subtle"
+	"database/sql"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"golang.org/x/crypto/argon2"
+)
+
+// Roles, weakest first.
+const (
+	Moderator = "moderator" // see everything; announce, kick
+	Admin     = "admin"     // also ban, save, restart, backups, settings
+	Owner     = "owner"     // also manage admins
+)
+
+var rank = map[string]int{Moderator: 1, Admin: 2, Owner: 3}
+
+// Allows reports whether role may do what needs at least min.
+func Allows(role, min string) bool { return rank[role] >= rank[min] }
+
+// User is a signed-in admin.
+type User struct {
+	Name string `json:"name"`
+	Role string `json:"role"`
+}
+
+// Session is one signed-in browser.
+type Session struct {
+	User    User
+	CSRF    string
+	Expires time.Time
+}
+
+// Auth manages accounts and sessions.
+type Auth struct {
+	DB        *sql.DB
+	SetupCode string // shown on the console until the owner exists
+	mu        sync.Mutex
+	sessions  map[string]*Session
+	fails     int
+	lockUntil time.Time
+}
+
+// SessionLife is how long a sign-in lasts.
+const SessionLife = 12 * time.Hour
+
+// New prepares auth; it makes a setup code if there is no owner yet.
+func New(db *sql.DB) (*Auth, error) {
+	a := &Auth{DB: db, sessions: map[string]*Session{}}
+	n, err := a.UserCount()
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		a.SetupCode = token(6)
+	}
+	return a, nil
+}
+
+func token(n int) string {
+	b := make([]byte, n)
+	rand.Read(b)
+	return strings.TrimRight(base64.RawURLEncoding.EncodeToString(b), "=")
+}
+
+// UserCount is how many admins exist.
+func (a *Auth) UserCount() (int, error) {
+	var n int
+	return n, a.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&n)
+}
+
+func hash(pw string, salt []byte) string {
+	k := argon2.IDKey([]byte(pw), salt, 2, 64*1024, 2, 32)
+	return fmt.Sprintf("argon2id$2$65536$2$%s$%s", base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(k))
+}
+
+func verify(pw, stored string) bool {
+	parts := strings.Split(stored, "$")
+	if len(parts) != 6 || parts[0] != "argon2id" {
+		return false
+	}
+	salt, err1 := base64.RawStdEncoding.DecodeString(parts[4])
+	want, err2 := base64.RawStdEncoding.DecodeString(parts[5])
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	got := argon2.IDKey([]byte(pw), salt, 2, 64*1024, 2, uint32(len(want)))
+	return subtle.ConstantTimeCompare(got, want) == 1
+}
+
+// CheckPassword returns an error explaining why a password is not good enough, or nil.
+func CheckPassword(pw string) error {
+	if len([]rune(pw)) < 10 {
+		return errors.New("use at least 10 characters")
+	}
+	return nil
+}
+
+func validName(n string) bool {
+	if len(n) < 2 || len(n) > 32 {
+		return false
+	}
+	for _, r := range n {
+		if !(r == '_' || r == '-' || r == '.' || r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z') {
+			return false
+		}
+	}
+	return true
+}
+
+// CreateOwner makes the first account, given the setup code.
+func (a *Auth) CreateOwner(code, name, pw string) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.SetupCode == "" {
+		return errors.New("Warden is already set up")
+	}
+	if subtle.ConstantTimeCompare([]byte(code), []byte(a.SetupCode)) != 1 {
+		return errors.New("that setup code isn't right; it is printed in Warden's console and log")
+	}
+	if err := a.addUser(name, pw, Owner); err != nil {
+		return err
+	}
+	a.SetupCode = ""
+	return nil
+}
+
+// AddUser makes another admin (the owner does this).
+func (a *Auth) AddUser(name, pw, role string) error {
+	if role != Admin && role != Moderator {
+		return errors.New("role must be admin or moderator")
+	}
+	return a.addUser(name, pw, role)
+}
+
+func (a *Auth) addUser(name, pw, role string) error {
+	if !validName(name) {
+		return errors.New("names are 2-32 letters, digits, dots, dashes or underscores")
+	}
+	if err := CheckPassword(pw); err != nil {
+		return err
+	}
+	salt := make([]byte, 16)
+	rand.Read(salt)
+	_, err := a.DB.Exec(`INSERT INTO users(name,hash,role,created) VALUES(?,?,?,?)`, name, hash(pw, salt), role, time.Now().Unix())
+	if err != nil {
+		return errors.New("that name is already taken")
+	}
+	return nil
+}
+
+// Login checks a password and starts a session. Returns the session token.
+func (a *Auth) Login(name, pw string) (string, *Session, error) {
+	a.mu.Lock()
+	if time.Now().Before(a.lockUntil) {
+		a.mu.Unlock()
+		return "", nil, errors.New("too many wrong passwords; wait a minute")
+	}
+	a.mu.Unlock()
+	var stored, role string
+	err := a.DB.QueryRow(`SELECT hash, role FROM users WHERE name=?`, name).Scan(&stored, &role)
+	ok := err == nil && verify(pw, stored)
+	if err != nil {
+		verify(pw, hash("x", make([]byte, 16))) // same work either way: no hint whether the name exists
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if !ok {
+		a.fails++
+		if a.fails >= 5 {
+			a.fails, a.lockUntil = 0, time.Now().Add(time.Minute)
+		}
+		return "", nil, errors.New("that name and password don't match")
+	}
+	a.fails = 0
+	tok := token(32)
+	s := &Session{User: User{Name: name, Role: role}, CSRF: token(24), Expires: time.Now().Add(SessionLife)}
+	for t, old := range a.sessions {
+		if time.Now().After(old.Expires) {
+			delete(a.sessions, t)
+		}
+	}
+	a.sessions[tok] = s
+	a.DB.Exec(`UPDATE users SET last_login=? WHERE name=?`, time.Now().Unix(), name)
+	return tok, s, nil
+}
+
+// Session returns the live session for a token, or nil.
+func (a *Auth) Session(tok string) *Session {
+	if tok == "" {
+		return nil
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	s := a.sessions[tok]
+	if s == nil || time.Now().After(s.Expires) {
+		delete(a.sessions, tok)
+		return nil
+	}
+	return s
+}
+
+// Logout ends a session.
+func (a *Auth) Logout(tok string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.sessions, tok)
+}
+
+// Users lists the admins.
+func (a *Auth) Users() ([]map[string]any, error) {
+	rows, err := a.DB.Query(`SELECT name, role, created, COALESCE(last_login,0) FROM users ORDER BY created`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{}
+	for rows.Next() {
+		var n, r string
+		var c, l int64
+		rows.Scan(&n, &r, &c, &l)
+		out = append(out, map[string]any{"name": n, "role": r, "created": c, "lastLogin": l})
+	}
+	return out, rows.Err()
+}

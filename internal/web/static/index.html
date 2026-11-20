@@ -11,32 +11,112 @@
   <div class="brand">
     <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 2 L25 7 V14 C25 20 20 24.5 14 26 C8 24.5 3 20 3 14 V7 Z" stroke="currentColor" stroke-width="2"/><path d="M9 14 L13 18 L19 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     <span class="name">Warden</span>
-    <span class="server" id="servername">…</span>
+    <span class="server" id="servername"></span>
   </div>
-  <span class="pill" id="state"><span class="dot"></span><span id="statetext">Checking…</span></span>
+  <div class="topright">
+    <span class="pill" id="state" hidden><span class="dot"></span><span id="statetext"></span></span>
+    <button class="ghost" id="signout" hidden>Sign out</button>
+  </div>
 </header>
-<main>
-  <section class="hero">
-    <h1 id="headline">Checking on the server…</h1>
-    <p id="subline"></p>
-  </section>
-  <section class="stats" aria-label="At a glance">
-    <div class="stat"><span class="label">Players</span><span class="value" id="players">–</span><span class="note" id="playersnote"></span></div>
-    <div class="stat"><span class="label">Server FPS</span><span class="value" id="fps">–</span><span class="note" id="fpsnote"></span></div>
-    <div class="stat"><span class="label">Up for</span><span class="value" id="uptime">–</span><span class="note" id="daysnote"></span></div>
-    <div class="stat"><span class="label">Bases</span><span class="value" id="bases">–</span><span class="note">Across all guilds</span></div>
-  </section>
-  <section class="card" aria-labelledby="pl">
-    <h2 id="pl">Players online</h2>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th>Player</th><th>Level</th><th>Platform</th><th>Ping</th></tr></thead>
-        <tbody id="playerrows"><tr><td colspan="4" class="empty">Nobody is online.</td></tr></tbody>
-      </table>
-    </div>
-  </section>
-  <p class="foot" id="foot"></p>
-</main>
+
+<div class="layout" id="layout" hidden>
+  <nav class="side" aria-label="Sections">
+    <a href="#/" data-view="dash">Dashboard</a>
+    <a href="#/players" data-view="players">Players</a>
+    <a href="#/activity" data-view="activity">Activity</a>
+    <a href="#/admins" data-view="admins" id="adminsnav" hidden>Admins</a>
+  </nav>
+  <main id="main">
+    <section id="view-dash" class="view">
+      <div class="herorow">
+        <div class="hero">
+          <h1 id="headline">Checking on the server…</h1>
+          <p id="subline"></p>
+        </div>
+        <div class="actions">
+          <button class="btn" id="b-announce">Announce</button>
+          <button class="btn" id="b-save">Save now</button>
+          <button class="btn primary" id="b-shutdown">Shut down…</button>
+        </div>
+      </div>
+      <section class="stats" aria-label="At a glance">
+        <div class="stat"><span class="label">Players</span><span class="value" id="players">–</span><span class="note" id="playersnote"></span></div>
+        <div class="stat"><span class="label">Server FPS</span><span class="value" id="fps">–</span><span class="note" id="fpsnote"></span></div>
+        <div class="stat"><span class="label">Up for</span><span class="value" id="uptime">–</span><span class="note" id="daysnote"></span></div>
+        <div class="stat"><span class="label">Bases</span><span class="value" id="bases">–</span><span class="note">Across all guilds</span></div>
+      </section>
+      <section class="card" aria-labelledby="hist">
+        <div class="cardhead"><h2 id="hist">The last 24 hours</h2>
+          <div class="seg" role="group" aria-label="Range"><button id="r-day" aria-pressed="true">24 h</button><button id="r-week" aria-pressed="false">7 days</button></div></div>
+        <div class="chart" id="chart-players" role="img" aria-label="Players online over time"></div>
+        <div class="chart" id="chart-fps" role="img" aria-label="Server FPS over time"></div>
+        <p class="note" id="histnote"></p>
+      </section>
+      <section class="card" aria-labelledby="pl">
+        <h2 id="pl">Players online</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Player</th><th>Level</th><th>Platform</th><th>Ping</th><th><span class="sr">Actions</span></th></tr></thead>
+          <tbody id="playerrows"></tbody></table></div>
+      </section>
+    </section>
+
+    <section id="view-players" class="view" hidden>
+      <h1>Everyone who has played</h1>
+      <p class="sub">First and last seen, and total time online since Warden started watching.</p>
+      <input class="search" id="rsearch" type="search" placeholder="Find a player" aria-label="Find a player">
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First seen</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody id="rosterrows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-activity" class="view" hidden>
+      <h1>Activity</h1>
+      <p class="sub">Everything done through Warden, newest first.</p>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
+        <tbody id="auditrows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-admins" class="view" hidden>
+      <h1>Admins</h1>
+      <p class="sub">Moderators can announce and kick. Admins can also ban, save and shut down. Only the owner manages admins.</p>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Name</th><th>Role</th><th>Added</th><th>Last sign-in</th></tr></thead>
+        <tbody id="userrows"></tbody></table></div></div>
+      <form class="card form" id="adduser">
+        <h2>Add an admin</h2>
+        <label for="nu-name">Name</label><input id="nu-name" required autocomplete="off">
+        <label for="nu-pw">Password (at least 10 characters)</label><input id="nu-pw" type="password" required autocomplete="new-password">
+        <label for="nu-role">Role</label><select id="nu-role"><option value="moderator">Moderator</option><option value="admin">Admin</option></select>
+        <button class="btn primary" type="submit">Add</button>
+        <p class="msg" id="nu-msg" role="alert"></p>
+      </form>
+    </section>
+  </main>
+</div>
+
+<section class="gate" id="gate" hidden>
+  <form class="card form" id="gateform">
+    <h1 id="gatetitle">Sign in</h1>
+    <p class="sub" id="gatesub"></p>
+    <div id="codewrap" hidden><label for="g-code">Setup code (printed in Warden's window and log)</label><input id="g-code" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+    <label for="g-name">Name</label><input id="g-name" required autocomplete="username" autocapitalize="none" spellcheck="false">
+    <label for="g-pw">Password</label><input id="g-pw" type="password" required autocomplete="current-password" autocapitalize="none" spellcheck="false">
+    <button class="btn primary" type="submit" id="gatebtn">Sign in</button>
+    <p class="msg" id="gatemsg" role="alert"></p>
+  </form>
+</section>
+
+<dialog id="dlg">
+  <form method="dialog" class="form" id="dlgform">
+    <h2 id="dlgtitle"></h2>
+    <p class="sub" id="dlgtext"></p>
+    <label for="dlginput" id="dlglabel"></label>
+    <input id="dlginput" autocomplete="off">
+    <div class="row"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" id="dlgok" value="ok">OK</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status" hidden></div>
 <script src="app.js"></script>
 </body>
 </html>

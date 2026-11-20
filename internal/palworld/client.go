@@ -123,3 +123,33 @@ func (c *Client) Settings(ctx context.Context) (map[string]any, error) {
 	var v map[string]any
 	return v, c.do(ctx, http.MethodGet, "/settings", nil, &v)
 }
+
+// Announce sends a message to everyone in the game.
+func (c *Client) Announce(ctx context.Context, msg string) error {
+	return c.do(ctx, http.MethodPost, "/announce", map[string]string{"message": msg}, nil)
+}
+
+// Kick removes a player, with a message they see.
+func (c *Client) Kick(ctx context.Context, userID, msg string) error {
+	return c.do(ctx, http.MethodPost, "/kick", map[string]string{"userid": userID, "message": msg}, nil)
+}
+
+// Ban bans a player, with a message they see.
+func (c *Client) Ban(ctx context.Context, userID, msg string) error {
+	return c.do(ctx, http.MethodPost, "/ban", map[string]string{"userid": userID, "message": msg}, nil)
+}
+
+// Unban lifts a ban.
+func (c *Client) Unban(ctx context.Context, userID string) error {
+	return c.do(ctx, http.MethodPost, "/unban", map[string]string{"userid": userID}, nil)
+}
+
+// Save saves the world now.
+func (c *Client) Save(ctx context.Context) error {
+	return c.do(ctx, http.MethodPost, "/save", map[string]string{}, nil)
+}
+
+// Shutdown stops the server after waitSeconds, showing msg in game.
+func (c *Client) Shutdown(ctx context.Context, waitSeconds int, msg string) error {
+	return c.do(ctx, http.MethodPost, "/shutdown", map[string]any{"waittime": waitSeconds, "message": msg}, nil)
+}

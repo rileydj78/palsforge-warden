@@ -2,14 +2,20 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
+	"github.com/rileydj78/palsforge-warden/internal/store"
 	"github.com/rileydj78/palsforge-warden/internal/web"
 )
 
@@ -18,6 +24,7 @@ var version = "0.0.1-dev"
 func main() {
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")
 	listen := flag.String("listen", "127.0.0.1:8282", "where the panel listens (loopback only)")
+	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")
 	flag.Parse()
 	if *serverDir == "" {
@@ -46,6 +53,24 @@ func main() {
 		}
 		return
 	}
-	log.Printf("Warden %s: panel on http://%s/ (this machine only)", version, *listen)
+	if err := os.MkdirAll(*dataDir, 0o700); err == nil {
+		if f, err := os.OpenFile(filepath.Join(*dataDir, "warden.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
+			log.SetOutput(io.MultiWriter(os.Stderr, f)) // a service has no console: the log file is where the setup code is
+		}
+	}
+	st2, err := store.Open(*dataDir)
+	if err != nil {
+		log.Fatalf("could not open Warden's data in %s: %v", *dataDir, err)
+	}
+	au, err := auth.New(st2.DB)
+	if err != nil {
+		log.Fatalf("could not read Warden's accounts: %v", err)
+	}
+	srv.Store, srv.Auth = st2, au
+	if au.SetupCode != "" {
+		log.Printf("FIRST RUN: open the panel and create the owner account with this setup code: %s", au.SetupCode)
+	}
+	go monitor.Run(context.Background(), game, st2)
+	log.Printf("Warden %s: panel on http://%s/ (this machine only); data in %s", version, *listen, *dataDir)
 	log.Fatal(srv.Listen(*listen))
 }
