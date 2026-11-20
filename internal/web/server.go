@@ -359,6 +359,7 @@ func (s *Server) Handler() http.Handler {
 	s.controlRoutes(mux)
 	s.settingsRoutes(mux)
 	s.gameSettingsRoutes(mux)
+	s.modRoutes(mux)
 	return secure(mux)
 }
 

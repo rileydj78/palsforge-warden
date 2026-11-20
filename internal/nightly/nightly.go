@@ -15,6 +15,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/routine"
@@ -148,6 +149,7 @@ type Runner struct {
 	Backups *Backups
 	Store   *store.Store
 	Notify  *notify.Notifier
+	Mods    *mods.Manager
 	mu      sync.Mutex
 	busy    bool
 	stepNow string
@@ -171,6 +173,12 @@ func (r *Runner) RunNow(ctx context.Context, kind string, warn []int, update boo
 	r.mu.Unlock()
 	defer func() { r.mu.Lock(); r.busy = false; r.stepNow = ""; r.mu.Unlock() }()
 	p := routine.Plan{WarnMinutes: warn, Update: update}
+	if r.Mods != nil {
+		p.BeforeStart = func(context.Context) (string, error) {
+			done, err := r.Mods.ApplyPending()
+			return strings.Join(done, ", "), err
+		}
+	}
 	rep := routine.Run(ctx, p, r.Game, r.Host, r.Backups)
 	r.Store.AddRun(kind, rep.Started, rep.OK, rep)
 	log.Printf("%s routine finished: ok=%v", kind, rep.OK)

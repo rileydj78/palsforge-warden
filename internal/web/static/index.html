@@ -27,6 +27,7 @@
     <a href="#/server" data-view="server" id="servernav" hidden>Server</a>
     <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
     <a href="#/game" data-view="game" id="gamenav" hidden>Game settings</a>
+    <a href="#/mods" data-view="mods" id="modsnav" hidden>Mods</a>
     <a href="#/logs" data-view="logs" id="logsnav" hidden>Logs</a>
     <a href="#/activity" data-view="activity">Activity</a>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Admins</a>
@@ -119,6 +120,18 @@
       </div>
       <div id="g-groups"></div>
       <section class="card" id="g-unknown-card" hidden><h2>Other options</h2><p class="note">Options Warden doesn't explain yet. They're kept exactly as they are.</p><p class="mono" id="g-unknown"></p></section>
+    </section>
+
+    <section id="view-mods" class="view" hidden>
+      <div class="herorow">
+        <div class="hero"><h1>Mods</h1><p class="sub" id="md-sub">Turning a mod off moves it to Warden's own folder; nothing is deleted.</p></div>
+        <div class="actions"><button class="btn primary" id="md-apply" hidden>Apply now (restart in 1 minute)</button></div>
+      </div>
+      <div id="md-problems"></div>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Mod</th><th>Kind</th><th>Size</th><th>Changed</th><th>State</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody id="modrows"></tbody></table></div></div>
+      <p class="note">Most mods must also be installed, at the same version, on every player's game.</p>
     </section>
 
     <section id="view-logs" class="view" hidden>

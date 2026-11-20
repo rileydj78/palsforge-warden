@@ -14,6 +14,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
@@ -110,6 +111,7 @@ func main() {
 			}
 		}
 		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2, Notify: nt,
+			Mods:    &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir},
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
 		go runner.WatchDown(context.Background())
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}

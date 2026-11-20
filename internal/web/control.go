@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/logs"
+	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 )
@@ -398,5 +400,73 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			}()
 		}
 		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "backup": bak})
+	}))
+}
+
+// ---- mods
+
+func (s *Server) modRoutes(mux *http.ServeMux) {
+	c := s.Control
+	if c == nil || c.Runner.Mods == nil {
+		return
+	}
+	m := c.Runner.Mods
+	mux.HandleFunc("GET /api/mods", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		list, probs, err := m.List()
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		if list == nil {
+			list = []mods.Mod{}
+		}
+		if probs == nil {
+			probs = []mods.Problem{}
+		}
+		writeJSON(w, 200, map[string]any{"mods": list, "problems": probs, "running": c.Host.Running()})
+	}))
+	mux.HandleFunc("POST /api/mods/toggle", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ ID, Op string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := m.Queue(in.ID, in.Op)
+		s.Store.Audit(ses.User.Name, in.Op+" mod", in.ID, "queued", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if !c.Host.Running() { // stopped: apply straight away
+			done, err := m.ApplyPending()
+			if err != nil {
+				fail(w, 500, err.Error())
+				return
+			}
+			writeJSON(w, 200, map[string]any{"applied": done})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"queued": true})
+	}))
+	mux.HandleFunc("POST /api/mods/apply-now", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		if busy, _ := c.Runner.Busy(); busy {
+			fail(w, 409, "the nightly routine is running; it applies mod changes itself")
+			return
+		}
+		s.Store.Audit(ses.User.Name, "apply mod changes now", "", "restart", true)
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			s.Game.Announce(ctx, "The server restarts in 1 minute to change mods.")
+			c.Host.PlanStop(ctx)
+			if err := s.Game.Shutdown(ctx, 60, "Restarting to change mods."); err != nil || !c.Host.WaitStopped(ctx, 4*time.Minute) {
+				c.Host.ForceStop(ctx)
+				c.Host.WaitStopped(ctx, time.Minute)
+			}
+			done, err := m.ApplyPending()
+			s.Store.AddEvent(time.Now(), "mods", fmt.Sprintf("mod changes: %s %v", strings.Join(done, ", "), err))
+			c.Host.Start(ctx)
+		}()
+		writeJSON(w, 202, map[string]bool{"started": true})
 	}))
 }

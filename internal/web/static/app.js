@@ -63,7 +63,7 @@ function signedIn(out) {
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
-  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; }).catch(() => {});
+  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; $("modsnav").hidden = me.role === "moderator"; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -378,6 +378,35 @@ $("g-review").addEventListener("click", async () => {
   try { await api("/api/game-settings/apply", { values, restart: w === "NOW" ? "now" : "later" }); toast(w === "NOW" ? "Saved. The server restarts in 1 minute." : "Saved. They apply at the next restart."); loadGame(); } catch (e) { toast(e.message); }
 });
 
+// ---- mods
+const KIND = { pak: "PAK mod", ue4ss: "UE4SS Lua mod", palschema: "PalSchema mod", plugin: "Server plugin" };
+async function loadMods() {
+  try {
+    const r = await api("/api/mods"), rows = $("modrows"); rows.replaceChildren();
+    const pending = r.mods.filter((m) => m.pending).length;
+    $("md-apply").hidden = !(pending && r.running);
+    $("md-sub").textContent = r.running ? (pending ? `${pending} change${pending === 1 ? "" : "s"} waiting: they apply at the next nightly run, or now with a restart.` : "Changes wait for the next nightly stop (mod files are locked while the server runs).") : "The server is stopped: changes apply straight away.";
+    const pb = $("md-problems"); pb.replaceChildren();
+    for (const p of r.problems) pb.append(el("p", `${p.mod} ${p.text}.`, "problem"));
+    if (!r.mods.length) { const tr = el("tr"); const td = el("td", "No mods found.", "empty"); td.colSpan = 6; tr.append(td); rows.append(tr); }
+    for (const m of r.mods) {
+      const tr = el("tr"), acts = el("td", null, "acts");
+      const goingOn = m.pending ? m.pending === "enable" : m.enabled;
+      const b = el("button", goingOn ? "Turn off" : "Turn on", goingOn ? "small warn" : "small");
+      b.onclick = async () => { try { const x = await api("/api/mods/toggle", { id: m.id, op: goingOn ? "disable" : "enable" }); toast(x.applied ? "Done." : "Queued."); loadMods(); } catch (e) { toast(e.message); } };
+      acts.append(b);
+      const state = m.pending ? `${m.enabled ? "On" : "Off"} → ${m.pending === "enable" ? "on" : "off"}` : (m.enabled ? "On" : "Off");
+      tr.append(el("td", m.name, "strong"), el("td", KIND[m.kind] || m.kind), el("td", size(m.size), "num"), el("td", m.changed ? new Date(m.changed).toLocaleDateString() : "–"), el("td", state, m.pending ? "strong" : ""), acts);
+      rows.append(tr);
+    }
+  } catch (e) {}
+}
+$("md-apply").addEventListener("click", async () => {
+  const ok = await ask({ title: "Apply the mod changes now?", text: "Players get a minute's warning, the server stops, the mods change, and it starts again.", label: "Type APPLY to confirm", confirmWord: "APPLY", ok: "Apply" });
+  if (ok == null) return;
+  try { await api("/api/mods/apply-now", {}); toast("Restarting in 1 minute to change mods."); setTimeout(loadMods, 90000); } catch (e) { toast(e.message); }
+});
+
 // ---- logs
 async function loadLogs(first) {
   const sel = $("lg-src");
@@ -440,7 +469,7 @@ $("setform").addEventListener("submit", async (e) => {
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -452,6 +481,7 @@ function route() {
   if (view === "logs") loadLogs(true);
   if (view === "game") loadGame();
   if (view === "map") drawMap();
+  if (view === "mods") loadMods();
 }
 window.addEventListener("hashchange", route);
 async function refresh() {

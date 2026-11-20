@@ -43,6 +43,8 @@ type Plan struct {
 	Update      bool
 	HealthWait  time.Duration // how long to wait for the server to answer after starting
 	Sleep       func(ctx context.Context, d time.Duration) error
+	// BeforeStart runs while the server is stopped, just before it starts (e.g. mod changes).
+	BeforeStart func(ctx context.Context) (string, error)
 }
 
 // Step is one line of the routine's report.
@@ -153,6 +155,13 @@ func Run(ctx context.Context, p Plan, g Game, h Host, b Backups) *Report {
 	} else {
 		r.add("backup", errors.New("skipped"), "the server never stopped")
 		r.OK = false
+	}
+
+	if stopped && p.BeforeStart != nil {
+		sum, err := p.BeforeStart(ctx)
+		if sum != "" || err != nil {
+			bad(r.add("mods", err, sum))
+		}
 	}
 
 	// 5. Start, always, and wait until it answers.
