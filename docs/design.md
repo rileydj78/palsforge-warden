@@ -23,9 +23,12 @@ because Smart App Control blocks new unsigned programs):
 | Logs viewer (IPs masked) | done |
 | Game settings editor | done |
 | Map (players) | done; coordinate transform to be checked in game |
-| Mods | next |
-| PalDefender | after mods (needs its API docs) |
+| Mods: scan, mistakes, on/off, zip install | done |
+| PalDefender: connect, guilds, map positions, messages, IP bans | done |
 | Signed Windows release | waiting on SignPath Foundation |
+| Access: no sign-in on the server; accounts on a separate admin port | done |
+
+The full competitor comparison and the parity gaps are in [feature-survey.md](feature-survey.md).
 
 ## 1. What it is
 
