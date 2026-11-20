@@ -40,7 +40,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/server", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		busy, _ := c.Runner.Busy()
 		runs, _ := s.Store.Runs(1)
-		out := map[string]any{"host": c.Host.State(), "build": c.Host.BuildID(), "routineRunning": busy, "memory": c.Host.Memory(), "machine": host.MachineLoad(), "health": c.Cfg.Health, "proof": nightly.LastProof(c.Runner.Backups.DataDir),
+		out := map[string]any{"host": c.Host.State(), "build": c.Host.BuildID(), "routineRunning": busy, "memory": c.Host.Memory(), "machine": host.MachineLoad(), "disk": host.DiskOf(c.Cfg.ServerDir), "health": c.Cfg.Health, "proof": nightly.LastProof(c.Runner.Backups.DataDir),
 			"nightly": c.Cfg.Nightly, "update": c.Cfg.Update.Enabled, "offsite": len(c.Cfg.Backups.Offsite)}
 		if c.Cfg.Nightly.Enabled {
 			out["nextRun"] = nightly.NextRun(c.Cfg.Nightly.Time, time.Now())

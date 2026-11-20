@@ -160,3 +160,18 @@ func cpuTimes() (idle, total uint64) {
 	ft := func(f syscall.Filetime) uint64 { return uint64(f.HighDateTime)<<32 | uint64(f.LowDateTime) }
 	return ft(i), ft(k) + ft(u) // kernel time includes idle time
 }
+
+var procDiskFree = kernel32.NewProc("GetDiskFreeSpaceExW")
+
+// diskFree returns free and total bytes on the drive holding path.
+func diskFree(path string) (free, total uint64) {
+	p, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return 0, 0
+	}
+	var avail, tot, all uint64
+	if r, _, _ := procDiskFree.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&avail)), uintptr(unsafe.Pointer(&tot)), uintptr(unsafe.Pointer(&all))); r == 0 {
+		return 0, 0
+	}
+	return avail, tot
+}

@@ -313,6 +313,7 @@ async function loadServer() {
     $("srv-crashes").textContent = h.crashes24h;
     $("srv-mem").textContent = s.memory ? `${(s.memory / (1 << 30)).toFixed(1)} GB` : "–";
     if (s.machine) { $("srv-cpu").textContent = `${Math.round(s.machine.cpuPercent)}% CPU`; $("srv-ram").textContent = s.machine.memTotal ? `${(s.machine.memUsed / (1 << 30)).toFixed(1)} of ${(s.machine.memTotal / (1 << 30)).toFixed(0)} GB memory in use` : ""; }
+    if (s.disk && s.disk.total) { const free = s.disk.free / (1 << 30); $("srv-ram").textContent += `${$("srv-ram").textContent ? "; " : ""}${free.toFixed(0)} GB free on the server's drive${free < 20 ? " (low: backups may fail)" : ""}`; }
     $("srv-memnote").textContent = s.health && s.health.memoryLimitGB ? `Restarts with warnings above ${s.health.memoryLimitGB} GB` : "No memory limit set";
     $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
     $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";

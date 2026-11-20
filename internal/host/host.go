@@ -419,3 +419,12 @@ func MachineLoad() Machine {
 	m.MemUsed, m.MemTotal = machineMem()
 	return m
 }
+
+// Disk is free space on the drive that holds a folder.
+type Disk struct {
+	Free  uint64 `json:"free"`
+	Total uint64 `json:"total"`
+}
+
+// DiskOf reports the drive holding path.
+func DiskOf(path string) Disk { f, t := diskFree(path); return Disk{Free: f, Total: t} }
