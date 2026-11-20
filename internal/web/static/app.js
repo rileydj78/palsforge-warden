@@ -433,7 +433,17 @@ $("b-routine").addEventListener("click", async () => {
 });
 async function loadBackups() {
   try {
-    const places = await api("/api/backups"), box = $("bk-places"); box.replaceChildren();
+    const resp = await api("/api/backups"), places = resp.places || [], box = $("bk-places"); box.replaceChildren();
+    if ((resp.remotes || []).length) {
+      const c = el("section", null, "card"); c.append(el("h2", "Other machines and cloud storage"), el("p", "Each new backup is sent here, read back and checked; old ones are removed by the same rules as here.", "note"));
+      const ul = el("ul", null, "checks");
+      for (const r of resp.remotes) {
+        const li = el("li", null, !r.at || r.at.startsWith("0001") ? "info" : r.ok ? "ok" : "bad");
+        li.append(el("b", r.name + ":"), el("span", !r.at || r.at.startsWith("0001") ? "no copy yet (the next backup goes here)" : r.ok ? `last copy ${when2(r.at)}, read back and checked` : `the last copy failed ${when2(r.at)}: ${r.error}`));
+        ul.append(li);
+      }
+      c.append(ul); box.append(c);
+    }
     places.forEach((p, i) => {
       const c = el("section", null, "card");
       c.append(el("h2", i === 0 ? "On this machine" : "Second place"), el("p", p.dir, "note mono"));

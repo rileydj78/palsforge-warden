@@ -108,11 +108,14 @@ func (b *Backups) CopyAndVerify(ctx context.Context, names []string) error {
 	if remotes := b.Cfg.Backups.Remotes(); len(remotes) > 0 {
 		var errs []error
 		for _, t := range remotes {
+			var terr error
 			for _, a := range b.made {
 				if err := t.SendVerified(ctx, *a); err != nil {
 					errs = append(errs, fmt.Errorf("%s: %w", t.Name(), err))
+					terr = err
 				}
 			}
+			RecordRemote(b.DataDir, t.Name(), terr)
 		}
 		if len(errs) > 0 {
 			return errors.Join(errs...)
@@ -462,4 +465,33 @@ func (r *Runner) SwitchWorld(ctx context.Context, id string, warn []int) (*routi
 	r.Store.AddRun("world switch", rep.Started, rep.OK, rep)
 	r.tell("world switch", rep)
 	return rep, nil
+}
+
+// RemoteStatus is the last copy to a place on another machine or in cloud storage.
+type RemoteStatus struct {
+	Name  string    `json:"name"`
+	At    time.Time `json:"at"`
+	OK    bool      `json:"ok"`
+	Error string    `json:"error,omitempty"`
+}
+
+// RecordRemote remembers how the last copy to a remote place went.
+func RecordRemote(dataDir, name string, err error) {
+	m := RemoteStatuses(dataDir)
+	st := RemoteStatus{Name: name, At: time.Now(), OK: err == nil}
+	if err != nil {
+		st.Error = err.Error()
+	}
+	m[name] = st
+	b, _ := json.Marshal(m)
+	os.WriteFile(filepath.Join(dataDir, "remote-status.json"), b, 0o600)
+}
+
+// RemoteStatuses returns the last copy to each remote place, by name.
+func RemoteStatuses(dataDir string) map[string]RemoteStatus {
+	m := map[string]RemoteStatus{}
+	if b, err := os.ReadFile(filepath.Join(dataDir, "remote-status.json")); err == nil {
+		json.Unmarshal(b, &m)
+	}
+	return m
 }

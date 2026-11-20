@@ -94,7 +94,17 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 			}
 			places = append(places, p)
 		}
-		writeJSON(w, 200, places)
+		// Places on other machines and in cloud storage: each with its last copy.
+		st := nightly.RemoteStatuses(c.Runner.Backups.DataDir)
+		var remotes []nightly.RemoteStatus
+		for _, t := range c.Cfg.Backups.Remotes() {
+			r, ok := st[t.Name()]
+			if !ok {
+				r = nightly.RemoteStatus{Name: t.Name()}
+			}
+			remotes = append(remotes, r)
+		}
+		writeJSON(w, 200, map[string]any{"places": places, "remotes": remotes})
 	}))
 
 	// Changes. Each is audited; long ones run in the background and land in the run history.
