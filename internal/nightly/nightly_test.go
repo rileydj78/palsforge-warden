@@ -10,6 +10,8 @@ import (
 
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/store"
 )
 
 func TestNextRun(t *testing.T) {
@@ -59,5 +61,51 @@ func TestBackupsWithOffsiteAndImageOnSunday(t *testing.T) {
 	b.Cfg.Backups.Offsite = nil
 	if err := b.CopyAndVerify(context.Background(), nil); err == nil {
 		t.Fatal("no second place must be reported, not silently accepted")
+	}
+}
+
+type fakeGame struct{}
+
+func (fakeGame) Announce(context.Context, string) error      { return nil }
+func (fakeGame) Save(context.Context) error                  { return nil }
+func (fakeGame) Shutdown(context.Context, int, string) error { return nil }
+func (fakeGame) Alive(context.Context) bool                  { return true }
+
+func TestRestoreRoundTrip(t *testing.T) {
+	srv, data := t.TempDir(), t.TempDir()
+	world := filepath.Join(srv, "Pal/Saved/SaveGames/0/W1/Level.sav")
+	os.MkdirAll(filepath.Dir(world), 0o755)
+	os.WriteFile(world, []byte("monday"), 0o644)
+	cfg := config.Defaults(srv)
+	cfg.Control.Mode, cfg.Control.StartCommand, cfg.Control.Exe = "external", []string{"true"}, "no-such-server-program"
+	st, _ := store.Open(t.TempDir())
+	b := &Backups{Cfg: cfg, DataDir: data, Now: func() time.Time { return time.Date(2026, 11, 16, 4, 0, 0, 0, time.Local) }}
+	names, err := b.MakeAll(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(world, []byte("tuesday, griefed"), 0o644)
+	b.Now = nil
+	r := &Runner{Cfg: cfg, Game: fakeGame{}, Host: host.New(cfg, data), Backups: b, Store: st}
+	a, err := r.FindArchive(0, names[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	rep, err := r.Restore(context.Background(), a, "test")
+	if err != nil || !rep.OK {
+		t.Fatalf("restore: %v %+v", err, rep.Steps)
+	}
+	if got, _ := os.ReadFile(world); string(got) != "monday" {
+		t.Fatalf("world should be Monday's again, got %q", got)
+	}
+	kept, _ := filepath.Glob(filepath.Join(srv, "Pal", "Saved.before-restore-*"))
+	if len(kept) != 1 {
+		t.Fatal("the replaced world must be kept aside")
+	}
+	// A damaged backup is refused before anything is touched.
+	os.WriteFile(a.Path, []byte("damaged"), 0o644)
+	rep, _ = r.Restore(context.Background(), a, "test")
+	if rep.OK || rep.Steps[0].Name != "check" {
+		t.Fatalf("a damaged backup must be refused at the check: %+v", rep.Steps)
 	}
 }

@@ -275,3 +275,91 @@ func Prune(dir string, p Policy) ([]string, error) {
 	}
 	return removed, nil
 }
+
+// Entry is one file inside an archive.
+type Entry struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+}
+
+// Contents lists an archive's files (for a preview before restoring).
+func Contents(path string) ([]Entry, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer z.Close()
+	out := make([]Entry, 0, len(z.File))
+	for _, f := range z.File {
+		out = append(out, Entry{Name: f.Name, Size: int64(f.UncompressedSize64)})
+	}
+	return out, nil
+}
+
+// Verify checks a finished archive against its .sha256 file.
+func Verify(a Archive) error {
+	if a.SHA256 == "" {
+		return fmt.Errorf("%s has no checksum file, so it can't be trusted for a restore", a.Name)
+	}
+	got, err := FileSHA256(a.Path)
+	if err != nil {
+		return err
+	}
+	if got != a.SHA256 {
+		return fmt.Errorf("%s doesn't match its checksum: the file is damaged", a.Name)
+	}
+	return nil
+}
+
+// Extract unpacks an archive into root. Every entry must stay inside root and under one of the
+// allowed prefixes (slash-separated); anything else is refused before a single file is written.
+func Extract(path, root string, allowed []string) (int, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return 0, err
+	}
+	defer z.Close()
+	rootAbs, _ := filepath.Abs(root)
+	for _, f := range z.File {
+		name := filepath.ToSlash(filepath.Clean(filepath.FromSlash(f.Name)))
+		ok := false
+		for _, a := range allowed {
+			if name == a || strings.HasPrefix(name, a+"/") {
+				ok = true
+			}
+		}
+		dst, _ := filepath.Abs(filepath.Join(root, filepath.FromSlash(name)))
+		if !ok || strings.HasPrefix(name, "../") || filepath.IsAbs(f.Name) || !strings.HasPrefix(dst, rootAbs+string(filepath.Separator)) {
+			return 0, fmt.Errorf("refusing to restore %q: it's outside the places a backup may write", f.Name)
+		}
+	}
+	n := 0
+	for _, f := range z.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		dst := filepath.Join(root, filepath.FromSlash(filepath.Clean(filepath.FromSlash(f.Name))))
+		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+			return n, err
+		}
+		src, err := f.Open()
+		if err != nil {
+			return n, err
+		}
+		out, err := os.Create(dst)
+		if err != nil {
+			src.Close()
+			return n, err
+		}
+		_, err = io.Copy(out, src)
+		src.Close()
+		if cerr := out.Close(); err == nil {
+			err = cerr
+		}
+		if err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}

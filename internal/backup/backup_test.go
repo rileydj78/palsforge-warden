@@ -96,3 +96,33 @@ func TestPruneKeepsDailyAndWeekly(t *testing.T) {
 		t.Fatal("the newest must be kept")
 	}
 }
+
+func TestExtractRefusesEscapes(t *testing.T) {
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad.zip")
+	f, _ := os.Create(bad)
+	zw := zip.NewWriter(f)
+	w, _ := zw.Create("../../evil.txt")
+	w.Write([]byte("x"))
+	zw.Close()
+	f.Close()
+	root := t.TempDir()
+	if _, err := Extract(bad, root, []string{"Pal/Saved"}); err == nil {
+		t.Fatal("a path that climbs out must be refused")
+	}
+	good := filepath.Join(dir, "good.zip")
+	f, _ = os.Create(good)
+	zw = zip.NewWriter(f)
+	w, _ = zw.Create("Pal/Saved/SaveGames/0/W/Level.sav")
+	w.Write([]byte("world"))
+	w, _ = zw.Create("Pal/Binaries/Win64/evil.dll")
+	w.Write([]byte("x"))
+	zw.Close()
+	f.Close()
+	if _, err := Extract(good, root, []string{"Pal/Saved"}); err == nil {
+		t.Fatal("files outside the allowed places must be refused")
+	}
+	if _, err := os.Stat(filepath.Join(root, "Pal/Saved/SaveGames/0/W/Level.sav")); !os.IsNotExist(err) {
+		t.Fatal("nothing may be written when any entry is refused")
+	}
+}

@@ -277,12 +277,24 @@ async function loadBackups() {
       c.append(el("h2", i === 0 ? "On this machine" : "Second place"), el("p", p.dir, "note mono"));
       if (p.error) c.append(el("p", p.error, "problem"));
       const t = el("table"), tb = el("tbody");
-      t.append(Object.assign(el("thead"), { innerHTML: "<tr><th>Backup</th><th>Kind</th><th>Made</th><th>Size</th><th>Checked</th></tr>" }));
-      if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 5; tr.append(td); tb.append(tr); }
-      for (const a of p.archives) { const tr = el("tr"); tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–")); tb.append(tr); }
+      const hr = el("tr"); for (const h of ["Backup", "Kind", "Made", "Size", "Checked", ""]) hr.append(el("th", h)); const th = el("thead"); th.append(hr); t.append(th);
+      if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 6; tr.append(td); tb.append(tr); }
+      for (const a of p.archives) {
+        const tr = el("tr"), acts = el("td", null, "acts");
+        if (me.role === "owner" && a.kind === "data") { const b = el("button", "Restore…", "small warn"); b.onclick = () => restore(i, a.name); acts.append(b); }
+        tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–"), acts); tb.append(tr);
+      }
       t.append(tb); const w = el("div", null, "tablewrap"); w.append(t); c.append(w); box.append(c);
     });
   } catch (e) {}
+}
+async function restore(place, name) {
+  let pv;
+  try { pv = await api(`/api/backups/preview?place=${place}&name=${encodeURIComponent(name)}`); } catch (e) { toast(e.message); return; }
+  const what = `${pv.files} files (${size(pv.bytes)}): ${pv.worlds.length} world${pv.worlds.length === 1 ? "" : "s"}${pv.settings ? ", the server settings" : ""}${pv.modFiles ? `, ${pv.modFiles} mod files` : ""}.`;
+  const ok = await ask({ title: `Restore ${name}?`, text: `It holds ${what} Players are warned, the server stops, a safety backup of the world as it is now is made, the current folders are kept aside, and the server starts again on the restored world.`, label: "Type RESTORE to confirm", confirmWord: "RESTORE", ok: "Restore" });
+  if (ok == null) return;
+  try { await api("/api/backups/restore", { place, name }); toast("Restoring. Follow it on the Server page."); location.hash = "#/server"; } catch (e) { toast(e.message); }
 }
 $("b-backup").addEventListener("click", async () => {
   toast("Backing up… this can take a minute.");

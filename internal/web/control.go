@@ -3,6 +3,8 @@ package web
 import (
 	"context"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
@@ -116,6 +118,60 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		s.Store.Audit(ses.User.Name, "run routine now", "", map[bool]string{true: "with warnings", false: "no warnings"}[in.Warn], true)
 		go c.Runner.RunNow(context.Background(), "manual", warn, in.Update && c.Cfg.Update.Enabled)
+		writeJSON(w, 202, map[string]bool{"started": true})
+	}))
+	mux.HandleFunc("GET /api/backups/preview", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
+		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))
+		if err != nil {
+			fail(w, 404, err.Error())
+			return
+		}
+		files, err := backup.Contents(a.Path)
+		if err != nil {
+			fail(w, 500, "can't read that backup: "+err.Error())
+			return
+		}
+		worlds, mods, settings, total := map[string]bool{}, 0, false, int64(0)
+		for _, f := range files {
+			total += f.Size
+			parts := strings.Split(f.Name, "/")
+			if len(parts) > 4 && parts[2] == "SaveGames" {
+				worlds[parts[4]] = true
+			}
+			if strings.HasSuffix(f.Name, "PalWorldSettings.ini") {
+				settings = true
+			}
+			if strings.Contains(f.Name, "~mods/") || strings.Contains(f.Name, "ue4ss/Mods/") {
+				mods++
+			}
+		}
+		ws := []string{}
+		for k := range worlds {
+			ws = append(ws, k)
+		}
+		writeJSON(w, 200, map[string]any{"archive": a, "files": len(files), "bytes": total, "worlds": ws, "settings": settings, "modFiles": mods})
+	}))
+	mux.HandleFunc("POST /api/backups/restore", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			Place int    `json:"place"`
+			Name  string `json:"name"`
+		}
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		a, err := c.Runner.FindArchive(in.Place, in.Name)
+		if err != nil {
+			fail(w, 404, err.Error())
+			return
+		}
+		if busy, _ := c.Runner.Busy(); busy {
+			fail(w, 409, "another run is in progress")
+			return
+		}
+		s.Store.Audit(ses.User.Name, "restore backup", a.Name, "", true)
+		go c.Runner.Restore(context.Background(), a, ses.User.Name)
 		writeJSON(w, 202, map[string]bool{"started": true})
 	}))
 	mux.HandleFunc("POST /api/backups/now", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
