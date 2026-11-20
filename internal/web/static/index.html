@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Warden</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none" aria-hidden="true"><path d="M14 2 L25 7 V14 C25 20 20 24.5 14 26 C8 24.5 3 20 3 14 V7 Z" stroke="currentColor" stroke-width="2"/><path d="M9 14 L13 18 L19 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span class="name">Warden</span>
+    <span class="server" id="servername">…</span>
+  </div>
+  <span class="pill" id="state"><span class="dot"></span><span id="statetext">Checking…</span></span>
+</header>
+<main>
+  <section class="hero">
+    <h1 id="headline">Checking on the server…</h1>
+    <p id="subline"></p>
+  </section>
+  <section class="stats" aria-label="At a glance">
+    <div class="stat"><span class="label">Players</span><span class="value" id="players">–</span><span class="note" id="playersnote"></span></div>
+    <div class="stat"><span class="label">Server FPS</span><span class="value" id="fps">–</span><span class="note" id="fpsnote"></span></div>
+    <div class="stat"><span class="label">Up for</span><span class="value" id="uptime">–</span><span class="note" id="daysnote"></span></div>
+    <div class="stat"><span class="label">Bases</span><span class="value" id="bases">–</span><span class="note">Across all guilds</span></div>
+  </section>
+  <section class="card" aria-labelledby="pl">
+    <h2 id="pl">Players online</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Player</th><th>Level</th><th>Platform</th><th>Ping</th></tr></thead>
+        <tbody id="playerrows"><tr><td colspan="4" class="empty">Nobody is online.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+  <p class="foot" id="foot"></p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
