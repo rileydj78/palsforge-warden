@@ -13,7 +13,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,11 +23,27 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	setup "github.com/rileydj78/palsforge-warden/internal/install"
+	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 	"golang.org/x/crypto/ssh"
 )
 
-const taskName = "Palsforge Warden"
+// taskNameFor is the Windows task for the main Warden ("") or a named instance.
+func taskNameFor(name string) string {
+	if name == "" {
+		return "Palsforge Warden"
+	}
+	return "Palsforge Warden (" + name + ")"
+}
+
+// instanceAddrs returns a named instance's chosen ports ("" name: the defaults).
+func instanceAddrs(name string) (local, admin string) {
+	if name == "" {
+		return "127.0.0.1:8282", "127.0.0.1:8283"
+	}
+	p := loadPorts(instanceData(name))
+	return p.Local, p.Admin
+}
 
 // subcommand handles "warden install|uninstall|open|remote ...". It returns false when the
 // arguments aren't a subcommand (then Warden runs normally).
@@ -38,9 +56,13 @@ func subcommand(args []string) bool {
 	case "install":
 		err = install(args[1:])
 	case "uninstall":
-		err = uninstall()
+		err = uninstall(flagValue(args[1:], "name"))
 	case "open":
-		err = openPanel(listenFrom(args[1:]))
+		l := listenFrom(args[1:])
+		if n := flagValue(args[1:], "name"); n != "" && l == "127.0.0.1:8282" {
+			l, _ = instanceAddrs(n)
+		}
+		err = openPanel(l)
 	case "remote":
 		err = remote(args[1:])
 	case "install-server":
@@ -65,6 +87,7 @@ const usage = `Palsforge Warden: an admin panel for a Palworld dedicated server.
 
   warden -server <folder>            run Warden (panel on http://127.0.0.1:8282)
   warden install -server <folder>    start Warden with Windows (a background task)
+                                     add -name <name> for another server on the same machine
   warden uninstall                   stop starting it with Windows
   warden open                        open the panel in its own window
   warden install-server <folder>     download SteamCMD and the Palworld server, with first settings Warden can use
@@ -111,6 +134,14 @@ func install(args []string) error {
 		return err
 	}
 	run := []string{"-server", server}
+	name := flagValue(args, "name")
+	if name != "" {
+		if err := instances.ValidName(name); err != nil {
+			return err
+		}
+		run = append(run, "-name", name)
+	}
+	taskName := taskNameFor(name)
 	if d := flagValue(args, "data"); d != "" {
 		run = append(run, "-data", d)
 	}
@@ -149,15 +180,16 @@ WantedBy=multi-user.target
 		return fmt.Errorf("couldn't create the startup task (run this from an Administrator window): %s", strings.TrimSpace(string(out)))
 	}
 	exec.Command("schtasks", "/Run", "/TN", taskName).Run()
-	if err := startMenuShortcut(exe); err == nil {
-		fmt.Println("Warden will now start with Windows, and it's starting now.\nOpen the panel from the Start menu: \"Palsforge Warden\".")
+	if err := startMenuShortcut(exe, name); err == nil {
+		fmt.Printf("Warden will now start with Windows, and it's starting now.\nOpen the panel from the Start menu: %q.\n", taskName)
 	} else {
 		fmt.Printf("Warden will now start with Windows, and it's starting now.\nOpen the panel with: \"%s\" open\n", exe)
 	}
 	return nil
 }
 
-func uninstall() error {
+func uninstall(name string) error {
+	taskName := taskNameFor(name)
 	if runtime.GOOS != "windows" {
 		fmt.Println("On Linux: systemctl disable --now warden")
 		return nil
@@ -167,7 +199,7 @@ func uninstall() error {
 	if err != nil {
 		return fmt.Errorf("couldn't remove the startup task: %s", strings.TrimSpace(string(out)))
 	}
-	os.Remove(shortcutPath())
+	os.Remove(shortcutPath(name))
 	fmt.Println("Warden no longer starts with Windows. Its data and backups are kept.")
 	return nil
 }
@@ -234,25 +266,46 @@ func remote(args []string) error {
 		}
 		return nil
 	}
+	name := flagValue(args[1:], "name")
+	_, admin := instanceAddrs(name)
+	if a := flagValue(args[1:], "admin-listen"); a != "" {
+		admin = a
+	}
+	if admin == "" {
+		return errors.New("that instance hasn't run yet, so it has no ports; start it once first")
+	}
+	// The main Warden is on 8443; each instance gets its own port (8444, 8445, ...) from its
+	// administration port, so they don't move.
+	httpsPort := 8443
+	if _, p, err := net.SplitHostPort(admin); err == nil {
+		if n, _ := strconv.Atoi(p); n > 8283 {
+			httpsPort = 8443 + (n-8283)/10
+		}
+	}
+	hp := fmt.Sprintf("--https=%d", httpsPort)
 	var cmd *exec.Cmd
 	if args[0] == "on" {
-		admin := flagValue(args[1:], "admin-listen")
-		if admin == "" {
-			admin = "127.0.0.1:8283"
-		}
-		cmd = exec.Command(ts, "serve", "--bg", "--https=8443", "http://"+admin) // the sign-in port, never the local one
+		cmd = exec.Command(ts, "serve", "--bg", hp, "http://"+admin) // the sign-in port, never the local one
 	} else {
-		cmd = exec.Command(ts, "serve", "--https=8443", "off")
+		cmd = exec.Command(ts, "serve", hp, "off")
+	}
+	data := store.DefaultDir()
+	if name != "" {
+		data = instanceData(name)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("tailscale serve failed: %s", strings.TrimSpace(string(out)))
 	}
 	if args[0] == "on" {
-		fmt.Println("The panel is now on your Tailscale network only (not the internet), at port 8443:")
+		fmt.Printf("The panel is now on your Tailscale network only (not the internet), at port %d:\n", httpsPort)
 		fmt.Println(strings.TrimSpace(string(out)))
+		if m := regexp.MustCompile(`https://\S+`).FindString(string(out)); m != "" {
+			os.WriteFile(filepath.Join(data, "remote-url.txt"), []byte(m), 0o600) // for the server switcher
+		}
 	} else {
 		fmt.Println("The panel is no longer shared on your Tailscale network.")
+		os.Remove(filepath.Join(data, "remote-url.txt"))
 	}
 	return nil
 }
@@ -319,14 +372,18 @@ func restartSelf() {
 	os.Exit(0)
 }
 
-func shortcutPath() string {
-	return filepath.Join(os.Getenv("ProgramData"), `Microsoft\Windows\Start Menu\Programs`, "Palsforge Warden.lnk")
+func shortcutPath(name string) string {
+	return filepath.Join(os.Getenv("ProgramData"), `Microsoft\Windows\Start Menu\Programs`, taskNameFor(name)+".lnk")
 }
 
 // startMenuShortcut adds "Palsforge Warden" to every user's Start menu; it opens the panel.
-func startMenuShortcut(exe string) error {
-	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s'); $s.TargetPath='%s'; $s.Arguments='open'; $s.Description='Palsforge Warden: the Palworld server panel'; $s.Save()`,
-		strings.ReplaceAll(shortcutPath(), "'", "''"), strings.ReplaceAll(exe, "'", "''"))
+func startMenuShortcut(exe, name string) error {
+	arg := "open"
+	if name != "" {
+		arg = "open -name " + name
+	}
+	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s'); $s.TargetPath='%s'; $s.Arguments='%s'; $s.Description='Palsforge Warden: the Palworld server panel'; $s.Save()`,
+		strings.ReplaceAll(shortcutPath(name), "'", "''"), strings.ReplaceAll(exe, "'", "''"), arg)
 	return exec.Command("powershell", "-NoProfile", "-Command", ps).Run()
 }
 

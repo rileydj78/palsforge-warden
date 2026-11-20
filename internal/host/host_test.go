@@ -129,3 +129,32 @@ func TestPublicBuildIsRead(t *testing.T) {
 		t.Fatalf("got %v", m)
 	}
 }
+
+func TestOnlyThisServersProcessCounts(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("uses /proc")
+	}
+	// Two copies of the same program in different folders: only the one asked about counts.
+	dir := t.TempDir()
+	b, err := os.ReadFile("/bin/sh") // a real program that runs under any name
+	if err != nil {
+		t.Skip("no /bin/sh")
+	}
+	a, c := filepath.Join(dir, "a", "PalServer"), filepath.Join(dir, "b", "PalServer")
+	for _, p := range []string{a, c} {
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		os.WriteFile(p, b, 0o755)
+	}
+	cmd := exec.Command(a, "-c", "sleep 30")
+	if err := cmd.Start(); err != nil {
+		t.Skip(err)
+	}
+	defer cmd.Process.Kill()
+	time.Sleep(200 * time.Millisecond)
+	if p, _ := pidsOf(a); len(p) != 1 {
+		t.Fatalf("its own server: %v", p)
+	}
+	if p, _ := pidsOf(c); len(p) != 0 {
+		t.Fatalf("another server with the same program name must not count: %v", p)
+	}
+}

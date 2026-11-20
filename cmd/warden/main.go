@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -18,6 +19,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/kit"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
@@ -45,7 +47,32 @@ func main() {
 	adminListen := flag.String("admin-listen", "127.0.0.1:8283", "the administration port for remote admins (sign-in required); warden remote on publishes it")
 	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")
+	name := flag.String("name", "", "this Warden's instance name when one machine runs several servers (e.g. pvp); each has its own data and ports")
 	flag.Parse()
+	set := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	if *name != "" {
+		if err := instances.ValidName(*name); err != nil {
+			log.Fatal(err)
+		}
+		if !set["data"] {
+			*dataDir = instanceData(*name)
+		}
+		p := loadPorts(*dataDir)
+		if p.Local == "" {
+			p.Local, p.Admin, p.Public = instances.Ports(store.DefaultDir())
+			savePorts(*dataDir, p)
+		}
+		if !set["listen"] {
+			*listen = p.Local
+		}
+		if !set["admin-listen"] {
+			*adminListen = p.Admin
+		}
+		if !set["public-listen"] {
+			*publicListen = p.Public
+		}
+	}
 	if *serverDir == "" {
 		*serverDir = findServer()
 	}
@@ -230,5 +257,44 @@ func main() {
 	}
 	srv.Settings = &web.Settings{DataDir: *dataDir, Restart: restartSelf}
 	log.Printf("Warden %s: panel on http://%s/ (this machine only, no sign-in); administration port %s (sign-in); data in %s", version, *listen, *adminListen, *dataDir)
+	srv.Instances = &web.InstancesInfo{MainData: store.DefaultDir(), Self: *name}
+	go func() { // tell the other Wardens on this machine where this one is
+		for {
+			e := instances.Entry{Name: *name, ServerDir: *serverDir, Local: *listen, Admin: *adminListen, Public: *publicListen}
+			if b, err := os.ReadFile(filepath.Join(*dataDir, "remote-url.txt")); err == nil {
+				e.Remote = strings.TrimSpace(string(b))
+			}
+			c, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if in, err := game.Info(c); err == nil {
+				e.ServerName = in.ServerName
+			} else {
+				e.ServerName = filepath.Base(*serverDir)
+			}
+			cancel()
+			instances.Announce(store.DefaultDir(), e)
+			time.Sleep(time.Minute)
+		}
+	}()
 	log.Fatal(srv.Listen(*listen, *adminListen, *publicListen))
+}
+
+// instanceData is a named instance's own data folder.
+func instanceData(name string) string { return filepath.Join(store.DefaultDir(), "instances", name) }
+
+type ports struct{ Local, Admin, Public string }
+
+// loadPorts returns the ports a named instance chose the first time it ran (kept, so its
+// bookmarks and Tailscale address don't move).
+func loadPorts(data string) ports {
+	var p ports
+	if b, err := os.ReadFile(filepath.Join(data, "ports.json")); err == nil {
+		json.Unmarshal(b, &p)
+	}
+	return p
+}
+
+func savePorts(data string, p ports) {
+	os.MkdirAll(data, 0o700)
+	b, _ := json.Marshal(p)
+	os.WriteFile(filepath.Join(data, "ports.json"), b, 0o600)
 }

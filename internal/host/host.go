@@ -199,9 +199,20 @@ func (h *Host) launch() error {
 	}
 	if h.cfg.Control.Affinity != "" {
 		if mask, err := ParseAffinity(h.cfg.Control.Affinity); err == nil {
-			if err := setAffinity(cmd.Process.Pid, mask); err != nil {
+			pid := cmd.Process.Pid
+			if err := setAffinity(pid, mask); err != nil {
 				h.event("warning", "couldn't set the CPU cores: "+err.Error())
 			}
+			// The game resets its own CPU affinity while it starts up, so set it again once
+			// it has (seen live: an affinity set at launch was gone a minute later).
+			go func() {
+				for _, d := range []time.Duration{5 * time.Second, 25 * time.Second, time.Minute} {
+					time.Sleep(d)
+					if err := setAffinity(pid, mask); err != nil {
+						return // the process is gone
+					}
+				}
+			}()
 		}
 	}
 	h.mu.Lock()

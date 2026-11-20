@@ -68,6 +68,7 @@ function signedIn(out) {
   $("signout").textContent = `Sign out (${me.name})`;
   $("signout").hidden = !!out.local; // on the server machine there's nobody to sign out
   $("security").hidden = !!out.local;
+  loadInstances();
   $("adminsnav").hidden = me.role !== "owner";
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
@@ -828,3 +829,20 @@ $("upd-check").addEventListener("click", async () => {
     a.onclick = async () => { try { await api("/api/update/allow", { build: u.latest }); toast("Allowed. It installs in the next nightly routine."); a.hidden = true; } catch (e) { toast(e.message); } };
   } catch (e) { $("upd-state").textContent = e.message; } finally { b.disabled = false; }
 });
+
+// Several servers on one machine: each has its own Warden; this lists the others.
+async function loadInstances() {
+  try {
+    const list = await api("/api/instances"), sel = $("switcher");
+    if (list.length < 2) { sel.hidden = true; return; }
+    sel.replaceChildren();
+    for (const x of list) {
+      const o = el("option", (x.serverName || x.name || "Main server") + (x.name ? ` (${x.name})` : ""));
+      o.value = x.self ? "" : (x.url || ""); o.selected = !!x.self; o.disabled = !x.self && !x.url;
+      if (!x.self && !x.url) o.textContent += ": not shared remotely";
+      sel.append(o);
+    }
+    sel.hidden = false; $("servername").hidden = true;
+    sel.onchange = () => { if (sel.value) location.href = sel.value; };
+  } catch (e) {}
+}

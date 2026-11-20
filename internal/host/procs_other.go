@@ -15,7 +15,12 @@ import (
 
 // pidsOf lists the process ids whose program is exe (matched by file name in /proc).
 func pidsOf(exe string) ([]int, error) {
-	name := []byte(filepath.Base(exe))
+	// Match the full path, not just the program name: with several servers on one machine,
+	// each Warden must see (and stop) only its own.
+	want := filepath.Clean(exe)
+	if r, err := filepath.EvalSymlinks(want); err == nil {
+		want = r
+	}
 	ents, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil, err
@@ -26,6 +31,13 @@ func pidsOf(exe string) ([]int, error) {
 		if err != nil {
 			continue
 		}
+		if p, err := os.Readlink(filepath.Join("/proc", e.Name(), "exe")); err == nil {
+			if strings.TrimSuffix(p, " (deleted)") == want {
+				pids = append(pids, pid)
+			}
+			continue
+		}
+		// Can't read its program (another user's process): fall back to an absolute argv[0].
 		cmdline, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
 		if err != nil || len(cmdline) == 0 {
 			continue
@@ -34,7 +46,7 @@ func pidsOf(exe string) ([]int, error) {
 		if i := bytes.IndexByte(cmdline, 0); i >= 0 {
 			argv0 = cmdline[:i]
 		}
-		if bytes.Equal([]byte(filepath.Base(string(argv0))), name) {
+		if filepath.IsAbs(string(argv0)) && filepath.Clean(string(argv0)) == want {
 			pids = append(pids, pid)
 		}
 	}

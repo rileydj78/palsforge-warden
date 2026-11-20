@@ -24,6 +24,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
@@ -45,10 +46,12 @@ type Server struct {
 	Settings *Settings
 	PalDef   *paldefender.Client // nil unless PalDefender is connected
 	Public   *Public             // the read-only status page; nil when it's off
-	mu       sync.Mutex
-	local    *auth.Session // the local port's session: the owner, at the server
-	last     *Status
-	lastAt   time.Time
+	// Instances: the other Wardens on this machine (one per game server); nil = don't list.
+	Instances *InstancesInfo
+	mu        sync.Mutex
+	local     *auth.Session // the local port's session: the owner, at the server
+	last      *Status
+	lastAt    time.Time
 }
 
 // PlayerView is what the panel shows about a player. No IP addresses: the panel never needs them.
@@ -323,6 +326,23 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, 200, p)
+	}))
+	mux.HandleFunc("GET /api/instances", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		out := []map[string]any{}
+		if s.Instances != nil {
+			local := onLocalPort(r)
+			for _, e := range instances.List(s.Instances.MainData) {
+				m := map[string]any{"name": e.Name, "serverName": e.ServerName, "self": e.Name == s.Instances.Self}
+				switch {
+				case local: // on the machine: each one's own no-sign-in panel
+					m["url"] = "http://" + e.Local + "/"
+				case e.Remote != "": // remotely: each one's own sign-in address
+					m["url"] = e.Remote
+				}
+				out = append(out, m)
+			}
+		}
+		writeJSON(w, 200, out)
 	}))
 	mux.HandleFunc("GET /api/roster", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		p, err := s.Store.Roster()
@@ -623,4 +643,10 @@ func (s *Server) Listen(localAddr, adminAddr, publicAddr string) error {
 		errs <- (&http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}).Serve(aln)
 	}()
 	return <-errs
+}
+
+// InstancesInfo says where the instance list lives and which entry is this Warden.
+type InstancesInfo struct {
+	MainData string
+	Self     string
 }

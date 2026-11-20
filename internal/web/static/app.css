@@ -139,3 +139,6 @@ form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; } fo
 .dot.off { opacity: .45; }
 
 .tag.warn { background: #FBE8D4; color: #8A4A0E; }
+
+.switcher { font: inherit; font-size: 14px; color: var(--top-ink); background: transparent; border: 1px solid #3A4A40; border-radius: 8px; padding: 5px 8px; max-width: min(320px, 50vw); }
+.switcher option { color: #1C2620; }

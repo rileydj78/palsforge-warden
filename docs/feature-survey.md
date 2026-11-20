@@ -325,7 +325,7 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 6 | Richer map | **Partly**: bases, offline positions; Alpha Pals and landmarks not started |
 | 7 | Discord | **Partly**: join/leave alerts, live status message; command bot and chat relay not started |
 | 8 | Character migration / host-save fix | Not started |
-| 9 | More than one server | Not started (0.3 plan) |
+| 9 | More than one server | **Done** (one Warden per server, switcher, own ports/cores; tested with 3 + live) |
 | 10 | Translations | Not started |
 | 11 | Two-factor sign-in | **Done** (TOTP, escalating lock, codes work once) |
 | 12 | Public status page | **Done** (own read-only port; Funnel publishes only it) + the Discord live status |
@@ -345,7 +345,7 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 
-Not release-ready until the "Not started" items that matter most to owners (8, 9, 10) are
+Not release-ready until the "Not started" items that matter most to owners (8, 10) are
 decided: built, or consciously left out of 1.0 and said so. Character migration (8) needs a save
 parser for Oodle-compressed 1.0 saves: the largest single piece of work left.
 

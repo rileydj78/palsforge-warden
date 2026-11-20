@@ -16,23 +16,65 @@ import (
 
 // pidsOf lists the process ids running the program exe (matched by file name).
 func pidsOf(exe string) ([]int, error) {
-	name := filepath.Base(exe)
-	cmd := exec.Command("tasklist", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq "+name)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("tasklist: %w", err)
+	// Match the full path, not just the program name: with several servers on one machine,
+	// each Warden must see (and stop) only its own.
+	want := filepath.Clean(exe)
+	snap, _, err := procSnapshot.Call(th32csSnapProcess, 0)
+	if snap == uintptr(syscall.InvalidHandle) {
+		return nil, fmt.Errorf("process list: %v", err)
 	}
-	rows, _ := csv.NewReader(strings.NewReader(string(out))).ReadAll()
+	defer syscall.CloseHandle(syscall.Handle(snap))
+	var e processEntry32
+	e.Size = uint32(unsafe.Sizeof(e))
 	var pids []int
-	for _, r := range rows {
-		if len(r) > 1 && strings.EqualFold(r[0], name) {
-			if pid, err := strconv.Atoi(r[1]); err == nil {
-				pids = append(pids, pid)
-			}
+	name := strings.ToLower(filepath.Base(want))
+	for r, _, _ := procFirst.Call(snap, uintptr(unsafe.Pointer(&e))); r != 0; r, _, _ = procNext.Call(snap, uintptr(unsafe.Pointer(&e))) {
+		if strings.ToLower(syscall.UTF16ToString(e.ExeFile[:])) != name {
+			continue
+		}
+		if p := imagePath(e.ProcessID); p != "" && strings.EqualFold(filepath.Clean(p), want) {
+			pids = append(pids, int(e.ProcessID))
 		}
 	}
 	return pids, nil
+}
+
+const th32csSnapProcess = 0x2
+
+type processEntry32 struct {
+	Size            uint32
+	Usage           uint32
+	ProcessID       uint32
+	DefaultHeapID   uintptr
+	ModuleID        uint32
+	Threads         uint32
+	ParentProcessID uint32
+	PriClassBase    int32
+	Flags           uint32
+	ExeFile         [260]uint16
+}
+
+var (
+	procSnapshot = syscall.NewLazyDLL("kernel32.dll").NewProc("CreateToolhelp32Snapshot")
+	procFirst    = syscall.NewLazyDLL("kernel32.dll").NewProc("Process32FirstW")
+	procNext     = syscall.NewLazyDLL("kernel32.dll").NewProc("Process32NextW")
+	procImage    = syscall.NewLazyDLL("kernel32.dll").NewProc("QueryFullProcessImageNameW")
+)
+
+// imagePath is a process's full program path ("" if it can't be read).
+func imagePath(pid uint32) string {
+	const queryLimited = 0x1000
+	h, err := syscall.OpenProcess(queryLimited, false, pid)
+	if err != nil {
+		return ""
+	}
+	defer syscall.CloseHandle(h)
+	buf := make([]uint16, 1024)
+	n := uint32(len(buf))
+	if r, _, _ := procImage.Call(uintptr(h), 0, uintptr(unsafe.Pointer(&buf[0])), uintptr(unsafe.Pointer(&n))); r == 0 {
+		return ""
+	}
+	return syscall.UTF16ToString(buf[:n])
 }
 
 func kill(pid int) error {

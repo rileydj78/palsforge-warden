@@ -71,6 +71,12 @@ away again.
 the command that starts it, and (if your script stops when a file exists) that file. Warden then
 stops the server with warnings and starts it again with your command.
 
+**Several servers on one machine:** install one Warden per server with a name, e.g.
+`warden install -server C:\PalServer2 -name pvp`. Each gets its own data, ports, task and
+Start-menu entry, and a server switcher appears in every panel. They stay fully separate: one
+server's problems never touch another's. Pin each server to its own cores in Settings
+("CPU cores", e.g. `8-11`). `warden remote on -name pvp` shares that one on its own port.
+
 ## Install (Linux)
 
 Build or download `warden-linux-amd64`, then run `warden install -server /path/to/PalServer`:
