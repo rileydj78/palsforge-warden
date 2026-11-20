@@ -39,6 +39,7 @@ type Server struct {
 	Store   *store.Store
 	Auth    *auth.Auth
 	Version string
+	Control *Control
 	mu      sync.Mutex
 	last    *Status
 	lastAt  time.Time
@@ -344,6 +345,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		return s.Game.Shutdown(ctx, in.Seconds, in.Message)
 	}, none)
+	s.controlRoutes(mux)
 	return secure(mux)
 }
 

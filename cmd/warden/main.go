@@ -13,7 +13,9 @@ import (
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
+	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 	"github.com/rileydj78/palsforge-warden/internal/web"
@@ -71,6 +73,29 @@ func main() {
 		log.Printf("FIRST RUN: open the panel and create the owner account with this setup code: %s", au.SetupCode)
 	}
 	go monitor.Run(context.Background(), game, st2)
+
+	wcfg, found, err := config.Load(*dataDir, *serverDir)
+	if err != nil {
+		log.Fatalf("Warden's settings: %v", err)
+	}
+	if !found {
+		wcfg.Nightly.Enabled = false // nothing runs on its own until the admin has looked at the settings
+		if err := config.Save(*dataDir, wcfg); err == nil {
+			log.Printf("wrote default settings to %s; the nightly routine is OFF until you turn it on there", config.ConfigPath(*dataDir))
+		}
+	}
+	if err := wcfg.Check(); err != nil {
+		log.Printf("settings need attention (%s): %v; server control is off", config.ConfigPath(*dataDir), err)
+	} else {
+		h := host.New(wcfg, *dataDir)
+		h.OnEvent = func(e host.Event) { log.Printf("server: %s", e.Text); st2.AddEvent(e.At, e.Kind, e.Text) }
+		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2,
+			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
+		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
+		go h.Supervise(context.Background())
+		go runner.Schedule(context.Background())
+		log.Printf("server control: %s mode; nightly routine %s", wcfg.Control.Mode, map[bool]string{true: "at " + wcfg.Nightly.Time, false: "off"}[wcfg.Nightly.Enabled])
+	}
 	log.Printf("Warden %s: panel on http://%s/ (this machine only); data in %s", version, *listen, *dataDir)
 	log.Fatal(srv.Listen(*listen))
 }

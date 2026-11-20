@@ -4,6 +4,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,8 @@ var schema = []string{
 		action TEXT NOT NULL, target TEXT, detail TEXT, ok INTEGER NOT NULL)`,
 	`CREATE TABLE IF NOT EXISTS samples (
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
+	`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, kind TEXT, started INTEGER, ok INTEGER, report TEXT)`,
+	`CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts INTEGER, kind TEXT, text TEXT)`,
 	`CREATE TABLE IF NOT EXISTS players (
 		user_id TEXT PRIMARY KEY, name TEXT NOT NULL, platform TEXT, level INTEGER,
 		first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, seconds INTEGER NOT NULL DEFAULT 0,
@@ -169,6 +172,71 @@ func (s *Store) Roster() ([]SeenPlayer, error) {
 		var p SeenPlayer
 		rows.Scan(&p.UserID, &p.Name, &p.Platform, &p.Level, &p.FirstSeen, &p.LastSeen, &p.Seconds, &p.Banned, &p.Note)
 		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// Run is one nightly routine (or a manual run), with its JSON report.
+type Run struct {
+	ID      int64           `json:"id"`
+	Kind    string          `json:"kind"`
+	Started int64           `json:"started"`
+	OK      bool            `json:"ok"`
+	Report  json.RawMessage `json:"report"`
+}
+
+// AddRun stores a routine report.
+func (s *Store) AddRun(kind string, started time.Time, ok bool, report any) {
+	b, _ := json.Marshal(report)
+	s.DB.Exec(`INSERT INTO runs(kind, started, ok, report) VALUES(?,?,?,?)`, kind, started.Unix(), ok, string(b))
+	s.DB.Exec(`DELETE FROM runs WHERE id NOT IN (SELECT id FROM runs ORDER BY id DESC LIMIT 200)`)
+}
+
+// Runs returns the newest n runs.
+func (s *Store) Runs(n int) ([]Run, error) {
+	rows, err := s.DB.Query(`SELECT id, kind, started, ok, report FROM runs ORDER BY id DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Run{}
+	for rows.Next() {
+		var r Run
+		var rep string
+		if err := rows.Scan(&r.ID, &r.Kind, &r.Started, &r.OK, &rep); err == nil {
+			r.Report = json.RawMessage(rep)
+			out = append(out, r)
+		}
+	}
+	return out, rows.Err()
+}
+
+// Event is a server event: a crash, a restart, an update.
+type Event struct {
+	TS   int64  `json:"ts"`
+	Kind string `json:"kind"`
+	Text string `json:"text"`
+}
+
+// AddEvent records a server event (keeps the newest 1000).
+func (s *Store) AddEvent(ts time.Time, kind, text string) {
+	s.DB.Exec(`INSERT INTO events(ts, kind, text) VALUES(?,?,?)`, ts.Unix(), kind, text)
+	s.DB.Exec(`DELETE FROM events WHERE id NOT IN (SELECT id FROM events ORDER BY id DESC LIMIT 1000)`)
+}
+
+// Events returns the newest n events.
+func (s *Store) Events(n int) ([]Event, error) {
+	rows, err := s.DB.Query(`SELECT ts, kind, text FROM events ORDER BY id DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Event{}
+	for rows.Next() {
+		var e Event
+		if err := rows.Scan(&e.TS, &e.Kind, &e.Text); err == nil {
+			out = append(out, e)
+		}
 	}
 	return out, rows.Err()
 }
