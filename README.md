@@ -34,3 +34,9 @@ not affiliated with or endorsed by Pocketpair.
 ## Licence
 
 [MIT](LICENSE)
+
+## Signing and privacy
+
+Windows builds are being set up for free open-source code signing through SignPath Foundation;
+see [the code signing policy](docs/code-signing-policy.md). Warden sends nothing anywhere unless
+you configure it to (no telemetry, no update check).
