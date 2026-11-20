@@ -119,3 +119,10 @@ dl.tree dt { color: var(--muted); }
 dl.tree dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 13px; }
 dl.tree details { grid-column: 1 / -1; }
 dl.tree summary { cursor: pointer; font-weight: 600; padding: 2px 0; }
+ul.checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+ul.checks li { padding: 8px 12px 8px 34px; border-radius: 8px; position: relative; }
+ul.checks li::before { position: absolute; left: 12px; font-weight: 700; }
+ul.checks li.ok::before { content: "✓"; color: var(--accent); }
+ul.checks li.warn { background: var(--warn-bg); } ul.checks li.warn::before { content: "!"; color: var(--warn-ink); }
+ul.checks li.bad { background: #FBE3DF; color: #6B1A12; } ul.checks li.bad::before { content: "✗"; }
+@media (prefers-color-scheme: dark) { ul.checks li.bad { background: #3B1E1A; color: #F4A79C; } }

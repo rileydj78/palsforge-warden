@@ -93,3 +93,31 @@ func memOf(exe string) (int64, error) {
 	}
 	return total, nil
 }
+
+// openPorts lists the TCP ports listening on every network (not only this machine).
+func openPorts() map[int]bool {
+	cmd := exec.Command("netstat", "-ano", "-p", "TCP")
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
+	open := map[int]bool{}
+	if err != nil {
+		return open
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) >= 4 && strings.EqualFold(f[3], "LISTENING") {
+			addr := f[1]
+			i := strings.LastIndex(addr, ":")
+			if i < 0 {
+				continue
+			}
+			host, port := addr[:i], addr[i+1:]
+			if host == "0.0.0.0" || host == "[::]" {
+				if p, err := strconv.Atoi(port); err == nil {
+					open[p] = true
+				}
+			}
+		}
+	}
+	return open
+}

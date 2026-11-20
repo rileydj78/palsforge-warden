@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -69,4 +70,32 @@ func memOf(exe string) (int64, error) {
 		}
 	}
 	return total, nil
+}
+
+// openPorts lists the TCP ports listening on every network (not only this machine).
+func openPorts() map[int]bool {
+	open := map[int]bool{}
+	for _, f := range []string{"/proc/net/tcp", "/proc/net/tcp6"} {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		for _, line := range bytes.Split(b, []byte("\n"))[1:] {
+			fs := bytes.Fields(line)
+			if len(fs) < 4 || string(fs[3]) != "0A" { // 0A = LISTEN
+				continue
+			}
+			local := string(fs[1])
+			i := strings.LastIndexByte(local, ':')
+			if i < 0 {
+				continue
+			}
+			if strings.Trim(local[:i], "0") == "" { // 0.0.0.0 or ::
+				if p, err := strconv.ParseInt(local[i+1:], 16, 32); err == nil {
+					open[int(p)] = true
+				}
+			}
+		}
+	}
+	return open
 }

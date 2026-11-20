@@ -385,3 +385,6 @@ func (h *Host) Memory() int64 {
 	n, _ := memOf(h.cfg.Abs(h.cfg.Control.Exe))
 	return n
 }
+
+// OpenPorts lists TCP ports listening on all networks (for the exposure check).
+func OpenPorts() map[int]bool { return openPorts() }

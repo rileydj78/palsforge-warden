@@ -279,6 +279,11 @@ async function loadServer() {
     $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
     $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";
     $("srv-sub").textContent = s.offsite ? "" : "Backups are kept on this machine only. Add a second place (backups.offsite) so a dead disk can't take them.";
+    if (me.role !== "moderator") api("/api/setup-check").then((cs) => {
+      const ul = $("checks"); ul.replaceChildren();
+      cs.sort((a, b) => (a.ok - b.ok) || (b.warn - a.warn));
+      for (const c of cs) { const li = el("li", null, c.ok ? "ok" : c.warn ? "warn" : "bad"); li.append(el("strong", c.area), el("span", " " + c.detail)); ul.append(li); }
+    }).catch(() => {});
     try {
       const pd = await api("/api/paldefender");
       $("pd-card").hidden = !pd.installed && !pd.connected;
