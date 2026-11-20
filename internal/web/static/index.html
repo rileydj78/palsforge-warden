@@ -104,8 +104,29 @@
     <section id="view-player" class="view" hidden>
       <div class="herorow">
         <div class="hero"><h1 id="pd-name">Player</h1><p class="sub" id="pd-sub"></p></div>
-        <div class="actions admin-only"><button class="btn" id="pd-give-item">Give item…</button><button class="btn" id="pd-give-pal">Give Pal…</button></div>
+        <div class="actions admin-only"><button class="btn" id="pd-give-item">Give item…</button><button class="btn" id="pd-give-pal">Give Pal…</button><button class="btn" id="pd-give-egg">Give egg…</button><button class="btn" id="pd-give-tpl" hidden>Give Pal template…</button></div>
       </div>
+      <p class="note admin-only" id="pd-online">Giving and technology changes need the player online: PalDefender works through their live game.</p>
+      <div id="pd-progress"></div>
+      <form class="card form full admin-only" id="pd-grant">
+        <h2>Give experience, points and relics</h2>
+        <div class="grid3">
+          <div><label for="pg-exp">Experience (EXP)</label><input id="pg-exp" type="number" min="0" max="100000000" inputmode="numeric" placeholder="0"></div>
+          <div><label for="pg-tech">Technology points</label><input id="pg-tech" type="number" min="0" max="10000" inputmode="numeric" placeholder="0"></div>
+          <div><label for="pg-anc">Ancient technology points</label><input id="pg-anc" type="number" min="0" max="10000" inputmode="numeric" placeholder="0"></div>
+        </div>
+        <details><summary>Relics (statue upgrades)</summary><div class="grid3" id="pg-relics"></div></details>
+        <label for="pg-why">Why (goes in Activity)</label><input id="pg-why" placeholder="e.g. compensation for the rollback">
+        <div class="row start"><button class="btn primary" type="submit">Give</button></div>
+      </form>
+      <section class="card form full admin-only" id="pd-techs">
+        <h2>Technology</h2>
+        <p class="note" id="pt-sum">Loading…</p>
+        <label for="pt-ids">Technology IDs to learn or forget (comma or space separated, e.g. Technology_GrapplingGun)</label><input id="pt-ids" autocomplete="off">
+        <div class="row start"><button class="btn" type="button" id="pt-learn">Learn these</button><button class="btn" type="button" id="pt-forget">Forget these</button><button class="btn" type="button" id="pt-learn-all">Learn all</button><button class="btn danger" type="button" id="pt-forget-all">Forget all…</button></div>
+        <label for="pt-find">Find in unlocked</label><input id="pt-find" type="search" autocomplete="off">
+        <div class="tablewrap" tabindex="0" role="region" aria-label="Unlocked technologies"><table><thead><tr><th>Unlocked technology</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="pt-rows"></tbody></table></div>
+      </section>
       <div id="pd-detail"></div>
     </section>
 

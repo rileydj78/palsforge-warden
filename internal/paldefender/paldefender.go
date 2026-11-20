@@ -120,6 +120,9 @@ func (c *Client) do(ctx context.Context, method, path string, body, out any) err
 	}
 	if resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
+		if bytes.Contains(b, []byte("APalPlayerController")) {
+			return errors.New("that player has to be online: PalDefender works through their live game")
+		}
 		return fmt.Errorf("PalDefender answered %s: %s", resp.Status, bytes.TrimSpace(b))
 	}
 	if out != nil {

@@ -208,7 +208,7 @@ details.passed summary::before { content: "✓ "; color: var(--accent); font-wei
 .row.savebar .unsaved { margin-right: auto; color: var(--warn-ink); font-weight: 600; }
 
 /* Groups of fields inside a form stack like the form itself; text boxes look like inputs. */
-.form > div:not(.row):not(.chips) { display: flex; flex-direction: column; gap: 8px; }
+.form > div:not(.row):not(.chips):not(.grid3) { display: flex; flex-direction: column; gap: 8px; }
 .form textarea { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); resize: vertical; }
 @media (max-width: 760px) {
   .tablewrap td[data-label]::before { content: attr(data-label); display: block; font-family: var(--font); font-size: 11px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--soft); }
@@ -236,3 +236,10 @@ a.todo { font-weight: 500; }
 /* Menu groups. */
 .side .navhead { font-size: 11px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; color: var(--soft); padding: 14px 12px 4px; }
 @media (max-width: 760px) { .side .navhead { display: none; } }
+
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px 16px; }
+.grid3 > div { display: flex; flex-direction: column; gap: 6px; }
+.grid3 input { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 8px 0; }
+.stats div { display: flex; flex-direction: column; } .stats b { font-size: 20px; font-variant-numeric: tabular-nums; }
+button:disabled, .btn:disabled { opacity: .5; cursor: not-allowed; }

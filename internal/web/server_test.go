@@ -327,3 +327,21 @@ func TestDeleteBaseIsOwnerOnly(t *testing.T) {
 		}
 	}
 }
+
+func TestProgressAndTechsNeedAdmin(t *testing.T) {
+	st, _ := store.Open(t.TempDir())
+	au, _ := auth.New(st.DB)
+	s := &Server{Game: (&fakeGame{}).start(t), Store: st, Auth: au, Version: "test"}
+	for _, c := range []struct{ method, path string }{{"POST", "/api/action/progress"}, {"POST", "/api/players/techs"}, {"GET", "/api/players/techs?userId=steam_1"}, {"GET", "/api/paldefender/give-info"}} {
+		if code, _ := s.BotCall(t.Context(), auth.Moderator, "discord:x", c.method, c.path, map[string]any{"userId": "steam_1", "exp": 5}); code != 403 {
+			t.Fatalf("moderator %s %s: %d", c.method, c.path, code)
+		}
+	}
+	// An admin without PalDefender gets a plain answer, not a crash.
+	if code, _ := s.BotCall(t.Context(), auth.Admin, "discord:x", "POST", "/api/action/progress", map[string]any{"userId": "steam_1", "exp": 5}); code != 409 {
+		t.Fatalf("no PalDefender: %d", code)
+	}
+	if code, _ := s.BotCall(t.Context(), auth.Admin, "discord:x", "POST", "/api/action/progress", map[string]any{"userId": "steam_1", "exp": -5}); code != 400 {
+		t.Fatalf("negative amounts: %d", code)
+	}
+}

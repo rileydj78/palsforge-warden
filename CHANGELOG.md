@@ -23,6 +23,13 @@
   when the game created their save. Players who joined while Warden wasn't running are listed
   as "not seen by Warden" instead of missing. Warden's own records now carry the game's player
   ID, so the two always line up.
+- **Progression and technology** (admins, with PalDefender): give experience, technology
+  points, ancient technology points and any of the 13 relic types; see a player's unlocked
+  technologies, learn or forget specific ones or all (forgetting all asks to type FORGET); give
+  Pal eggs with a chosen Pal and level, and custom Pals from PalDefender's templates. The player
+  page shows level, EXP, unspent points, bosses and captures in plain words. Everything is in
+  Activity. Players must be online (PalDefender works through their live game): offline, the
+  page says so and the buttons are off.
 - Layout pass, graphs, the Inter font, side menu grouped Server / Players / Records / Admin.
 
 ## 1.0.0-rc.3 (2026-11-20)

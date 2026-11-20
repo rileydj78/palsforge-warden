@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1148,8 +1149,8 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("POST /api/action/give", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		var in struct {
-			UserID, Name, Kind, ID, Reason string
-			Count, Level                   int
+			UserID, Name, Kind, ID, Reason, Pal string
+			Count, Level                        int
 		}
 		if readJSON(r, &in) != nil || in.UserID == "" || len(in.UserID) > 100 || !idRe.MatchString(in.ID) {
 			fail(w, 400, "say which player and which item or Pal (its game ID, e.g. Money or Anubis)")
@@ -1177,8 +1178,23 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			}
 			what = fmt.Sprintf("%s level %d", in.ID, in.Level)
 			err = s.PalDef.GivePal(ctx, in.UserID, in.ID, in.Level)
+		case "egg": // an egg item (e.g. PalEgg_Fire_01) with a chosen Pal inside
+			if !idRe.MatchString(in.Pal) || in.Level < 1 || in.Level > 80 || in.Count < 1 || in.Count > 50 {
+				fail(w, 400, "an egg needs the Pal inside, a level 1 to 80 and a count 1 to 50")
+				return
+			}
+			what = fmt.Sprintf("%d × %s egg (%s level %d)", in.Count, in.ID, in.Pal, in.Level)
+			err = s.PalDef.GiveEgg(ctx, in.UserID, in.ID, in.Pal, in.Level, in.Count)
+		case "template": // a custom Pal from PalDefender's Pals/Templates folder
+			name := in.ID + ".json"
+			if s.Control == nil || !slices.Contains(paldefender.Templates(s.Control.Cfg.ServerDir), name) {
+				fail(w, 400, "that template isn't in PalDefender's Pals/Templates folder")
+				return
+			}
+			what = "Pal template " + name
+			err = s.PalDef.GiveTemplates(ctx, in.UserID, []string{name})
 		default:
-			fail(w, 400, "give an item or a Pal")
+			fail(w, 400, "give an item, a Pal, an egg or a Pal template")
 			return
 		}
 		s.Store.Audit(ses.User.Name, "give", cleanText(in.Name, 64)+" ("+cleanText(in.UserID, 100)+")", what+"; "+cleanText(in.Reason, 120), err == nil)
@@ -1187,6 +1203,131 @@ func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"ok": true, "gave": what})
+	}))
+}
+
+// What can be given, for the panel's forms.
+func (s *Server) giveInfoRoutes(mux *http.ServeMux) {
+	need := func(w http.ResponseWriter) bool {
+		if s.PalDef == nil {
+			fail(w, 409, "this needs PalDefender connected (Server page)")
+			return false
+		}
+		return true
+	}
+	mux.HandleFunc("GET /api/paldefender/give-info", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		var t []string
+		if s.Control != nil {
+			for _, n := range paldefender.Templates(s.Control.Cfg.ServerDir) {
+				t = append(t, strings.TrimSuffix(n, ".json"))
+			}
+		}
+		writeJSON(w, 200, map[string]any{"relics": paldefender.RelicTypes, "templates": t})
+	}))
+	// Experience, technology points, ancient technology points and relics.
+	mux.HandleFunc("POST /api/action/progress", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			UserID, Name, Reason string
+			EXP, Tech, Ancient   int
+			Relics               map[string]int
+		}
+		if readJSON(r, &in) != nil || in.UserID == "" || len(in.UserID) > 100 {
+			fail(w, 400, "which player?")
+			return
+		}
+		if in.EXP < 0 || in.EXP > 100_000_000 || in.Tech < 0 || in.Tech > 10_000 || in.Ancient < 0 || in.Ancient > 10_000 || len(in.Relics) > len(paldefender.RelicTypes) {
+			fail(w, 400, "experience up to 100,000,000; technology points up to 10,000 each")
+			return
+		}
+		p := paldefender.Progression{EXP: in.EXP, TechnologyPoints: in.Tech, AncientTechnologyPoints: in.Ancient}
+		var parts []string
+		for k, v := range in.Relics {
+			if v == 0 {
+				continue
+			}
+			if v < 0 || v > 1000 || !slices.Contains(paldefender.RelicTypes, k) {
+				fail(w, 400, "relics: a known type and 1 to 1000 each")
+				return
+			}
+			if p.Relics == nil {
+				p.Relics = map[string]int{}
+			}
+			p.Relics[k] = v
+			parts = append(parts, fmt.Sprintf("%d %s", v, k))
+		}
+		if p.Empty() {
+			fail(w, 400, "nothing to give")
+			return
+		}
+		if !need(w) {
+			return
+		}
+		if p.EXP > 0 {
+			parts = append(parts, fmt.Sprintf("%d EXP", p.EXP))
+		}
+		if p.TechnologyPoints > 0 {
+			parts = append(parts, fmt.Sprintf("%d technology points", p.TechnologyPoints))
+		}
+		if p.AncientTechnologyPoints > 0 {
+			parts = append(parts, fmt.Sprintf("%d ancient technology points", p.AncientTechnologyPoints))
+		}
+		sort.Strings(parts)
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		res, err := s.PalDef.GiveProgression(ctx, in.UserID, p)
+		what := strings.Join(parts, ", ")
+		s.Store.Audit(ses.User.Name, "give", cleanText(in.Name, 64)+" ("+cleanText(in.UserID, 100)+")", what+"; "+cleanText(in.Reason, 120), err == nil)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "gave": what, "result": res})
+	}))
+	// Technologies: what a player has unlocked, and learning or forgetting them.
+	mux.HandleFunc("GET /api/players/techs", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		id := r.URL.Query().Get("userId")
+		if id == "" || len(id) > 100 || !need(w) {
+			if id == "" || len(id) > 100 {
+				fail(w, 400, "which player?")
+			}
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		un, locked, total, err := s.PalDef.Techs(ctx, id)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"unlocked": un, "locked": locked, "total": total})
+	}))
+	mux.HandleFunc("POST /api/players/techs", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			UserID, Name, Reason string
+			Learn, All           bool
+			IDs                  []string
+		}
+		if readJSON(r, &in) != nil || in.UserID == "" || len(in.UserID) > 100 {
+			fail(w, 400, "which player?")
+			return
+		}
+		if !need(w) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		res, err := s.PalDef.SetTechs(ctx, in.UserID, in.Learn, in.All, in.IDs)
+		verb := map[bool]string{true: "learn technology", false: "forget technology"}[in.Learn]
+		what := strings.Join(in.IDs, ", ")
+		if in.All {
+			what = "all"
+		}
+		s.Store.Audit(ses.User.Name, verb, cleanText(in.Name, 64)+" ("+cleanText(in.UserID, 100)+")", cleanText(what, 300)+"; "+cleanText(in.Reason, 120), err == nil)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "result": res})
 	}))
 }
 

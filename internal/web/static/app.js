@@ -597,16 +597,115 @@ function tree(v, depth = 0) {
 let detailFor = null;
 async function loadPlayer(id) {
   detailFor = roster.find((p) => p.userId === id) || { userId: id, name: id };
+  loadGiveInfo();
   $("pd-name").textContent = detailFor.name; $("pd-sub").textContent = "Loading from PalDefender…";
   const box = $("pd-detail"); box.replaceChildren();
   try {
     const d = await api(`/api/players/detail?userId=${encodeURIComponent(id)}`);
     $("pd-sub").textContent = (d.errors || []).length ? `Some parts couldn't be read: ${d.errors.join("; ")}` : "Inventory, Pals and progression, as PalDefender reports them.";
-    for (const [title, part] of [["Inventory", d.inventory], ["Pals", d.pals], ["Progression", d.progression]]) {
+    showProgress(d.progression);
+    for (const [title, part] of [["Inventory", d.inventory], ["Pals", d.pals]]) {
       const c = el("section", null, "card"); c.append(el("h2", title), part ? tree(part) : el("p", "Not available.", "note")); box.append(c);
     }
   } catch (e) { $("pd-sub").textContent = e.message; }
+  if (me.role !== "moderator") loadTechs();
+  // PalDefender acts through the player's live game: offline, everything here would fail.
+  let online = false;
+  try { online = ((await api("/api/status")).players || []).some((p) => p.userId === id); } catch (e) {}
+  for (const b of document.querySelectorAll("#view-player .actions button, #pd-grant button, #pd-techs button")) b.disabled = !online;
+  $("pd-online").textContent = online ? `${detailFor.name} is online: gifts and technology changes reach them at once.` : `${detailFor.name} is offline. Giving and technology changes work while they're in the game (PalDefender works through their live game).`;
 }
+// Progression in plain words, with everything else PalDefender reports below it.
+function showProgress(raw) {
+  const box = $("pd-progress"); box.replaceChildren();
+  const c = el("section", null, "card"); c.append(el("h2", "Progression"));
+  const pr = raw && (raw.Progression || raw);
+  if (!pr || !pr.Player) { c.append(el("p", "Not available (the player may be offline).", "note")); box.append(c); return; }
+  const cur = pr.Currencies || {}, bos = pr.Bosses || {}, cap = pr.Captures || {};
+  const stats = el("div", null, "stats");
+  const stat = (label, v) => { const d = el("div"); d.append(el("span", label, "note"), el("b", v == null ? "–" : Number(v).toLocaleString())); stats.append(d); };
+  stat("Level", pr.Player.level); stat("Experience", pr.Player.exp); stat("Unspent stat points", pr.Player.unusedStatusPoints);
+  stat("Technology points", cur.technologyPoints); stat("Ancient technology points", cur.ancientTechnologyPoints);
+  stat("Bosses beaten", bos.totalBossDefeatCount); stat("Pals caught", cap.tribeCaptureCount);
+  c.append(stats);
+  const rel = Object.entries(cur.relics || {}).filter(([, v]) => v);
+  if (rel.length) c.append(el("p", "Relics: " + rel.map(([k, v]) => `${k} ${v}`).join(", "), "note"));
+  const more = el("details"); more.append(el("summary", "Everything else PalDefender reports (bosses, captures, activities)"), tree(pr)); c.append(more);
+  box.append(c);
+}
+let techs = [];
+async function loadTechs() {
+  if (!detailFor) return;
+  $("pt-sum").textContent = "Loading…"; $("pt-rows").replaceChildren();
+  try {
+    const t = await api(`/api/players/techs?userId=${encodeURIComponent(detailFor.userId)}`);
+    techs = t.unlocked || [];
+    $("pt-sum").textContent = `${techs.length} unlocked${t.total ? ` of ${t.total}` : ""}. Technology IDs are listed at paldeck.cc/technology.`;
+    drawTechs();
+  } catch (e) { techs = []; $("pt-sum").textContent = e.message.charAt(0).toUpperCase() + e.message.slice(1) + "."; }
+}
+function drawTechs() {
+  const q = $("pt-find").value.trim().toLowerCase(), rows = $("pt-rows"); rows.replaceChildren();
+  for (const id of techs.filter((x) => !q || x.toLowerCase().includes(q)).slice(0, 300)) {
+    const tr = el("tr"), acts = el("td", null, "acts"), b = el("button", "Forget", "small"); b.type = "button";
+    b.setAttribute("aria-label", `Forget ${id}`); b.onclick = () => setTechs(false, false, [id]);
+    acts.append(b); tr.append(el("td", id, "mono"), acts); rows.append(tr);
+  }
+}
+async function setTechs(learn, all, ids) {
+  if (!detailFor) return;
+  try {
+    const r = await api("/api/players/techs", { userId: detailFor.userId, name: detailFor.name, learn, all, ids, reason: $("pg-why").value.trim() });
+    const res = r.result || {};
+    const n = learn ? (res.UnlockedCount ?? (res.Unlocked || []).length) : (res.ForgottenCount ?? 0);
+    toast(`${learn ? "Learned" : "Forgot"} ${n} technolog${n === 1 ? "y" : "ies"}${(res.Skipped || []).length ? `; ${res.Skipped.length} skipped` : ""}.`);
+    loadTechs();
+  } catch (e) { toast(e.message); }
+}
+const techIDs = () => $("pt-ids").value.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+$("pt-find").addEventListener("input", drawTechs);
+$("pt-learn").addEventListener("click", () => { const ids = techIDs(); if (ids.length) setTechs(true, false, ids); else toast("Type one or more technology IDs first."); });
+$("pt-forget").addEventListener("click", () => { const ids = techIDs(); if (ids.length) setTechs(false, false, ids); else toast("Type one or more technology IDs first."); });
+$("pt-learn-all").addEventListener("click", async () => { if (await ask({ title: `Unlock every technology for ${detailFor.name}?`, text: "Every recipe becomes available to them at once.", ok: "Learn all" }) != null) setTechs(true, true, []); });
+$("pt-forget-all").addEventListener("click", async () => { if (await ask({ title: `Forget every technology for ${detailFor.name}?`, text: "All their unlocked recipes are removed. Points they spent aren't given back.", label: "Type FORGET to confirm", confirmWord: "FORGET", ok: "Forget all" }) != null) setTechs(false, true, []); });
+let giveInfo = null;
+async function loadGiveInfo() {
+  if (giveInfo || me.role === "moderator") return;
+  try {
+    giveInfo = await api("/api/paldefender/give-info");
+    const box = $("pg-relics"); box.replaceChildren();
+    for (const r of giveInfo.relics || []) { const d = el("div"); const i = el("input"); i.type = "number"; i.min = "0"; i.max = "1000"; i.id = `pg-r-${r}`; i.dataset.relic = r; i.placeholder = "0"; const l = el("label", r.replace(/([a-z])([A-Z])/g, "$1 $2")); l.htmlFor = i.id; d.append(l, i); box.append(d); }
+    $("pd-give-tpl").hidden = !(giveInfo.templates || []).length;
+  } catch (e) {}
+}
+$("pd-grant").addEventListener("submit", async (e) => {
+  e.preventDefault(); if (!detailFor) return;
+  const num = (id) => parseInt($(id).value, 10) || 0;
+  const relics = {}; for (const i of document.querySelectorAll("#pg-relics input")) { const v = parseInt(i.value, 10) || 0; if (v > 0) relics[i.dataset.relic] = v; }
+  const body = { userId: detailFor.userId, name: detailFor.name, exp: num("pg-exp"), tech: num("pg-tech"), ancient: num("pg-anc"), relics, reason: $("pg-why").value.trim() };
+  if (!body.exp && !body.tech && !body.ancient && !Object.keys(relics).length) { toast("Fill in at least one amount."); return; }
+  try {
+    const r = await api("/api/action/progress", body); toast(`Gave ${r.gave}.`);
+    for (const i of document.querySelectorAll("#pd-grant input[type=number]")) i.value = "";
+    loadPlayer(detailFor.userId);
+  } catch (err) { toast(err.message); }
+});
+async function giveEgg() {
+  if (!detailFor) return;
+  const what = await ask({ title: `Give ${detailFor.name} an egg`, text: "Egg item, the Pal inside, its level and how many, e.g. PalEgg_Fire_01 Foxparks 12 1. Egg item IDs are listed at paldeck.cc.", label: "Egg, Pal, level, count", ok: "Give", required: true });
+  if (!what) return;
+  const [id, pal, lv, n] = what.trim().split(/\s+/);
+  try { const r = await api("/api/action/give", { userId: detailFor.userId, name: detailFor.name, kind: "egg", id, pal, level: parseInt(lv || "1", 10), count: parseInt(n || "1", 10), reason: $("pg-why").value.trim() }); toast(`Gave ${r.gave}.`); } catch (e) { toast(e.message); }
+}
+async function giveTemplate() {
+  if (!detailFor || !giveInfo) return;
+  const list = giveInfo.templates || [];
+  const v = await ask({ title: `Give ${detailFor.name} a Pal template`, text: `Templates on this server: ${list.join(", ")}`, label: "Template name", value: list[0] || "", ok: "Give", required: true });
+  if (!v) return;
+  try { const r = await api("/api/action/give", { userId: detailFor.userId, name: detailFor.name, kind: "template", id: v.trim().replace(/\.json$/i, ""), reason: $("pg-why").value.trim() }); toast(`Gave ${r.gave}.`); } catch (e) { toast(e.message); }
+}
+$("pd-give-egg").addEventListener("click", giveEgg);
+$("pd-give-tpl").addEventListener("click", giveTemplate);
 async function give(kind) {
   if (!detailFor) return;
   const what = await ask({ title: kind === "item" ? `Give ${detailFor.name} an item` : `Give ${detailFor.name} a Pal`, text: kind === "item" ? "Type the item's game ID and how many, e.g. Money 5000 or PalSphere_Legend 10." : "Type the Pal's game ID and level, e.g. Anubis 30.", label: kind === "item" ? "Item and count" : "Pal and level", ok: "Give", required: true });
