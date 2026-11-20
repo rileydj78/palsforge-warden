@@ -197,3 +197,27 @@ func TestAllowListNeedsAdmin(t *testing.T) {
 		t.Fatalf("a moderator may see it, got %d", code)
 	}
 }
+
+func TestPublicPageShowsOnlyStatus(t *testing.T) {
+	st, _ := store.Open(t.TempDir())
+	au, _ := auth.New(st.DB)
+	fg := &fakeGame{}
+	s := &Server{Game: fg.start(t), Store: st, Auth: au, Version: "test", Public: &Public{Invite: "https://discord.gg/x"}}
+	ts := httptest.NewServer(s.PublicHandler())
+	t.Cleanup(ts.Close)
+	resp, _ := http.Get(ts.URL + "/")
+	b := new(bytes.Buffer)
+	b.ReadFrom(resp.Body)
+	page := b.String()
+	if !strings.Contains(page, "Test") || !strings.Contains(page, "Online") || strings.Contains(page, "Moss") || strings.Contains(page, "10.0.0.9") || strings.Contains(page, "steam_1") {
+		t.Fatalf("name and state only; no names unless asked, never IPs or IDs: %s", page)
+	}
+	for _, p := range []string{"/api/me", "/api/status", "/api/users", "/index.html"} {
+		if r, _ := http.Get(ts.URL + p); r.StatusCode != 404 {
+			t.Fatalf("%s must not exist on the public port (%d)", p, r.StatusCode)
+		}
+	}
+	if r, _ := http.Post(ts.URL+"/", "text/plain", nil); r.StatusCode == 200 {
+		t.Fatal("the public port is read-only")
+	}
+}

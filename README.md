@@ -28,9 +28,22 @@ internet, and Palworld's admin password never leaves the server.
 - **Runs the server for you, or works alongside what you have:** Warden can start the server
   itself and restart it after a crash, or work with an existing service, scheduled task or
   watchdog script.
+- **Community and moderation:** server messages and a private welcome, weekly events (double XP
+  weekends switch on and off by themselves), an allow-list, one list of every ban (game and
+  PalDefender), player notes; with PalDefender: inventories, Pals, guilds, bases on the map, and
+  giving items or Pals. Discord or ntfy alerts, and a live status message in Discord.
+- **Keeps a stuck server going:** restarts a frozen server, optionally restarts when memory grows
+  too large (with warnings), keeps the last backup before a crash, and stops after 3 automatic
+  restarts in 6 hours so a broken server isn't restarted forever.
+- **Game settings in plain words**, with presets, import/export, and changes written only while
+  the server is stopped (Palworld rewrites its settings when it shuts down).
+- **A public status page** (optional): name, online, player count, on its own read-only port;
+  `warden remote public on` publishes only that page through Tailscale Funnel.
+- **New server from nothing:** `warden install-server C:\PalServer` (or type NEW in setup) gets
+  SteamCMD and the server and writes first settings Warden can use.
 - **No sign-in on the server, accounts for remote admins:** at the machine you're the owner; for
-  others you create moderator, admin or owner accounts that sign in over Tailscale. Every action
-  is in the audit log.
+  others you create moderator, admin or owner accounts that sign in over Tailscale, with optional
+  two-step sign-in (authenticator app). Every action is in the audit log.
 
 ## Install (Windows)
 

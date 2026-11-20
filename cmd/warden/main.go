@@ -40,6 +40,7 @@ func main() {
 	}
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")
 	listen := flag.String("listen", "127.0.0.1:8282", "the local panel: this machine only, no sign-in")
+	publicListen := flag.String("public-listen", "127.0.0.1:8284", "the read-only status page's port, when it's on in Settings (warden remote public on publishes it)")
 	adminListen := flag.String("admin-listen", "127.0.0.1:8283", "the administration port for remote admins (sign-in required); warden remote on publishes it")
 	dataDir := flag.String("data", store.DefaultDir(), "where Warden keeps its own data")
 	check := flag.Bool("check", false, "check the setup, print what works, and exit")
@@ -193,11 +194,15 @@ func main() {
 		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn, gate, game.Kick)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
+		if wcfg.StatusPage.On {
+			srv.Public = &web.Public{ShowNames: wcfg.StatusPage.ShowNames, Invite: wcfg.StatusPage.Invite}
+			log.Printf("status page on http://%s/ (read-only)", *publicListen)
+		}
 		go h.Supervise(context.Background())
 		go runner.Schedule(context.Background())
 		log.Printf("server control: %s mode; nightly routine %s", wcfg.Control.Mode, map[bool]string{true: "at " + wcfg.Nightly.Time, false: "off"}[wcfg.Nightly.Enabled])
 	}
 	srv.Settings = &web.Settings{DataDir: *dataDir, Restart: restartSelf}
 	log.Printf("Warden %s: panel on http://%s/ (this machine only, no sign-in); administration port %s (sign-in); data in %s", version, *listen, *adminListen, *dataDir)
-	log.Fatal(srv.Listen(*listen, *adminListen))
+	log.Fatal(srv.Listen(*listen, *adminListen, *publicListen))
 }

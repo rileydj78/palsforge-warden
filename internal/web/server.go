@@ -44,6 +44,7 @@ type Server struct {
 	Control  *Control
 	Settings *Settings
 	PalDef   *paldefender.Client // nil unless PalDefender is connected
+	Public   *Public             // the read-only status page; nil when it's off
 	mu       sync.Mutex
 	local    *auth.Session // the local port's session: the owner, at the server
 	last     *Status
@@ -582,8 +583,18 @@ func listen(addr string) (net.Listener, error) {
 
 // Listen serves the panel on two loopback ports: local (this machine, no sign-in, full owner
 // control) and admin (what tailscale serve publishes; every request needs a signed-in account).
-func (s *Server) Listen(localAddr, adminAddr string) error {
+func (s *Server) Listen(localAddr, adminAddr, publicAddr string) error {
 	h := s.Handler()
+	errs := make(chan error, 3)
+	if publicAddr != "" && s.Public != nil {
+		pln, err := listen(publicAddr)
+		if err != nil {
+			return err
+		}
+		go func() {
+			errs <- (&http.Server{Handler: s.PublicHandler(), ReadHeaderTimeout: 10 * time.Second, WriteTimeout: 30 * time.Second}).Serve(pln)
+		}()
+	}
 	lln, err := listen(localAddr)
 	if err != nil {
 		return err
@@ -592,7 +603,6 @@ func (s *Server) Listen(localAddr, adminAddr string) error {
 	if err != nil {
 		return err
 	}
-	errs := make(chan error, 2)
 	go func() {
 		errs <- (&http.Server{Handler: localOnly(h), ReadHeaderTimeout: 10 * time.Second}).Serve(lln)
 	}()

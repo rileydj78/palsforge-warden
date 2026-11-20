@@ -33,8 +33,17 @@ type Warden struct {
 	Health    Health             `json:"health"`
 	// Allow-list: when on, players who aren't on Warden's list are kicked as they join.
 	AllowList AllowList `json:"allowList"`
+	// A read-only status page on its own port (127.0.0.1:8284), for warden remote public on.
+	StatusPage StatusPage `json:"statusPage"`
 	// Weekly events, one per line: "Name | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5".
 	Events string `json:"events"`
+}
+
+// StatusPage is the public, read-only page.
+type StatusPage struct {
+	On        bool   `json:"on"`
+	ShowNames bool   `json:"showNames"` // list who's online (names only)
+	Invite    string `json:"invite"`    // a link shown on the page, e.g. a Discord invite
 }
 
 // AllowList is the join gate.
@@ -122,6 +131,9 @@ var (
 // Check reports what's wrong with a configuration, in words an admin can act on.
 func (w *Warden) Check() error {
 	var bad []string
+	if v := w.StatusPage.Invite; v != "" && !strings.HasPrefix(v, "https://") {
+		bad = append(bad, "the status page's link must start with https://")
+	}
 	if w.ServerDir == "" {
 		bad = append(bad, "the server folder isn't set")
 	} else if _, err := os.Stat(w.ServerDir); err != nil {

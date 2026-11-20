@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,8 @@ import (
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/config"
+	setup "github.com/rileydj78/palsforge-warden/internal/install"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 )
 
@@ -33,6 +36,8 @@ func subcommand(args []string) bool {
 		err = openPanel(listenFrom(args[1:]))
 	case "remote":
 		err = remote(args[1:])
+	case "install-server":
+		_, err = installServer(args[1:])
 	case "adduser":
 		err = addUserCmd(args[1:])
 	case "help", "-h", "--help":
@@ -53,7 +58,9 @@ const usage = `Palsforge Warden: an admin panel for a Palworld dedicated server.
   warden install -server <folder>    start Warden with Windows (a background task)
   warden uninstall                   stop starting it with Windows
   warden open                        open the panel in its own window
+  warden install-server <folder>     download SteamCMD and the Palworld server, with first settings Warden can use
   warden adduser <name> <role>       make a remote admin account (moderator, admin or owner); reads the password from input
+  warden remote public on|off        put the read-only status page on the internet (Tailscale Funnel)
   warden remote on|off               let remote admins sign in over your Tailscale network (never the internet)
 
 Options: -data <folder> (Warden's own data), -listen 127.0.0.1:<port> (local, no sign-in),
@@ -177,8 +184,12 @@ func openPanel(listen string) error {
 // remote publishes the panel to the admin's own tailnet with "tailscale serve" (HTTPS, tailnet
 // only), or stops publishing it.
 func remote(args []string) error {
+	public := len(args) > 0 && args[0] == "public"
+	if public {
+		args = args[1:]
+	}
 	if len(args) == 0 || (args[0] != "on" && args[0] != "off") {
-		return errors.New("use: warden remote on   or   warden remote off")
+		return errors.New("use: warden remote on|off   or   warden remote public on|off")
 	}
 	ts := "tailscale"
 	if runtime.GOOS == "windows" {
@@ -188,6 +199,30 @@ func remote(args []string) error {
 	}
 	if _, err := exec.LookPath(ts); err != nil && !fileExists(ts) {
 		return errors.New("Tailscale isn't installed: install it from tailscale.com and sign in, then run this again")
+	}
+	if public {
+		var cmd *exec.Cmd
+		if args[0] == "on" {
+			pub := flagValue(args[1:], "public-listen")
+			if pub == "" {
+				pub = "127.0.0.1:8284"
+			}
+			// Funnel publishes to the internet: only the status-page port, which has no other routes.
+			cmd = exec.Command(ts, "funnel", "--bg", "--https=443", "http://"+pub)
+		} else {
+			cmd = exec.Command(ts, "funnel", "--https=443", "off")
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("tailscale funnel failed (Funnel must be allowed for this machine in Tailscale's admin console): %s", strings.TrimSpace(string(out)))
+		}
+		if args[0] == "on" {
+			fmt.Println("The status page is now public (read-only: name, online, player count). Turn it on in Warden's Settings too.")
+			fmt.Println(strings.TrimSpace(string(out)))
+		} else {
+			fmt.Println("The status page is no longer public.")
+		}
+		return nil
 	}
 	var cmd *exec.Cmd
 	if args[0] == "on" {
@@ -305,9 +340,18 @@ func firstRun() {
 		}
 	}
 	for server == "" {
-		fmt.Print("\nWhere is your Palworld server folder (the one with PalServer.exe)? ")
+		fmt.Print("\nWhere is your Palworld server folder (the one with PalServer.exe)?\n(No server yet? Type NEW and Warden downloads one into C:\\PalServer.) ")
 		a, _ := in.ReadString('\n')
 		a = strings.Trim(strings.TrimSpace(a), `"`)
+		if strings.EqualFold(a, "new") {
+			dir, err := installServer([]string{`C:\PalServer`})
+			if err != nil {
+				fmt.Println("That didn't work:", err)
+				continue
+			}
+			server = dir
+			continue
+		}
 		if fileExists(filepath.Join(a, "Pal")) {
 			server = a
 		} else if a != "" {
@@ -372,4 +416,64 @@ func addUserCmd(args []string) error {
 	st.Audit("command line", "add admin", pos[0], pos[1], true)
 	fmt.Fprintf(os.Stderr, "Made %s (%s). They can sign in now.\n", pos[0], pos[1])
 	return nil
+}
+
+// installServer sets up a Palworld server from nothing and tells Warden where SteamCMD is.
+func installServer(args []string) (string, error) {
+	var dir string
+	for i := 0; i < len(args); i++ {
+		if strings.HasPrefix(args[i], "-") {
+			i++
+			continue
+		}
+		dir = args[i]
+	}
+	if dir == "" {
+		return "", errors.New("use: warden install-server <folder> [-name \"My server\"]")
+	}
+	dir, _ = filepath.Abs(dir)
+	if fileExists(filepath.Join(dir, "Pal")) {
+		fmt.Println("There's already a server in", dir, "- Warden will update it instead of starting over.")
+	}
+	steamDir := filepath.Join(filepath.Dir(dir), "steamcmd")
+	fmt.Println("Getting SteamCMD (Valve's downloader) into", steamDir, "...")
+	ctx := context.Background()
+	steam, err := setup.SteamCMD(ctx, steamDir)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("Downloading the Palworld dedicated server into", dir, "(about 6 GB; SteamCMD first updates itself) ...")
+	last := time.Time{}
+	err = setup.Server(ctx, steam, dir, func(line string) {
+		if strings.Contains(line, "progress:") && time.Since(last) < 5*time.Second {
+			return // one progress line every few seconds is plenty
+		}
+		last = time.Now()
+		fmt.Println("  ", line)
+	})
+	if err != nil {
+		return "", err
+	}
+	name := flagValue(args, "name")
+	if name == "" {
+		name = "My Palworld server"
+	}
+	ini, err := setup.StarterSettings(dir, name)
+	if err != nil {
+		return "", err
+	}
+	fmt.Println("Settings written to", ini, "(REST API on, a random admin password Warden reads itself).")
+	data := flagValue(args, "data")
+	if data == "" {
+		data = store.DefaultDir()
+	}
+	if w, found, err := config.Load(data, dir); err == nil && !found {
+		w.ServerDir = dir
+		w.Update.SteamCMD = steam
+		os.MkdirAll(data, 0o700)
+		config.Save(data, w)
+	}
+	fmt.Println("\nThe server is installed. Keep the game's ports open for players (UDP 8211, and 27015 for the")
+	fmt.Println("server list) and keep TCP 8212 (the REST API) closed to the internet.")
+	return dir, nil
 }

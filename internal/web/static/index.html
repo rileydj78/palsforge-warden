@@ -222,6 +222,11 @@
         <h2>Allow-list</h2>
         <label class="check"><input type="checkbox" id="s-a-on"> Only players on the allow-list may join (others are kicked as they arrive)</label>
         <label for="s-a-msg">Message for people who aren't on it</label><input id="s-a-msg" placeholder="This server is invite-only right now.">
+        <h2>Public status page</h2>
+        <label class="check"><input type="checkbox" id="s-p-on"> A read-only status page (server name, online, player count) on its own port, 127.0.0.1:8284</label>
+        <label class="check"><input type="checkbox" id="s-p-names"> Also list who's online (names only)</label>
+        <label for="s-p-inv">Link on the page (optional, e.g. your Discord invite)</label><input id="s-p-inv" placeholder="https://discord.gg/..." autocomplete="off">
+        <p class="note">It stays on this machine until you run <code>warden remote public on</code>, which publishes only this page to the internet through Tailscale Funnel.</p>
         <h2>Server messages</h2>
         <label class="check"><input type="checkbox" id="s-m-on"> Send messages in the game</label>
         <label for="s-m-list">Messages, one per line, sent in turn while anyone is online (your Discord, website, rules, events)</label><textarea id="s-m-list" rows="4"></textarea>
