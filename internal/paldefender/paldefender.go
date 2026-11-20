@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -181,29 +182,98 @@ func (c *Client) Ban(ctx context.Context, userID, reason string, ip bool) error 
 // BanEntry is one PalDefender ban, shown as found (its fields vary by version).
 type BanEntry map[string]any
 
-// Banlist reads PalDefender's ban list: from its API when connected, else from Banlist.json.
-func Banlist(ctx context.Context, c *Client, serverDir string) (users, ips []BanEntry, err error) {
+// Banlist reads PalDefender's ban list from Banlist.json, where PalDefender keeps it (its API
+// answers in another shape, filtered for searches).
+func Banlist(_ context.Context, _ *Client, serverDir string) (users, ips []BanEntry, err error) {
 	var raw struct {
 		UserEntries []BanEntry `json:"UserEntries"`
 		IPEntries   []BanEntry `json:"IPEntries"`
 	}
-	if c != nil {
-		if err = c.do(ctx, http.MethodGet, "banlist", nil, &raw); err == nil {
-			return raw.UserEntries, raw.IPEntries, nil
-		}
-	}
-	b, ferr := os.ReadFile(filepath.Join(Dir(serverDir), "Banlist.json"))
-	if ferr != nil {
-		if err == nil {
-			err = ferr
-		}
+	b, err := os.ReadFile(filepath.Join(Dir(serverDir), "Banlist.json"))
+	if err != nil {
 		return nil, nil, err
 	}
 	b = bytes.TrimPrefix(b, []byte("\xef\xbb\xbf"))
-	if jerr := json.Unmarshal(b, &raw); jerr != nil {
-		return nil, nil, jerr
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return nil, nil, err
 	}
 	return raw.UserEntries, raw.IPEntries, nil
+}
+
+// Guild is a guild summary from PalDefender.
+type Guild struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Level int    `json:"Level"`
+	Admin struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"admin"`
+	CampCount int `json:"camp_count"`
+	Camps     []struct {
+		ID     string `json:"id"`
+		MapPos Loc    `json:"map_pos"`
+	} `json:"camps"`
+	MemberCount int             `json:"member_count"`
+	Members     json.RawMessage `json:"members"`
+}
+
+// Guilds lists every guild with its bases.
+func (c *Client) Guilds(ctx context.Context) ([]Guild, error) {
+	var out struct {
+		Guilds map[string]Guild `json:"Guilds"`
+	}
+	if err := c.do(ctx, http.MethodGet, "guilds", nil, &out); err != nil {
+		return nil, err
+	}
+	list := make([]Guild, 0, len(out.Guilds))
+	for id, g := range out.Guilds {
+		g.ID = id
+		list = append(list, g)
+	}
+	return list, nil
+}
+
+// PlayerDetail is what PalDefender knows about one player: inventory, Pals and progression,
+// passed on as PalDefender gives them.
+type PlayerDetail struct {
+	Inventory   json.RawMessage `json:"inventory,omitempty"`
+	Pals        json.RawMessage `json:"pals,omitempty"`
+	Progression json.RawMessage `json:"progression,omitempty"`
+	Errors      []string        `json:"errors,omitempty"`
+}
+
+// Detail fetches a player's inventory, Pals and progression.
+func (c *Client) Detail(ctx context.Context, userID string) PlayerDetail {
+	var d PlayerDetail
+	id := url.PathEscape(userID)
+	for _, part := range []struct {
+		path, key string
+		dst       *json.RawMessage
+	}{{"items/" + id, "Inventory", &d.Inventory}, {"pals/" + id, "Pals", &d.Pals}, {"progression/" + id, "Progression", &d.Progression}} {
+		var raw map[string]json.RawMessage
+		if err := c.do(ctx, http.MethodGet, part.path, nil, &raw); err != nil {
+			msg := err.Error()
+			if strings.Contains(msg, "APalPlayerController") || strings.Contains(msg, "PLAYER_NOT_FOUND") {
+				d.Errors = []string{"PalDefender can only read players who are online right now"}
+				return d
+			}
+			d.Errors = append(d.Errors, msg)
+			continue
+		}
+		*part.dst = raw[part.key]
+	}
+	return d
+}
+
+// GiveItems gives a player items (ItemID → count).
+func (c *Client) GiveItems(ctx context.Context, userID, itemID string, count int) error {
+	return c.do(ctx, http.MethodPost, "give/items/"+url.PathEscape(userID), map[string]any{"Items": []map[string]any{{"ItemID": itemID, "Count": count}}}, nil)
+}
+
+// GivePal gives a player a Pal at a level.
+func (c *Client) GivePal(ctx context.Context, userID, palID string, level int) error {
+	return c.do(ctx, http.MethodPost, "give/pals/"+url.PathEscape(userID), map[string]any{"Pals": []map[string]any{{"PalID": palID, "Level": level}}}, nil)
 }
 
 // Unban lifts a PalDefender user ban.

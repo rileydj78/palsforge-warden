@@ -24,6 +24,7 @@
     <a href="#/" data-view="dash">Dashboard</a>
     <a href="#/players" data-view="players">Players</a>
     <a href="#/map" data-view="map">Map</a>
+    <a href="#/guilds" data-view="guilds" id="guildsnav" hidden>Guilds</a>
     <a href="#/server" data-view="server" id="servernav" hidden>Server</a>
     <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
     <a href="#/game" data-view="game" id="gamenav" hidden>Game settings</a>
@@ -74,6 +75,22 @@
       <p class="sub">Positions in the game's own map coordinates, updated every 10 seconds.</p>
       <div class="card"><div class="map" id="map" role="img" aria-label="Players on the map"></div>
       <div class="tablewrap"><table><thead><tr><th>Player</th><th>Map position</th><th>Level</th></tr></thead><tbody id="maprows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-guilds" class="view" hidden>
+      <h1>Guilds</h1>
+      <p class="sub">From PalDefender: every guild, its leader, members and bases.</p>
+      <div class="card"><div class="tablewrap"><table>
+        <thead><tr><th>Guild</th><th>Level</th><th>Leader</th><th>Members</th><th>Bases (map position)</th></tr></thead>
+        <tbody id="guildrows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-player" class="view" hidden>
+      <div class="herorow">
+        <div class="hero"><h1 id="pd-name">Player</h1><p class="sub" id="pd-sub"></p></div>
+        <div class="actions admin-only"><button class="btn" id="pd-give-item">Give item…</button><button class="btn" id="pd-give-pal">Give Pal…</button></div>
+      </div>
+      <div id="pd-detail"></div>
     </section>
 
     <section id="view-players" class="view" hidden>

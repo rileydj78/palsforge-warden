@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -726,3 +727,85 @@ func (s *Server) banRoutes(mux *http.ServeMux) {
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 }
+
+// ---- PalDefender's view of guilds and players, and game-master actions (audited)
+
+func (s *Server) palDefDataRoutes(mux *http.ServeMux) {
+	need := func(w http.ResponseWriter) bool {
+		if s.PalDef == nil {
+			fail(w, 409, "this needs PalDefender connected (Server page)")
+			return false
+		}
+		return true
+	}
+	mux.HandleFunc("GET /api/guilds", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		if !need(w) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		gs, err := s.PalDef.Guilds(ctx)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, gs)
+	}))
+	mux.HandleFunc("GET /api/players/detail", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		if !need(w) {
+			return
+		}
+		id := r.URL.Query().Get("userId")
+		if id == "" || len(id) > 100 {
+			fail(w, 400, "which player?")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		writeJSON(w, 200, s.PalDef.Detail(ctx, id))
+	}))
+	mux.HandleFunc("POST /api/action/give", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			UserID, Name, Kind, ID, Reason string
+			Count, Level                   int
+		}
+		if readJSON(r, &in) != nil || in.UserID == "" || !idRe.MatchString(in.ID) {
+			fail(w, 400, "say which player and which item or Pal (its game ID, e.g. Money or Anubis)")
+			return
+		}
+		if !need(w) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		var err error
+		var what string
+		switch in.Kind {
+		case "item":
+			if in.Count < 1 || in.Count > 9999 {
+				fail(w, 400, "count must be 1 to 9999")
+				return
+			}
+			what = fmt.Sprintf("%d × %s", in.Count, in.ID)
+			err = s.PalDef.GiveItems(ctx, in.UserID, in.ID, in.Count)
+		case "pal":
+			if in.Level < 1 || in.Level > 80 {
+				fail(w, 400, "level must be 1 to 80")
+				return
+			}
+			what = fmt.Sprintf("%s level %d", in.ID, in.Level)
+			err = s.PalDef.GivePal(ctx, in.UserID, in.ID, in.Level)
+		default:
+			fail(w, 400, "give an item or a Pal")
+			return
+		}
+		s.Store.Audit(ses.User.Name, "give", in.Name+" ("+in.UserID+")", what+"; "+cleanText(in.Reason, 120), err == nil)
+		if err != nil {
+			fail(w, 502, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "gave": what})
+	}))
+}
+
+var idRe = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)

@@ -42,6 +42,8 @@ func TestClient(t *testing.T) {
 			w.Write([]byte(`{"Version":{"Major":1,"Version":"1.7.2","VersionLong":"1.7.2 (build 77)","Beta":false}}`))
 		case "/v1/pdapi/players":
 			w.Write([]byte(`{"Meta":{"PlayerCount":1,"OnlineCount":1},"Players":[{"Name":"Moss","IP":"10.0.0.9","PlayerUID":"A","UserId":"steam_1","GuildName":"Mossy Hollow","Status":"Online","MapLocation":{"x":-120.5,"y":344.2,"z":0}}]}`))
+		case "/v1/pdapi/guilds":
+			w.Write([]byte(`{"Meta":{"GuildCount":1},"Guilds":{"G-1":{"name":"Mossy Hollow","Level":7,"admin":{"id":"A","name":"Moss"},"camp_count":1,"camps":[{"id":"C1","map_pos":{"x":-120,"y":344,"z":0}}],"member_count":2,"members":{}}}}`))
 		case "/v1/pdapi/ban/steam_1":
 			var m map[string]any
 			json.NewDecoder(r.Body).Decode(&m)
@@ -61,6 +63,10 @@ func TestClient(t *testing.T) {
 	}
 	if err := c.Ban(context.Background(), "steam_1", "cheating", true); err != nil || body != `{"IP":true,"Reason":"cheating"}` {
 		t.Fatalf("%v %s", err, body)
+	}
+	gs, err := c.Guilds(context.Background())
+	if err != nil || len(gs) != 1 || gs[0].ID != "G-1" || gs[0].Camps[0].MapPos.Y != 344 || gs[0].Admin.Name != "Moss" {
+		t.Fatalf("guilds: %+v %v", gs, err)
 	}
 	if New(Config{}) != nil {
 		t.Fatal("no token means no client")

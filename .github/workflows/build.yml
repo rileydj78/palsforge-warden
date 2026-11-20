@@ -23,6 +23,8 @@ jobs:
         run: go vet ./... && GOOS=windows go vet ./...
       - name: Test
         run: go test ./...
+      - name: Panel script is valid JavaScript
+        run: node --check internal/web/static/app.js
 
   build:
     needs: test

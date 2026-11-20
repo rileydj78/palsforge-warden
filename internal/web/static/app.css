@@ -112,3 +112,10 @@ pre.log { background: #0F1411; color: #CFE3D6; font: 12.5px/1.5 var(--mono); pad
 .map .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
 .map .dotlbl { font: 600 13px var(--font); fill: var(--ink); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
 a.small { text-decoration: none; display: inline-block; }
+.map .base { fill: var(--chart2); stroke: var(--card); stroke-width: 2; }
+.map .baselbl { font: 12px var(--font); fill: var(--muted); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+dl.tree { margin: 4px 0 4px 14px; display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 2px 14px; font-size: 14px; }
+dl.tree dt { color: var(--muted); }
+dl.tree dd { margin: 0; overflow-wrap: anywhere; font-family: var(--mono); font-size: 13px; }
+dl.tree details { grid-column: 1 / -1; }
+dl.tree summary { cursor: pointer; font-weight: 600; padding: 2px 0; }

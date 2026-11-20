@@ -62,7 +62,7 @@ function signedIn(out) {
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
   api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; $("modsnav").hidden = me.role === "moderator"; }).catch(() => {});
-  api("/api/paldefender").then((pd) => { pdConnected = pd.connected && !pd.error; }).catch(() => {});
+  api("/api/paldefender").then((pd) => { pdConnected = pd.connected && !pd.error; $("guildsnav").hidden = !pdConnected; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -141,6 +141,7 @@ function render(st) {
     const tr = el("tr");
     const acts = el("td", null, "acts");
     if (pdConnected) { const msg = el("button", "Message", "small"); msg.onclick = () => message(p); acts.append(msg); }
+    if (pdConnected && me.role !== "moderator") { const d = el("a", "Details", "small"); d.href = `#/player?id=${encodeURIComponent(p.userId)}`; acts.append(d); }
     const k = el("button", "Kick", "small warn"); k.onclick = () => kick(p); acts.append(k);
     if (me.role !== "moderator") { const b = el("button", "Ban", "small danger"); b.onclick = () => ban(p); acts.append(b); }
     tr.append(el("td", p.name, "strong"), el("td", p.guild || "–"), el("td", String(p.level), "num"), el("td", p.platform), el("td", `${Math.round(p.ping)} ms`, "num"), acts);
@@ -352,12 +353,14 @@ $("b-backup").addEventListener("click", async () => {
 });
 
 // ---- map: a plain grid in the game's coordinates (the map artwork is Pocketpair's, so it isn't used)
+let mapBases = [];
 async function drawMap() {
   let st; try { st = await api("/api/status"); } catch (e) { return; }
+  if (pdConnected) { try { mapBases = (await api("/api/guilds")).flatMap((g) => (g.camps || []).map((c) => ({ x: Math.round(c.map_pos.X ?? c.map_pos.x), y: Math.round(c.map_pos.Y ?? c.map_pos.y), guild: g.name }))); } catch (e) { mapBases = []; } }
   const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
   const ps = st.players || [];
   let lo = -1000, hi = 1000; // the island's usual extent; grow to fit anyone outside it
-  for (const p of ps) { lo = Math.min(lo, p.mapX - 50, p.mapY - 50); hi = Math.max(hi, p.mapX + 50, p.mapY + 50); }
+  for (const p of [...ps, ...mapBases.map((b) => ({ mapX: b.x, mapY: b.y }))]) { lo = Math.min(lo, p.mapX - 50, p.mapY - 50); hi = Math.max(hi, p.mapX + 50, p.mapY + 50); }
   const S = 800, k = S / (hi - lo), px = (v) => (v - lo) * k, py = (v) => S - (v - lo) * k;
   svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
   const line = (x1, y1, x2, y2, c) => { const l = document.createElementNS(ns, "line"); l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2); l.setAttribute("class", c); svg.append(l); };
@@ -365,6 +368,10 @@ async function drawMap() {
   for (let v = Math.ceil(lo / 250) * 250; v <= hi; v += 250) {
     line(px(v), 0, px(v), S, v === 0 ? "axis0" : "grid"); line(0, py(v), S, py(v), v === 0 ? "axis0" : "grid");
     text(px(v) + 3, S - 4, v, "gridlbl"); text(3, py(v) - 3, v, "gridlbl");
+  }
+  for (const b of mapBases) {
+    const r = document.createElementNS(ns, "rect"); r.setAttribute("x", px(b.x) - 5); r.setAttribute("y", py(b.y) - 5); r.setAttribute("width", 10); r.setAttribute("height", 10); r.setAttribute("class", "base"); svg.append(r);
+    text(px(b.x) + 8, py(b.y) + 4, b.guild, "baselbl");
   }
   for (const p of ps) {
     const c = document.createElementNS(ns, "circle"); c.setAttribute("cx", px(p.mapX)); c.setAttribute("cy", py(p.mapY)); c.setAttribute("r", 7); c.setAttribute("class", "dot"); svg.append(c);
@@ -376,6 +383,60 @@ async function drawMap() {
   for (const p of ps) { const tr = el("tr"); tr.append(el("td", p.name, "strong"), el("td", `${p.mapX}, ${p.mapY}`, "num"), el("td", String(p.level), "num")); rows.append(tr); }
 }
 setInterval(() => { if (me && !$("view-map").hidden) drawMap(); }, 10000);
+
+// ---- guilds and one player's details (PalDefender)
+async function loadGuilds() {
+  try {
+    const gs = await api("/api/guilds"), rows = $("guildrows"); rows.replaceChildren();
+    if (!gs.length) { const tr = el("tr"); const td = el("td", "No guilds yet.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+    gs.sort((a, b) => (b.Level || 0) - (a.Level || 0));
+    for (const g of gs) {
+      const tr = el("tr");
+      const camps = (g.camps || []).map((c) => `${Math.round(c.map_pos.X ?? c.map_pos.x)}, ${Math.round(c.map_pos.Y ?? c.map_pos.y)}`).join(" · ") || "none";
+      tr.append(el("td", g.name || "(unnamed)", "strong"), el("td", String(g.Level ?? "–"), "num"), el("td", (g.admin && g.admin.name) || "–"), el("td", String(g.member_count ?? "–"), "num"), el("td", camps, "num"));
+      rows.append(tr);
+    }
+  } catch (e) { toast(e.message); }
+}
+// A readable tree of whatever PalDefender returns (its formats vary by version). Text only.
+function tree(v, depth = 0) {
+  if (v == null || typeof v !== "object") return el("span", String(v));
+  const entries = Array.isArray(v) ? v.map((x, i) => [String(i + 1), x]) : Object.entries(v);
+  if (!entries.length) return el("span", "(none)", "note");
+  const list = el("dl", null, "tree");
+  for (const [k, x] of entries.slice(0, 300)) {
+    if (x && typeof x === "object" && depth < 4) {
+      const d = el("details"); if (depth < 1) d.open = true;
+      d.append(el("summary", Array.isArray(v) ? (x.Name || x.name || x.ItemID || x.PalID || x.CharacterID || k) : k), tree(x, depth + 1));
+      list.append(d);
+    } else { list.append(el("dt", k), el("dd", typeof x === "object" ? JSON.stringify(x) : String(x))); }
+  }
+  return list;
+}
+let detailFor = null;
+async function loadPlayer(id) {
+  detailFor = roster.find((p) => p.userId === id) || { userId: id, name: id };
+  $("pd-name").textContent = detailFor.name; $("pd-sub").textContent = "Loading from PalDefender…";
+  const box = $("pd-detail"); box.replaceChildren();
+  try {
+    const d = await api(`/api/players/detail?userId=${encodeURIComponent(id)}`);
+    $("pd-sub").textContent = (d.errors || []).length ? `Some parts couldn't be read: ${d.errors.join("; ")}` : "Inventory, Pals and progression, as PalDefender reports them.";
+    for (const [title, part] of [["Inventory", d.inventory], ["Pals", d.pals], ["Progression", d.progression]]) {
+      const c = el("section", null, "card"); c.append(el("h2", title), part ? tree(part) : el("p", "Not available.", "note")); box.append(c);
+    }
+  } catch (e) { $("pd-sub").textContent = e.message; }
+}
+async function give(kind) {
+  if (!detailFor) return;
+  const what = await ask({ title: kind === "item" ? `Give ${detailFor.name} an item` : `Give ${detailFor.name} a Pal`, text: kind === "item" ? "Type the item's game ID and how many, e.g. Money 5000 or PalSphere_Legend 10." : "Type the Pal's game ID and level, e.g. Anubis 30.", label: kind === "item" ? "Item and count" : "Pal and level", ok: "Give", required: true });
+  if (!what) return;
+  const [id, n] = what.trim().split(/\s+/);
+  const reason = await ask({ title: "Why?", text: "It goes in the activity log.", label: "Reason", value: "event prize", ok: "Give" });
+  if (reason == null) return;
+  try { const r = await api("/api/action/give", { userId: detailFor.userId, name: detailFor.name, kind, id, count: parseInt(n || "1", 10), level: parseInt(n || "1", 10), reason }); toast(`Gave ${r.gave}.`); loadPlayer(detailFor.userId); } catch (e) { toast(e.message); }
+}
+$("pd-give-item").addEventListener("click", () => give("item"));
+$("pd-give-pal").addEventListener("click", () => give("pal"));
 
 // ---- the game's settings
 let game = null;
@@ -539,7 +600,8 @@ $("setform").addEventListener("submit", async (e) => {
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods"].includes(v) ? v : "dash";
+  const vv = v.split("?")[0];
+  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map", "mods", "guilds", "player"].includes(vv) ? vv : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -552,6 +614,8 @@ function route() {
   if (view === "game") loadGame();
   if (view === "map") drawMap();
   if (view === "mods") loadMods();
+  if (view === "guilds") loadGuilds();
+  if (view === "player") loadPlayer(new URLSearchParams(v.split("?")[1] || "").get("id"));
 }
 window.addEventListener("hashchange", route);
 async function refresh() {
