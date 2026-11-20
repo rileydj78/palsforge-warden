@@ -18,6 +18,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/kit"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
@@ -190,6 +191,21 @@ func main() {
 				st2.Audit("allow-list", "kick", name+" ("+userID+")", "not on the allow-list", true)
 				return msg
 			}
+		}
+		if pdc := paldefender.New(wcfg.PalDef); wcfg.StarterKit.On && pdc != nil {
+			k := &kit.Kit{Cfg: wcfg.StarterKit, Give: pdc, Rec: st2}
+			allow := gate
+			gate = func(userID, name string) string {
+				if allow != nil {
+					if msg := allow(userID, name); msg != "" {
+						return msg // not let in: no kit
+					}
+				}
+				k.Seen(context.Background(), userID, name)
+				return ""
+			}
+		} else if wcfg.StarterKit.On {
+			log.Printf("starter kit is on but PalDefender isn't connected: no kits will be given")
 		}
 		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn, gate, game.Kick)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}

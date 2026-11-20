@@ -222,6 +222,12 @@
         <h2>Allow-list</h2>
         <label class="check"><input type="checkbox" id="s-a-on"> Only players on the allow-list may join (others are kicked as they arrive)</label>
         <label for="s-a-msg">Message for people who aren't on it</label><input id="s-a-msg" placeholder="This server is invite-only right now.">
+        <h2>Starter kit</h2>
+        <label class="check"><input type="checkbox" id="s-k-on"> Give each new player a starter kit once (needs PalDefender)</label>
+        <label for="s-k-items">Items: game item IDs and counts, e.g. <code>PalSphere:10, Money:5000</code></label><input id="s-k-items" autocomplete="off" spellcheck="false">
+        <label for="s-k-pals">Pals: game Pal IDs and levels, e.g. <code>Anubis:10</code> (internal names: Lamball is SheepBall)</label><input id="s-k-pals" autocomplete="off" spellcheck="false">
+        <label for="s-k-msg">Message with it ({name} becomes their name)</label><input id="s-k-msg" placeholder="Welcome, {name}! Your starter kit is in your inventory.">
+        <p class="note">Given 30 seconds after a player first joins, once per player, and written to the activity log.</p>
         <h2>Public status page</h2>
         <label class="check"><input type="checkbox" id="s-p-on"> A read-only status page (server name, online, player count) on its own port, 127.0.0.1:8284</label>
         <label class="check"><input type="checkbox" id="s-p-names"> Also list who's online (names only)</label>

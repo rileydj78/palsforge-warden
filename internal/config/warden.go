@@ -33,6 +33,8 @@ type Warden struct {
 	Health    Health             `json:"health"`
 	// Allow-list: when on, players who aren't on Warden's list are kicked as they join.
 	AllowList AllowList `json:"allowList"`
+	// Items and Pals every new player gets once (needs PalDefender).
+	StarterKit StarterKit `json:"starterKit"`
 	// A read-only status page on its own port (127.0.0.1:8284), for warden remote public on.
 	StatusPage StatusPage `json:"statusPage"`
 	// Weekly events, one per line: "Name | Fri 18:00 | Sun 22:00 | ExpRate=2, PalCaptureRate=1.5".
@@ -44,6 +46,36 @@ type StatusPage struct {
 	On        bool   `json:"on"`
 	ShowNames bool   `json:"showNames"` // list who's online (names only)
 	Invite    string `json:"invite"`    // a link shown on the page, e.g. a Discord invite
+}
+
+// StarterKit is given once to each player the first time Warden sees them.
+type StarterKit struct {
+	On      bool   `json:"on"`
+	Items   string `json:"items"`   // "PalSphere:10, Money:5000" (game item IDs and counts)
+	Pals    string `json:"pals"`    // "Anubis:10, SheepBall:1" (game Pal IDs and levels)
+	Message string `json:"message"` // sent to the player when it arrives
+}
+
+var kitRe = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}:[0-9]{1,6}$`)
+
+// ParseKit reads "ID:number, ID:number" into pairs.
+func ParseKit(s string) ([][2]string, error) {
+	var out [][2]string
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if !kitRe.MatchString(part) {
+			return nil, fmt.Errorf("%q should look like PalSphere:10 (a game ID, a colon, a number)", part)
+		}
+		kv := strings.SplitN(part, ":", 2)
+		out = append(out, [2]string{kv[0], kv[1]})
+	}
+	if len(out) > 30 {
+		return nil, errors.New("a starter kit holds at most 30 entries")
+	}
+	return out, nil
 }
 
 // AllowList is the join gate.
@@ -131,6 +163,12 @@ var (
 // Check reports what's wrong with a configuration, in words an admin can act on.
 func (w *Warden) Check() error {
 	var bad []string
+	if _, err := ParseKit(w.StarterKit.Items); err != nil {
+		bad = append(bad, "starter kit items: "+err.Error())
+	}
+	if _, err := ParseKit(w.StarterKit.Pals); err != nil {
+		bad = append(bad, "starter kit Pals: "+err.Error())
+	}
 	if v := w.StatusPage.Invite; v != "" && !strings.HasPrefix(v, "https://") {
 		bad = append(bad, "the status page's link must start with https://")
 	}

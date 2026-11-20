@@ -667,6 +667,7 @@ async function loadSettings() {
     $("s-ev").value = cfg.events || "";
     const hl = cfg.health || {};
     $("s-h-frozen").value = hl.restartFrozenMinutes ?? 5; $("s-h-mem").value = hl.memoryLimitGB || 0;
+    const sk = cfg.starterKit || {}; $("s-k-on").checked = !!sk.on; $("s-k-items").value = sk.items || ""; $("s-k-pals").value = sk.pals || ""; $("s-k-msg").value = sk.message || "";
     const sp = cfg.statusPage || {}; $("s-p-on").checked = !!sp.on; $("s-p-names").checked = !!sp.showNames; $("s-p-inv").value = sp.invite || "";
     const al = cfg.allowList || {}; $("s-a-on").checked = !!al.on; $("s-a-msg").value = al.message || "";
     const b = cfg.broadcasts || {};
@@ -687,6 +688,7 @@ $("setform").addEventListener("submit", async (e) => {
   c.notify = notifyForm();
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0 };
+  c.starterKit = { on: $("s-k-on").checked, items: $("s-k-items").value.trim(), pals: $("s-k-pals").value.trim(), message: $("s-k-msg").value.trim() };
   c.statusPage = { on: $("s-p-on").checked, showNames: $("s-p-names").checked, invite: $("s-p-inv").value.trim() };
   c.allowList = { on: $("s-a-on").checked, message: $("s-a-msg").value.trim() };
   c.broadcasts = { enabled: $("s-m-on").checked, messages: lines($("s-m-list").value), everyMinutes: parseInt($("s-m-every").value, 10) || 0, welcome: $("s-m-welcome").value.trim() };

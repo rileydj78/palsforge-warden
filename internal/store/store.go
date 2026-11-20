@@ -28,6 +28,7 @@ var schema = []string{
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
 	`ALTER TABLE users ADD COLUMN totp TEXT`,
 	`ALTER TABLE samples ADD COLUMN cpu REAL`,
+	`CREATE TABLE IF NOT EXISTS kits (user_id TEXT PRIMARY KEY, given INTEGER)`,
 	`CREATE TABLE IF NOT EXISTS allowed (user_id TEXT PRIMARY KEY, added INTEGER, by TEXT)`,
 	`ALTER TABLE samples ADD COLUMN mem REAL`,
 	`ALTER TABLE users ADD COLUMN totp_pending TEXT`,
@@ -293,4 +294,23 @@ func (s *Store) AllowList() ([]map[string]any, error) {
 		out = append(out, map[string]any{"userId": id, "name": name, "added": added, "by": by})
 	}
 	return out, rows.Err()
+}
+
+// KitGiven says whether a player already had their starter kit.
+func (s *Store) KitGiven(userID string) bool {
+	var n int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM kits WHERE user_id=?`, userID).Scan(&n)
+	return n > 0
+}
+
+// MarkKit records that a player got their starter kit.
+func (s *Store) MarkKit(userID string) {
+	s.DB.Exec(`INSERT OR IGNORE INTO kits(user_id, given) VALUES(?,?)`, userID, time.Now().Unix())
+}
+
+// Known says whether Warden has seen a player before now (in the roster).
+func (s *Store) Known(userID string) bool {
+	var n int
+	s.DB.QueryRow(`SELECT COUNT(*) FROM players WHERE user_id=?`, userID).Scan(&n)
+	return n > 0
 }
