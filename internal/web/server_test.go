@@ -152,3 +152,11 @@ func TestModeratorCannotBan(t *testing.T) {
 		t.Fatal("only the owner manages admins")
 	}
 }
+
+func TestMapCoords(t *testing.T) {
+	// The community transform: world (0,0) is about map (-341, 267).
+	x, y := mapCoords(0, 0)
+	if x != -341 || y != 267 {
+		t.Fatalf("got %d,%d", x, y)
+	}
+}

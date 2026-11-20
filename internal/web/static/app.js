@@ -302,6 +302,32 @@ $("b-backup").addEventListener("click", async () => {
   try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${r.made.join(", ")}`); loadBackups(); } catch (e) { toast(e.message); }
 });
 
+// ---- map: a plain grid in the game's coordinates (the map artwork is Pocketpair's, so it isn't used)
+async function drawMap() {
+  let st; try { st = await api("/api/status"); } catch (e) { return; }
+  const ns = "http://www.w3.org/2000/svg", svg = document.createElementNS(ns, "svg");
+  const ps = st.players || [];
+  let lo = -1000, hi = 1000; // the island's usual extent; grow to fit anyone outside it
+  for (const p of ps) { lo = Math.min(lo, p.mapX - 50, p.mapY - 50); hi = Math.max(hi, p.mapX + 50, p.mapY + 50); }
+  const S = 800, k = S / (hi - lo), px = (v) => (v - lo) * k, py = (v) => S - (v - lo) * k;
+  svg.setAttribute("viewBox", `0 0 ${S} ${S}`);
+  const line = (x1, y1, x2, y2, c) => { const l = document.createElementNS(ns, "line"); l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2); l.setAttribute("class", c); svg.append(l); };
+  const text = (x, y, t, c) => { const e = document.createElementNS(ns, "text"); e.setAttribute("x", x); e.setAttribute("y", y); e.setAttribute("class", c); e.textContent = t; svg.append(e); };
+  for (let v = Math.ceil(lo / 250) * 250; v <= hi; v += 250) {
+    line(px(v), 0, px(v), S, v === 0 ? "axis0" : "grid"); line(0, py(v), S, py(v), v === 0 ? "axis0" : "grid");
+    text(px(v) + 3, S - 4, v, "gridlbl"); text(3, py(v) - 3, v, "gridlbl");
+  }
+  for (const p of ps) {
+    const c = document.createElementNS(ns, "circle"); c.setAttribute("cx", px(p.mapX)); c.setAttribute("cy", py(p.mapY)); c.setAttribute("r", 7); c.setAttribute("class", "dot"); svg.append(c);
+    text(px(p.mapX) + 10, py(p.mapY) + 4, p.name, "dotlbl");
+  }
+  $("map").replaceChildren(svg);
+  const rows = $("maprows"); rows.replaceChildren();
+  if (!ps.length) { const tr = el("tr"); const td = el("td", "Nobody is online.", "empty"); td.colSpan = 3; tr.append(td); rows.append(tr); }
+  for (const p of ps) { const tr = el("tr"); tr.append(el("td", p.name, "strong"), el("td", `${p.mapX}, ${p.mapY}`, "num"), el("td", String(p.level), "num")); rows.append(tr); }
+}
+setInterval(() => { if (me && !$("view-map").hidden) drawMap(); }, 10000);
+
 // ---- the game's settings
 let game = null;
 async function loadGame() {
@@ -414,7 +440,7 @@ $("setform").addEventListener("submit", async (e) => {
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs", "game", "map"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -425,6 +451,7 @@ function route() {
   if (view === "settings") loadSettings();
   if (view === "logs") loadLogs(true);
   if (view === "game") loadGame();
+  if (view === "map") drawMap();
 }
 window.addEventListener("hashchange", route);
 async function refresh() {

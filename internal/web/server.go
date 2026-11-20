@@ -15,6 +15,7 @@ import (
 	"errors"
 	"io/fs"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"strings"
@@ -53,6 +54,14 @@ type PlayerView struct {
 	Ping     float64 `json:"ping"`
 	Platform string  `json:"platform"`
 	UserID   string  `json:"userId"`
+	MapX     int     `json:"mapX"` // the coordinates players see on their in-game map
+	MapY     int     `json:"mapY"`
+}
+
+// mapCoords turns REST world positions into in-game map coordinates (the transform community
+// tools use: world units are 1/462.96 of a map unit, with the origin shifted).
+func mapCoords(x, y float64) (int, int) {
+	return int(math.Round((y - 157664.55791065) / 462.962962963)), int(math.Round((x + 123467.1611767) / 462.962962963))
 }
 
 // Status is GET /api/status.
@@ -83,7 +92,8 @@ func (s *Server) status(ctx context.Context, fresh bool) *Status {
 		}
 		if ps, err := s.Game.Players(ctx); err == nil {
 			for _, p := range ps {
-				st.Players = append(st.Players, PlayerView{Name: p.Name, Level: p.Level, Ping: p.Ping, Platform: monitor.Platform(p.UserID), UserID: p.UserID})
+				mx, my := mapCoords(p.X, p.Y)
+				st.Players = append(st.Players, PlayerView{Name: p.Name, Level: p.Level, Ping: p.Ping, Platform: monitor.Platform(p.UserID), UserID: p.UserID, MapX: mx, MapY: my})
 			}
 		}
 	}

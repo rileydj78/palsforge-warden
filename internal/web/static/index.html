@@ -23,6 +23,7 @@
   <nav class="side" aria-label="Sections">
     <a href="#/" data-view="dash">Dashboard</a>
     <a href="#/players" data-view="players">Players</a>
+    <a href="#/map" data-view="map">Map</a>
     <a href="#/server" data-view="server" id="servernav" hidden>Server</a>
     <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
     <a href="#/game" data-view="game" id="gamenav" hidden>Game settings</a>
@@ -65,6 +66,13 @@
           <thead><tr><th>Player</th><th>Level</th><th>Platform</th><th>Ping</th><th><span class="sr">Actions</span></th></tr></thead>
           <tbody id="playerrows"></tbody></table></div>
       </section>
+    </section>
+
+    <section id="view-map" class="view" hidden>
+      <h1>Where everyone is</h1>
+      <p class="sub">Positions in the game's own map coordinates, updated every 10 seconds.</p>
+      <div class="card"><div class="map" id="map" role="img" aria-label="Players on the map"></div>
+      <div class="tablewrap"><table><thead><tr><th>Player</th><th>Map position</th><th>Level</th></tr></thead><tbody id="maprows"></tbody></table></div></div>
     </section>
 
     <section id="view-players" class="view" hidden>

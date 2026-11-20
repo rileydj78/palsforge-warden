@@ -104,3 +104,9 @@ pre.log { background: #0F1411; color: #CFE3D6; font: 12.5px/1.5 var(--mono); pad
 .form input.changed, .form select.changed { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
 .form .note { margin: -2px 0 6px; }
 #dlgtext { white-space: pre-line; }
+.map svg { width: 100%; max-width: 760px; aspect-ratio: 1; display: block; margin: 0 auto 12px; background: var(--ground); border-radius: 10px; }
+.map .grid { stroke: var(--rule); stroke-width: 1; }
+.map .axis0 { stroke: var(--line); stroke-width: 2; }
+.map .gridlbl { font: 11px var(--mono); fill: var(--soft); }
+.map .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
+.map .dotlbl { font: 600 13px var(--font); fill: var(--ink); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
