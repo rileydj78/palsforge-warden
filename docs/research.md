@@ -20,6 +20,28 @@ Sources are at the end; check each project's own page for its latest state.
 - **Save files** hold players, Pals, guilds and bases. Reading them needs a save parser; editing
   them is only safe while the server is stopped.
 
+## Mods on servers
+
+- **PAK mods** go in `Pal/Content/Paks/~mods` and work on Windows and Linux servers.
+- **UE4SS** (a mod loader) and its **Lua mods** live under `Pal/Binaries/Win64/ue4ss/Mods`; they need
+  the Windows server build, and the Xbox/Game Pass game can't run them.
+- **PalSchema** (JSON data mods on top of UE4SS) goes in `ue4ss/Mods/PalSchema/mods/<mod>`; a common
+  mistake is putting mods directly in `ue4ss/Mods`. Most PalSchema mods must be installed on the
+  server **and every player's game** at the same version. Sources disagree on Linux support;
+  treat it as Windows-only until verified.
+- **Steam Workshop:** Palworld 1.0 added an official Workshop path, experimental and Windows-only,
+  with clients needing the same mod list. Some Docker images automate Workshop installs.
+- Guides confirm UE4SS and PalSchema still worked on v1.0.5 (13 Nov 2026), but loaders often break
+  for a while after game updates.
+- None of the existing admin tools manage mods; this is a clear opening for Warden.
+
+## How people run servers
+
+- Self-hosted on Windows (SteamCMD), self-hosted on Linux, **Docker** (most used:
+  `thijsvanloef/palworld-server-docker`, tested on Linux and Windows 10; alternatives from jammsen,
+  thejcpalma), and **rented hosts** (file access usually by FTP/SFTP, restarts through the host's
+  own panel).
+
 ## The tools
 
 | Tool | Form | Strengths | Gaps |
@@ -53,6 +75,15 @@ Sources are at the end; check each project's own page for its latest state.
 7. **Windows and Linux** from day one, without Node.js or Docker as a requirement.
 
 ## Sources
+
+- [Palworld 1.0 modding guide (palpedia)](https://modding.palpedia.world/)
+- [Palworld mods in 2026, what works after 1.0 (Palworld Companion)](https://www.palworldcompanion.com/guides/palworld-mods)
+- [PalSchema on Nexus Mods](https://www.nexusmods.com/palworld/mods/2216)
+- [How to install PalSchema mods on a server (MintServers)](https://mintservers.com/knowledgebase/palworld-palschema-mods)
+- [Best Palworld mods for dedicated servers (DoomHosting)](https://www.doomhosting.com/blog/best-palworld-mods-2026-dedicated-server-multiplayer)
+- [Best Palworld server mods 2026 (WinterNode)](https://winternode.com/blog/palworld/best-server-mods)
+- [palworld-server-docker (thijsvanloef)](https://github.com/thijsvanloef/palworld-server-docker)
+- [Wine-based Docker image with Workshop installs (ripps818)](https://github.com/ripps818/docker-palworld-dedicated-server-wine)
 
 - [Palworld REST API reference (XGamingServer)](https://xgamingserver.com/docs/palworld/rest-api)
 - [The Palworld REST API: every endpoint, and why not to expose it (gamever)](https://gamever.io/knowledge-base/the-palworld-rest-api-every-endpoint-and-why-not-to-expose-it)

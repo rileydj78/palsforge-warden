@@ -19,6 +19,24 @@ discuss. The research behind it is in [research.md](research.md).
 Because Warden runs next to the server it can do what panel-only tools can't: back up files, edit
 settings, run the nightly routine and restart the server, with **one install**.
 
+## 1b. For any Palworld server **(decided: anyone can use it)**
+
+Warden must not assume the Palsforge setup. It has to fit how people actually run servers:
+
+| How the server runs | How Warden fits | What works |
+|---|---|---|
+| **Self-hosted on Windows** (SteamCMD, often with PalDefender) | Warden installed on the same machine, as a Windows service | Everything |
+| **Self-hosted on Linux** (native or Wine) | Warden as a systemd service | Everything except Windows-only mod loaders (see §2b) |
+| **Docker** (e.g. the popular `thijsvanloef/palworld-server-docker` image) | Warden as a second container sharing the server's data volume, restarting the server container through the Docker API | Everything the image allows |
+| **Rented from a game host** (no install allowed on the host) | Warden runs on the admin's own PC or a small box and reaches the server through the host's REST port (over the host's own secure path) and the files through **FTP/SFTP** | Dashboard, players, announcements, backups and settings through FTP; restarts only if the host offers them |
+
+- A **first-run wizard** finds the server (install folder, SteamCMD, the `.ini`, the REST port and
+  password, PalDefender if present), checks what it can do, and **shows which features are on and
+  why any are off** instead of failing later.
+- Nothing is Palsforge-specific: no fixed paths, addresses, schedules or names. Palsforge is just
+  the first user (§5).
+- The panel's text is ready for translation from the start (English first).
+
 ## 2. Features
 
 ### Version 0.1: the essentials
@@ -51,11 +69,47 @@ settings, run the nightly routine and restart the server, with **one install**.
     official map artwork belongs to Pocketpair, so Warden draws its own simple grid and lets an
     admin add a map image they have the right to use.
 
+### Mods (from 0.2, the most-wanted area after backups)
+See §2b.
+
 ### Version 0.3 and later
 11. **Desktop launcher:** a small app that remembers your servers and opens each panel in its own
     window, with a tray icon showing their state.
 12. **More than one server** in one panel.
 13. **Linux packages and a Docker image.**
+
+## 2b. Mod administration
+
+How Palworld server mods work today (verified sources in research.md):
+
+| Kind | Where it lives on the server | Notes |
+|---|---|---|
+| **PAK mods** | `Pal/Content/Paks/~mods` | Data and asset mods; work on Windows and Linux |
+| **UE4SS** (mod loader) + **Lua mods** | `Pal/Binaries/Win64/ue4ss/Mods` | Windows build only; often breaks for a while after a game update |
+| **PalSchema** (JSON data mods, needs UE4SS) | `.../ue4ss/Mods/PalSchema/mods/<mod>` | Most mods must also be on **every player's game at the same version** |
+| **Server plugins** such as **PalDefender** | `Pal/Binaries/Win64` (DLLs, own config folder) | Anti-cheat and admin features; Windows |
+| **Steam Workshop** (official, added with Palworld 1.0) | Through SteamCMD | Experimental and Windows-only so far; clients need the same list |
+
+What Warden does with them:
+1. **See what's installed:** scan every mod location; show each mod's name, kind, version, size,
+   where it came from, and whether it's on or off. Spot common mistakes (a PalSchema mod in the
+   wrong folder, a Lua mod without UE4SS, a Windows-only mod on Linux).
+2. **Turn mods on and off** without deleting them (Warden moves them to its own "disabled" area).
+3. **Install and update:** upload a mod's zip, give a download link, or a Workshop item ID;
+   Warden unpacks it into the right place for its kind. Version pinning: a mod stays at the
+   version you chose until you update it.
+4. **Change safely:** every mod change takes a backup first, is applied at the next restart (or
+   now, with an in-game warning), and Warden checks the server comes back healthy. If it doesn't,
+   Warden **rolls the mods back automatically** and tells the admin which change failed.
+5. **Game-update guard:** before the nightly game update, Warden can check whether the installed
+   loaders (UE4SS, PalSchema) are known to work with the new build, and hold the update or turn
+   the affected mods off, the admin's choice.
+6. **Tell players what they need:** because many mods must match on players' games, Warden makes a
+   shareable **mod list** (names, versions, download links) for the community's site or Discord,
+   and shows it on the optional public status page.
+7. **Mod sites:** download links and uploaded zips work for everything. Direct installs from mod
+   sites (Nexus Mods, CurseForge, Thunderstore) depend on each site's API terms (Nexus, for example,
+   limits direct downloads through its API); to be checked per site before building.
 
 ## 3. Safety by default
 
@@ -97,5 +151,7 @@ switches to Warden once version 0.1 does the same job.
    password otherwise?
 3. Which second places for backups in 0.1: folder and network share for sure; SFTP too?
 4. Discord in 0.1 or 0.2?
-5. Should the panel have an optional, read-only **public status page** (online, players, uptime)
-   for a community website like palsforge.com?
+5. Should the panel have an optional, read-only **public status page** (online, players, uptime,
+   mod list) for a community website like palsforge.com?
+6. Rented hosts: which ones to support first for FTP/SFTP and restart control?
+7. Mod sites: which to integrate directly, after checking their API terms?
