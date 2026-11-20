@@ -401,6 +401,19 @@ async function loadMods() {
     }
   } catch (e) {}
 }
+$("md-upload").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = $("md-file").files[0]; if (!f) return;
+  const fd = new FormData(); fd.append("file", f);
+  toast("Uploading…");
+  try {
+    const r = await fetch("/api/mods/install", { method: "POST", headers: { "X-CSRF": csrf }, body: fd });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || `Warden answered ${r.status}`);
+    toast(d.applied ? `Installed ${d.id}.` : `${d.id} is ready: it goes in at the next nightly stop, or now with "Apply now".`);
+    $("md-file").value = ""; loadMods();
+  } catch (err) { toast(err.message); }
+});
 $("md-apply").addEventListener("click", async () => {
   const ok = await ask({ title: "Apply the mod changes now?", text: "Players get a minute's warning, the server stops, the mods change, and it starts again.", label: "Type APPLY to confirm", confirmWord: "APPLY", ok: "Apply" });
   if (ok == null) return;

@@ -3,7 +3,9 @@ package web
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -447,6 +449,39 @@ func (s *Server) modRoutes(mux *http.ServeMux) {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"queued": true})
+	}))
+	mux.HandleFunc("POST /api/mods/install", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		r.Body = http.MaxBytesReader(w, r.Body, mods.MaxZip)
+		file, hdr, err := r.FormFile("file")
+		if err != nil {
+			fail(w, 400, "choose a mod's .zip file (up to 1 GB)")
+			return
+		}
+		defer file.Close()
+		tmp, err := os.CreateTemp(m.DataDir, "upload-*.zip")
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		defer os.Remove(tmp.Name())
+		_, err = io.Copy(tmp, file)
+		tmp.Close()
+		if err != nil {
+			fail(w, 400, "the upload didn't finish")
+			return
+		}
+		id, err := m.Install(tmp.Name(), hdr.Filename)
+		s.Store.Audit(ses.User.Name, "install mod", hdr.Filename, id, err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if !c.Host.Running() {
+			m.ApplyPending()
+			writeJSON(w, 200, map[string]any{"id": id, "applied": true})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"id": id, "queued": true})
 	}))
 	mux.HandleFunc("POST /api/mods/apply-now", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		if busy, _ := c.Runner.Busy(); busy {

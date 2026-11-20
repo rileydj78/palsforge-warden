@@ -1,6 +1,7 @@
 package mods
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,5 +78,47 @@ func TestQueueRefusesUnknownAndPathTricks(t *testing.T) {
 	m := &Manager{ServerDir: t.TempDir(), DataDir: t.TempDir()}
 	if m.Queue("pak/../../Windows", "disable") == nil {
 		t.Fatal("unknown mods must be refused")
+	}
+}
+
+func zipOf(t *testing.T, files map[string]string) string {
+	p := filepath.Join(t.TempDir(), "mod.zip")
+	f, _ := os.Create(p)
+	zw := zip.NewWriter(f)
+	for n, c := range files {
+		w, _ := zw.Create(n)
+		w.Write([]byte(c))
+	}
+	zw.Close()
+	f.Close()
+	return p
+}
+
+func TestInstallKinds(t *testing.T) {
+	srv, data := t.TempDir(), t.TempDir()
+	m := &Manager{ServerDir: srv, DataDir: data}
+	// A UE4SS mod nested one level too deep is found by its Scripts/main.lua.
+	id, err := m.Install(zipOf(t, map[string]string{"FastTravel-1.2/FastTravel/Scripts/main.lua": "print(1)", "FastTravel-1.2/README.txt": "x"}), "FastTravel-1.2.zip")
+	if err != nil || id != "ue4ss/FastTravel" {
+		t.Fatalf("%s %v", id, err)
+	}
+	id, err = m.Install(zipOf(t, map[string]string{"BetterStacks_P.pak": "pak", "readme.txt": "x"}), "BetterStacks.zip")
+	if err != nil || id != "pak/BetterStacks_P.pak" {
+		t.Fatalf("%s %v", id, err)
+	}
+	if _, err := m.ApplyPending(); err != nil {
+		t.Fatal(err)
+	}
+	if !exists(filepath.Join(srv, "Pal/Binaries/Win64/ue4ss/Mods/FastTravel/Scripts/main.lua")) || !exists(filepath.Join(srv, "Pal/Content/Paks/~mods/BetterStacks_P.pak")) {
+		t.Fatal("installed mods should be in place after applying")
+	}
+	if _, err := m.Install(zipOf(t, map[string]string{"notes.txt": "x"}), "x.zip"); err == nil || !strings.Contains(err.Error(), "can't tell") {
+		t.Fatalf("unknown archives must be explained: %v", err)
+	}
+	if _, err := m.Install(zipOf(t, map[string]string{"../../evil/Scripts/main.lua": "x"}), "evil.zip"); err == nil {
+		t.Fatal("paths that climb out must be refused")
+	}
+	if _, err := m.Install(zipOf(t, map[string]string{"BetterStacks_P.pak": "pak"}), "again.zip"); err == nil {
+		t.Fatal("a second copy of an installed mod must be refused")
 	}
 }
