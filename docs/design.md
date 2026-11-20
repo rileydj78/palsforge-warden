@@ -3,6 +3,30 @@
 Status: first draft, 2026-11-19. Decisions marked **(decided)**; everything else is a proposal to
 discuss. The research behind it is in [research.md](research.md).
 
+
+## Status (2026-11-20)
+
+Built, tested and running on a live server (Linux tests + CI; Windows builds wait for signing,
+because Smart App Control blocks new unsigned programs):
+
+| Area | State |
+|---|---|
+| Dashboard, history graphs, last backup / next run | done |
+| Players: online, roster, kick / ban / unban, announce | done |
+| Logins, roles, audit log, CSRF, loopback-only | done |
+| Nightly routine (warn, save, stop, back up, update, start, health check) | done |
+| Backups: data + image, checksums, verified second places, retention | done |
+| Restore: preview, safety backup, reversible | done |
+| Server control: supervise (crash restarts) or external (watchdog / service) | done |
+| Warden settings page; `warden install / open / remote` | done |
+| Notifications: Discord, ntfy | done |
+| Logs viewer (IPs masked) | done |
+| Game settings editor | done |
+| Map (players) | done; coordinate transform to be checked in game |
+| Mods | next |
+| PalDefender | after mods (needs its API docs) |
+| Signed Windows release | waiting on SignPath Foundation |
+
 ## 1. What it is
 
 **One program on the machine that runs the Palworld server** (Windows first, Linux too), used in
