@@ -28,8 +28,15 @@ func Sources(serverDir, dataDir string) []Source {
 		{"console", "Server console", filepath.Join(dataDir, "server-console.log")},
 		{"game", "Palworld (Pal.log)", filepath.Join(serverDir, "Pal", "Saved", "Logs", "Pal.log")},
 	}
-	if p := newest(filepath.Join(serverDir, "Pal", "Binaries", "Win64", "PalDefender", "Logs")); p != "" {
+	pd := filepath.Join(serverDir, "Pal", "Binaries", "Win64", "PalDefender", "Logs")
+	if p := newest(pd); p != "" {
 		cands = append(cands, Source{"paldefender", "PalDefender", p})
+	}
+	if p := newest(filepath.Join(pd, "Cheats")); p != "" {
+		cands = append(cands, Source{"cheats", "PalDefender: cheat detections", p})
+	}
+	if p := newest(filepath.Join(pd, "Network")); p != "" {
+		cands = append(cands, Source{"pdnetwork", "PalDefender: network", p})
 	}
 	var out []Source
 	for _, c := range cands {

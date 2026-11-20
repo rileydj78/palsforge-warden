@@ -137,3 +137,5 @@ form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; } fo
 .cmdgrid .card { margin: 0; }
 
 .dot.off { opacity: .45; }
+
+.tag.warn { background: #FBE8D4; color: #8A4A0E; }

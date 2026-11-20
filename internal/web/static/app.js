@@ -216,14 +216,20 @@ function renderRoster() {
   const rows = $("rosterrows"); rows.replaceChildren();
   const list = roster.filter((p) => !q || p.name.toLowerCase().includes(q));
   if (!list.length) { const tr = el("tr"); const td = el("td", roster.length ? "No match." : "Nobody yet. Players appear here once Warden has seen them online.", "empty"); td.colSpan = 7; tr.append(td); rows.append(tr); }
+  // Progress check: level per hour played, against everyone else's (works at any XP rate).
+  const rate = (p) => p.level / Math.max(p.seconds / 3600, 0.25);
+  const rates = roster.filter((p) => p.seconds >= 3600 && p.level > 1).map(rate).sort((a, b) => a - b);
+  const median = rates.length >= 5 ? rates[Math.floor(rates.length / 2)] : 0;
   for (const p of list) {
     const tr = el("tr"); const acts = el("td", null, "acts");
+    const fast = median > 0 && p.level >= 15 && rate(p) > 4 * median;
     if (me.role !== "moderator") {
       const b = el("button", p.banned ? "Unban" : "Ban", p.banned ? "small" : "small danger");
       b.onclick = () => (p.banned ? unban(p) : ban(p)).then(loadRoster);
       acts.append(b);
     }
     const name = el("td", p.name, "strong"); if (p.banned) name.append(el("span", "banned", "tag"));
+    if (fast) { const t = el("span", "worth a look", "tag warn"); t.title = `Level ${p.level} after ${duration(p.seconds)} played: over 4 times as fast as the usual player here. Could be a cheat, or just a very keen player.`; name.append(t); }
     if (p.note) name.append(el("div", p.note, "note"));
     if (allowSet.has(p.userId)) name.append(el("span", "allowed", "tag"));
     if (me.role !== "moderator") { const ab = el("button", allowSet.has(p.userId) ? "Disallow" : "Allow", "small"); ab.onclick = () => setAllow(p.userId, !allowSet.has(p.userId)); acts.append(ab); }

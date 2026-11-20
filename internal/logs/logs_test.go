@@ -46,3 +46,17 @@ func TestTailAndSearch(t *testing.T) {
 		t.Fatalf("search: %d", len(hits))
 	}
 }
+
+func TestCheatLogIsASource(t *testing.T) {
+	srv, data := t.TempDir(), t.TempDir()
+	d := filepath.Join(srv, "Pal", "Binaries", "Win64", "PalDefender", "Logs", "Cheats")
+	os.MkdirAll(d, 0o755)
+	os.WriteFile(filepath.Join(d, "20.11 10.00.00.log"), []byte("[10:00:00][warning] something\n"), 0o644)
+	found := false
+	for _, s := range Sources(srv, data) {
+		found = found || s.ID == "cheats"
+	}
+	if !found {
+		t.Fatal("PalDefender's cheat detections should be on the Logs page")
+	}
+}
