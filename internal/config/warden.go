@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 )
@@ -26,6 +27,7 @@ type Warden struct {
 	Update    Update             `json:"update"`
 	Notify    notify.Config      `json:"notify"`
 	PalDef    paldefender.Config `json:"palDefender"`
+	Broadcast broadcast.Config   `json:"broadcasts"`
 }
 
 // Control says how Warden starts and stops the game server.
@@ -140,6 +142,9 @@ func (w *Warden) Check() error {
 		if _, err := os.Stat(w.Update.SteamCMD); err != nil {
 			bad = append(bad, fmt.Sprintf("SteamCMD isn't at %s", w.Update.SteamCMD))
 		}
+	}
+	if w.Broadcast.EveryMinutes != 0 && (w.Broadcast.EveryMinutes < 5 || w.Broadcast.EveryMinutes > 720) {
+		bad = append(bad, "broadcasts.everyMinutes must be between 5 and 720")
 	}
 	if err := w.Notify.Check(); err != nil {
 		bad = append(bad, err.Error())

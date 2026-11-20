@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
@@ -116,6 +117,11 @@ func main() {
 			Mods:    &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir},
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
 		go runner.WatchDown(context.Background())
+		var private broadcast.Private
+		if pd := paldefender.New(wcfg.PalDef); pd != nil {
+			private = pd.Message
+		}
+		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b })
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
 		go h.Supervise(context.Background())

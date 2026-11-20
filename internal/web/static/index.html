@@ -180,6 +180,11 @@
         <label class="check"><input type="checkbox" id="s-u-on"> Update the game during the nightly routine</label>
         <label for="s-u-path">SteamCMD program</label><input id="s-u-path" placeholder="C:\steamcmd\steamcmd.exe">
         <label class="check"><input type="checkbox" id="s-u-val"> Check every game file (slower)</label>
+        <h2>Server messages</h2>
+        <label class="check"><input type="checkbox" id="s-m-on"> Send messages in the game</label>
+        <label for="s-m-list">Messages, one per line, sent in turn while anyone is online (your Discord, website, rules, events)</label><textarea id="s-m-list" rows="4"></textarea>
+        <label for="s-m-every">Minutes between messages</label><input id="s-m-every" type="number" min="5" max="720" placeholder="20">
+        <label for="s-m-welcome">Welcome for each player who joins ({name} becomes their name; privately when PalDefender is connected)</label><input id="s-m-welcome" placeholder="Welcome to the server, {name}!">
         <h2>Notifications</h2>
         <label for="s-x-dc">Discord webhook (Server Settings → Integrations → Webhooks)</label><input id="s-x-dc" autocomplete="off" placeholder="https://discord.com/api/webhooks/...">
         <label for="s-x-ntfy">ntfy topic address (phone push)</label><input id="s-x-ntfy" autocomplete="off" placeholder="https://ntfy.sh/your-secret-topic">

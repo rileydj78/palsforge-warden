@@ -484,6 +484,8 @@ async function loadSettings() {
     $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate;
     $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
     $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
+    const b = cfg.broadcasts || {};
+    $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
     $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk;
     showMode();
@@ -498,6 +500,7 @@ $("setform").addEventListener("submit", async (e) => {
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
   Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked });
   c.notify = notifyForm();
+  c.broadcasts = { enabled: $("s-m-on").checked, messages: lines($("s-m-list").value), everyMinutes: parseInt($("s-m-every").value, 10) || 0, welcome: $("s-m-welcome").value.trim() };
   Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
   try {
     await api("/api/settings", c); $("set-msg").textContent = "";
