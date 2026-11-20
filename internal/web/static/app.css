@@ -1,10 +1,12 @@
+/* Inter (SIL Open Font License; see INTER-LICENSE.txt), bundled so Warden looks the same on every system. */
+@font-face { font-family: "Inter"; src: url("inter.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 [hidden] { display: none !important; } /* page styles (display:flex) must never un-hide something */
 :root {
   --ground: #F2F3EF; --card: #FFFFFF; --ink: #17201B; --muted: #4E5C53; --soft: #5C6A61;
   --line: #DDE1D8; --rule: #ECEFE8; --accent: #1F7A5A; --accent-ink: #155C43; --accent-bg: #E3F0E9;
   --top: #17201B; --top-ink: #EEF2EC; --ok: #48C78E; --bad: #D14B3C; --warn-bg: #FFF6EA; --warn-ink: #6A3A08;
   --font: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
-  --head: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --head: Inter, "Segoe UI", system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -212,3 +214,19 @@ details.passed summary::before { content: "✓ "; color: var(--accent); font-wei
 
 /* Dashboard graphs: two by two on wide screens, shorter; one column on phones. */
 .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 4px 28px; }
+
+/* A little identity, kept quiet: firmer headings, sans tabular numbers in the tiles, soft depth
+   on cards, and a thin accent under the top bar. */
+h1 { font-weight: 650; letter-spacing: -0.02em; }
+h2 { font-weight: 600; letter-spacing: -0.01em; }
+.stat .value { font: 650 30px/1.15 var(--font); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat .value.date { font-size: 24px; }
+.card, .stat { box-shadow: 0 1px 2px rgba(16, 24, 20, .04), 0 6px 16px rgba(16, 24, 20, .04); }
+@media (prefers-color-scheme: dark) { .card, .stat { box-shadow: 0 1px 2px rgba(0, 0, 0, .3); } }
+header.top, .top { border-bottom: 2px solid var(--accent); }
+
+/* With real weights available (bundled Inter), keep body controls at medium, not bold. */
+.btn { font-weight: 550; }
+.side a { font-weight: 500; } .side a.on { font-weight: 600; }
+a.todo { font-weight: 500; }
+.stat .label, th, .chartlabel { font-weight: 550; }
