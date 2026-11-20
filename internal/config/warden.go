@@ -91,6 +91,10 @@ type Health struct {
 	RestartFrozenMinutes int `json:"restartFrozenMinutes"`
 	// Restart (with in-game warnings) when the server uses more memory than this (0 = off).
 	MemoryLimitGB float64 `json:"memoryLimitGB"`
+	// Stop the server after it has been empty this many minutes and start it again when someone
+	// tries to join (0 = off). Only when Warden runs the server. A paused server isn't listed in
+	// the community server browser.
+	PauseEmptyMinutes int `json:"pauseEmptyMinutes"`
 }
 
 // Control says how Warden starts and stops the game server.

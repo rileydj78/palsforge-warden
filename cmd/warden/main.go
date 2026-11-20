@@ -168,6 +168,7 @@ func main() {
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
 		pin = runner.PinLatest
 		go runner.Watch(context.Background())
+		go runner.AutoPause(context.Background())
 		if evs, err := events.Parse(wcfg.Events); err == nil {
 			go runner.RunEvents(context.Background(), evs)
 		}

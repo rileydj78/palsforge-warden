@@ -343,7 +343,8 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 20 | Off-machine targets | **Done**: SFTP (pinned host key) and S3-compatible, each read back and checked; WebDAV not started |
 | 24 | API keys | **Done** (moderator/admin keys, hashed, revocable, audited) |
 | 27 | Several worlds | **Done** (list, name, switch, fresh world; backup-gated; nothing deleted) |
-| 25, 28, 30 | Auto-pause, self-update, files | Not started |
+| 25 | Auto-pause when empty | **Done** (knock-to-wake on the game port; off by default; Warden-run servers only) |
+| 28, 30 | Self-update, files | Not started (self-update waits for code signing) |
 | 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 

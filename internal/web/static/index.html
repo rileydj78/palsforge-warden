@@ -261,6 +261,7 @@
         <h2>Keeping it healthy</h2>
         <label for="s-h-frozen">Restart a server that's running but hasn't answered for this many minutes (0 = only tell me)</label><input id="s-h-frozen" type="number" min="0" max="60">
         <label for="s-h-mem">Restart with warnings when the server uses more memory than this many GB (0 = off; Palworld's memory grows over days)</label><input id="s-h-mem" type="number" min="0" step="0.5">
+        <label for="s-h-pause">Pause the server after it's been empty this many minutes, and start it again when someone tries to join (0 = off; only when Warden runs the server; a paused server isn't in the community server list, so this suits private servers)</label><input id="s-h-pause" type="number" min="0" max="1440">
         <h2>Allow-list</h2>
         <label class="check"><input type="checkbox" id="s-a-on"> Only players on the allow-list may join (others are kicked as they arrive)</label>
         <label for="s-a-msg">Message for people who aren't on it</label><input id="s-a-msg" placeholder="This server is invite-only right now.">
