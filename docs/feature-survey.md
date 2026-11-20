@@ -348,9 +348,12 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 
-Not release-ready until the "Not started" items that matter most to owners (8, 10) are
-decided: built, or consciously left out of 1.0 and said so. Character migration (8) needs a save
-parser for Oodle-compressed 1.0 saves: the largest single piece of work left.
+**1.0 scope (decided 2026-11-20):** every gap above is done except: character migration (8:
+Palworld's saves use proprietary Oodle compression, and safe save editing is a large project of
+its own; left out), translations (10: planned for 1.1), the Discord command bot (7: API keys let
+existing bots use Warden), self-update (28: needs code signing first), a file manager (30: not
+needed on the machine itself), and Alpha Pal / landmark map data (6: needs data with a clear
+licence).
 
 ## Parity gaps (others have it, Warden doesn't)
 

@@ -48,3 +48,28 @@ jobs:
         with:
           name: warden-unsigned
           path: dist/
+
+  # A version tag (v1.0.0-rc.1, v1.0.0...) makes a DRAFT release with the builds and their
+  # checksums. Nothing is public until a maintainer reviews the draft and publishes it.
+  release:
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: warden-unsigned
+          path: dist
+      - name: Draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist && sha256sum warden.exe warden-linux-amd64 > SHA256SUMS && cd ..
+          VER="${GITHUB_REF_NAME#v}"
+          awk -v v="## $VER" '$0 ~ "^## " {p = ($0 ~ v)} p' CHANGELOG.md > notes.md
+          PRE=""; case "$VER" in *-*) PRE="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" dist/warden.exe dist/warden-linux-amd64 dist/SHA256SUMS \
+            --draft $PRE --title "Palsforge Warden $VER" --notes-file notes.md

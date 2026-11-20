@@ -4,36 +4,34 @@ Status: first draft, 2026-11-19. Decisions marked **(decided)**; everything else
 discuss. The research behind it is in [research.md](research.md).
 
 
-## Status (2026-11-20)
+## Status (2026-11-20, 1.0 release candidate)
 
-Built, tested and running on a live server (Linux tests + CI; Windows builds wait for signing,
-because Smart App Control blocks new unsigned programs):
+Built, tested (Go tests + CI) and running on a live Windows server with three test servers next
+to it. Windows builds are unsigned until code signing is arranged (SignPath Foundation declined
+for now: the project is too new; Smart App Control blocks unsigned programs).
 
 | Area | State |
 |---|---|
-| Dashboard, history graphs, last backup / next run | done |
-| Players: online, roster, kick / ban / unban, announce | done |
-| Logins, roles, audit log, CSRF, loopback-only | done |
+| Dashboard, history graphs (players, FPS, CPU, memory, network), disk space | done |
+| Players: online, roster, kick / ban / unban, notes, allow-list, fast-levelling flag | done |
+| Accounts on a separate admin port, roles, two-step sign-in, API keys, audit log, CSRF | done |
 | Nightly routine (warn, save, stop, back up, update, start, health check) | done |
-| Backups: data + image, checksums, verified second places, retention | done |
-| Restore: preview, safety backup, reversible | done |
-| Server control: supervise (crash restarts) or external (watchdog / service) | done |
-| Warden settings page; `warden install / open / remote` | done |
-| Notifications: Discord, ntfy | done |
-| Logs viewer (IPs masked) | done |
-| Game settings editor | done |
-| Map (players) | done; coordinate transform to be checked in game |
-| Mods: scan, mistakes, on/off, zip install | done |
-| PalDefender: connect, guilds, map positions, messages, IP bans | done |
-| Signed Windows release | waiting on SignPath Foundation |
-| Access: no sign-in on the server; accounts on a separate admin port | done |
-| Server messages + welcome; join/leave alerts; live Discord status message | done |
-| Frozen-server and memory-limit restarts; save watchdog | done |
-| Unified ban list; player notes; guilds; bases on the map; player inventory/Pals; give items/Pals | done |
-| Weekly events; game-settings presets; settings written only while stopped | done |
-| Proven restores; crash-aware retention (pinned backups); backup download | done |
-| Setup check with exposure check | done |
-| Allow-list, Discord commands, save migration, multi-server, translations, Docker, first-run installer | next (see feature-survey.md) |
+| Backups: data + image, checksums, verified second places (folder, SFTP, S3, WebDAV), retention, pins, proven restores, download | done |
+| Restore: preview, safety backup, reversible (tested live) | done |
+| Server control: supervise (crash restarts, CPU cores) or external (watchdog / service) | done |
+| Several servers on one machine (one Warden each, switcher); several worlds per server | done |
+| Frozen-server and memory restarts (capped), save watchdog, auto-pause when empty | done |
+| Game settings editor, presets, import/export, Engine.ini, weekly events | done |
+| Mods: scan, mistakes, on/off, zip install, update hold while mods are on | done |
+| PalDefender: guilds, bases, inventories, give items/Pals, starter kits, cheat logs, IP bans | done |
+| Messages, welcomes, join/leave alerts, live Discord status, public status page | done |
+| Commands page; logs viewer (IPs masked); setup check with exposure check | done |
+| Install from nothing (SteamCMD + server); Docker sidecar; double-click setup | done |
+| Signed Windows release; self-update | after code signing |
+| Translations | 1.1 |
+| Character / host-save migration | not planned: Palworld's saves use Oodle, which is proprietary |
+| Discord command bot | not planned for 1.0: API keys let existing bots use Warden |
+| File manager | not planned: Warden runs on the machine, and each file worth editing has its page |
 
 The full competitor comparison and the parity gaps are in [feature-survey.md](feature-survey.md).
 

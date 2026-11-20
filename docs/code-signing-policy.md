@@ -1,8 +1,9 @@
 # Code signing policy
 
-Free code signing for the Windows release of Palsforge Warden is provided by
-[SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org).
-(Pending: the project has applied; until approval, Windows builds are unsigned.)
+Windows builds of Palsforge Warden are **not signed yet**. SignPath Foundation's free programme
+for open-source projects asked us to reapply once the project is better established (November
+2026). Until a signing route is in place, each release lists the SHA-256 checksums of its files,
+built by this repository's GitHub Actions workflow. The rules below apply as soon as signing starts.
 
 ## What is signed
 

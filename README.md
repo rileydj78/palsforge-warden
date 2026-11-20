@@ -3,8 +3,8 @@
 A free, open-source admin panel for **Palworld dedicated servers**, from the people behind the
 [Palsforge](https://palsforge.com) community server.
 
-> **Status: 0.1 in testing.** It runs on a live community server. The first Windows release
-> waits for code signing (see below); until then, build it yourself or use the CI build.
+> **Status: 1.0 release candidate.** It runs a live community server. Windows builds aren't
+> code-signed yet (see below). What's in 1.0 and what isn't: [CHANGELOG.md](CHANGELOG.md).
 
 One program on the machine that runs your Palworld server. Use it **locally** in its own window,
 or **remotely** as a web page over your own **Tailscale** network. Nothing is opened to the
@@ -111,14 +111,16 @@ GOOS=windows GOARCH=amd64 go build -o warden.exe ./cmd/warden    # Windows
   and is written to the audit log. Player IP addresses never reach the browser.
 - **Plain words:** errors say what's wrong and what to do about it.
 
-See [docs/design.md](docs/design.md) for the plan and what comes next (settings editor for the
-game itself, logs, notifications, PalDefender, a map, and mod management).
+See [docs/design.md](docs/design.md) for the design and its status, and
+[docs/feature-survey.md](docs/feature-survey.md) for how Warden compares with 16 other tools.
 
 ## Signing and privacy
 
-Windows builds are being set up for free open-source code signing through SignPath Foundation;
-see [the code signing policy](docs/code-signing-policy.md). Warden sends nothing anywhere unless
-you configure it to.
+Windows builds are not code-signed yet: SignPath Foundation's free programme asks for an
+established project first, so signing comes later (see [the code signing policy](docs/code-signing-policy.md)).
+Until then Windows SmartScreen shows a warning ("More info" → "Run anyway"), and Smart App
+Control, where it's turned on, blocks the program. Each release lists SHA-256 checksums of its
+files. Warden sends nothing anywhere unless you configure it to.
 
 Palworld is a trademark of Pocketpair, Inc. Palsforge Warden is an unofficial fan project and is
 not affiliated with or endorsed by Pocketpair.
