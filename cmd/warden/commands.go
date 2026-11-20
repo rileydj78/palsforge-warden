@@ -232,3 +232,20 @@ func pauseIfDoubleClicked() {
 		}
 	}
 }
+
+// restartSelf starts a fresh copy of Warden with the same arguments and exits, so new settings
+// apply exactly as at startup.
+func restartSelf() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(exe, os.Args[1:]...)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, "warden: couldn't restart:", err)
+		return
+	}
+	fmt.Fprintln(os.Stderr, "warden: settings changed; restarted as process", cmd.Process.Pid)
+	os.Exit(0)
+}

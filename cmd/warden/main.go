@@ -103,6 +103,7 @@ func main() {
 		go runner.Schedule(context.Background())
 		log.Printf("server control: %s mode; nightly routine %s", wcfg.Control.Mode, map[bool]string{true: "at " + wcfg.Nightly.Time, false: "off"}[wcfg.Nightly.Enabled])
 	}
+	srv.Settings = &web.Settings{DataDir: *dataDir, Restart: restartSelf}
 	log.Printf("Warden %s: panel on http://%s/ (this machine only); data in %s", version, *listen, *dataDir)
 	log.Fatal(srv.Listen(*listen))
 }

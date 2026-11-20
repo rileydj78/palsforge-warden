@@ -27,6 +27,7 @@
     <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
     <a href="#/activity" data-view="activity">Activity</a>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Admins</a>
+    <a href="#/settings" data-view="settings" id="settingsnav" hidden>Settings</a>
   </nav>
   <main id="main">
     <section id="view-dash" class="view">
@@ -105,6 +106,37 @@
       <div class="card"><div class="tablewrap"><table>
         <thead><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr></thead>
         <tbody id="auditrows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-settings" class="view" hidden>
+      <h1>Warden settings</h1>
+      <p class="sub" id="set-path"></p>
+      <p class="problem" id="set-error" hidden></p>
+      <form class="card form wide" id="setform">
+        <h2>Nightly routine</h2>
+        <label class="check"><input type="checkbox" id="s-n-on"> Run it every night</label>
+        <label for="s-n-time">Time the server stops (this machine's clock)</label><input id="s-n-time" placeholder="04:00">
+        <label for="s-n-warn">In-game warnings, minutes before (comma-separated)</label><input id="s-n-warn" placeholder="15, 5, 1">
+        <h2>Backups</h2>
+        <label for="s-b-dir">Folder on this machine (empty = Warden's data folder)</label><input id="s-b-dir">
+        <label for="s-b-off">Second places, one per line (another disk, a NAS share). Each copy is checked.</label><textarea id="s-b-off" rows="3"></textarea>
+        <label for="s-b-img">Whole-server image</label><select id="s-b-img"><option value="weekly">Weekly (Sundays)</option><option value="daily">Every night</option><option value="off">Off</option></select>
+        <label for="s-b-d">Keep the newest (nightly)</label><input id="s-b-d" type="number" min="1" max="365">
+        <label for="s-b-w">Plus one a week for this many weeks</label><input id="s-b-w" type="number" min="0" max="104">
+        <h2>Game updates</h2>
+        <label class="check"><input type="checkbox" id="s-u-on"> Update the game during the nightly routine</label>
+        <label for="s-u-path">SteamCMD program</label><input id="s-u-path" placeholder="C:\steamcmd\steamcmd.exe">
+        <label class="check"><input type="checkbox" id="s-u-val"> Check every game file (slower)</label>
+        <h2>Starting and stopping the server</h2>
+        <label for="s-c-mode">Who runs the server</label><select id="s-c-mode"><option value="supervise">Warden runs it and restarts it after a crash</option><option value="external">Another program runs it (a service, a task, a host's panel)</option></select>
+        <div id="s-sup"><label for="s-c-exe">Server program (inside the server folder)</label><input id="s-c-exe">
+        <label for="s-c-args">Its options</label><input id="s-c-args">
+        <label for="s-c-aff">CPU cores it may use (Windows; e.g. 8-11; empty = all)</label><input id="s-c-aff"></div>
+        <div id="s-ext"><label for="s-c-start">Command that starts it, one word per line</label><textarea id="s-c-start" rows="3"></textarea>
+        <label for="s-c-stop">Stop file a watchdog script respects (optional)</label><input id="s-c-stop"></div>
+        <div class="row"><button class="btn primary" type="submit">Save and restart Warden</button></div>
+        <p class="msg" id="set-msg" role="alert"></p>
+      </form>
     </section>
 
     <section id="view-admins" class="view" hidden>

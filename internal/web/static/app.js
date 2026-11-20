@@ -60,6 +60,7 @@ function signedIn(out) {
   $("gate").hidden = true; $("layout").hidden = false; $("signout").hidden = false; $("state").hidden = false;
   $("signout").textContent = `Sign out (${me.name})`;
   $("adminsnav").hidden = me.role !== "owner";
+  $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
   api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; }).catch(() => {});
@@ -301,10 +302,43 @@ $("b-backup").addEventListener("click", async () => {
   try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${r.made.join(", ")}`); loadBackups(); } catch (e) { toast(e.message); }
 });
 
+// ---- Warden's own settings (owner)
+let cfg = null;
+const lines = (t) => t.split("\n").map((x) => x.trim()).filter(Boolean);
+function showMode() { const ext = $("s-c-mode").value === "external"; $("s-ext").hidden = !ext; $("s-sup").hidden = ext; }
+$("s-c-mode").addEventListener("change", showMode);
+async function loadSettings() {
+  try {
+    const r = await api("/api/settings"); cfg = r.settings;
+    $("set-path").textContent = `Saved in ${r.path}. The server folder is ${cfg.serverDir}.`;
+    $("set-error").hidden = !r.error; $("set-error").textContent = r.error ? `Needs attention: ${r.error}` : "";
+    $("s-n-on").checked = cfg.nightly.enabled; $("s-n-time").value = cfg.nightly.time; $("s-n-warn").value = (cfg.nightly.warnMinutes || []).join(", ");
+    $("s-b-dir").value = cfg.backups.dir; $("s-b-off").value = (cfg.backups.offsite || []).join("\n"); $("s-b-img").value = cfg.backups.image;
+    $("s-b-d").value = cfg.backups.keepDaily; $("s-b-w").value = cfg.backups.keepWeekly;
+    $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate;
+    $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
+    $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
+    showMode();
+  } catch (e) {}
+}
+$("setform").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const c = structuredClone(cfg);
+  c.nightly = { enabled: $("s-n-on").checked, time: $("s-n-time").value.trim(), warnMinutes: $("s-n-warn").value.split(",").map((x) => parseInt(x, 10)).filter((x) => !isNaN(x)) };
+  Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
+  Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked });
+  Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
+  try {
+    await api("/api/settings", c); $("set-msg").textContent = "";
+    toast("Saved. Warden is restarting; this page comes back in a few seconds.");
+    setTimeout(() => location.reload(), 4000);
+  } catch (err) { $("set-msg").textContent = err.message; }
+});
+
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups", "settings"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -312,6 +346,7 @@ function route() {
   if (view === "admins") loadUsers();
   if (view === "server") loadServer();
   if (view === "backups") loadBackups();
+  if (view === "settings") loadSettings();
 }
 window.addEventListener("hashchange", route);
 async function refresh() { try { render(await api("/api/status")); } catch (e) {} }

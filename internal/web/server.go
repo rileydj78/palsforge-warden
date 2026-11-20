@@ -35,14 +35,15 @@ const cookieName = "warden_session"
 
 // Server is the panel.
 type Server struct {
-	Game    *palworld.Client
-	Store   *store.Store
-	Auth    *auth.Auth
-	Version string
-	Control *Control
-	mu      sync.Mutex
-	last    *Status
-	lastAt  time.Time
+	Game     *palworld.Client
+	Store    *store.Store
+	Auth     *auth.Auth
+	Version  string
+	Control  *Control
+	Settings *Settings
+	mu       sync.Mutex
+	last     *Status
+	lastAt   time.Time
 }
 
 // PlayerView is what the panel shows about a player. No IP addresses: the panel never needs them.
@@ -346,6 +347,7 @@ func (s *Server) Handler() http.Handler {
 		return s.Game.Shutdown(ctx, in.Seconds, in.Message)
 	}, none)
 	s.controlRoutes(mux)
+	s.settingsRoutes(mux)
 	return secure(mux)
 }
 
@@ -373,5 +375,15 @@ func (s *Server) Listen(addr string) error {
 		log.Fatalf("refusing to listen on %s: Warden listens on 127.0.0.1 only (use tailscale serve for remote access)", addr)
 	}
 	srv := &http.Server{Addr: addr, Handler: s.Handler(), ReadHeaderTimeout: 10 * time.Second}
-	return srv.ListenAndServe()
+	var ln net.Listener
+	for i := 0; ; i++ { // after a restart the old process may hold the port for a moment
+		if ln, err = net.Listen("tcp", addr); err == nil || i == 20 {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if err != nil {
+		return err
+	}
+	return srv.Serve(ln)
 }

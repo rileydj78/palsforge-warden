@@ -92,3 +92,7 @@ td.bad, .bad { color: #A3261B; font-weight: 700; }
 details.run { border-top: 1px solid var(--rule); padding: 8px 0; }
 details.run summary { cursor: pointer; font-weight: 500; }
 details.run table { margin-top: 8px; }
+.form.wide { max-width: 640px; }
+.form h2 { margin-top: 14px; }
+.form textarea { font: 13px var(--mono); padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); }
+.check { display: flex; gap: 8px; align-items: center; }

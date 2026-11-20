@@ -196,3 +196,51 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		writeJSON(w, 200, map[string]any{"ok": true, "made": names})
 	}))
 }
+
+// Settings is the owner's view of warden.json. Saving checks it, writes it and restarts Warden
+// (Restart is set by main) so every part picks the new values up the same way as at startup.
+type Settings struct {
+	DataDir string
+	Restart func()
+}
+
+func (s *Server) settingsRoutes(mux *http.ServeMux) {
+	if s.Settings == nil {
+		return
+	}
+	mux.HandleFunc("GET /api/settings", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		cfg, _, err := config.Load(s.Settings.DataDir, "")
+		resp := map[string]any{"settings": cfg, "path": config.ConfigPath(s.Settings.DataDir)}
+		if err != nil {
+			resp["error"] = err.Error()
+		} else if err := cfg.Check(); err != nil {
+			resp["error"] = err.Error()
+		}
+		writeJSON(w, 200, resp)
+	}))
+	mux.HandleFunc("POST /api/settings", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var cfg config.Warden
+		if readJSON(r, &cfg) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		if err := cfg.Check(); err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		if busy := s.Control != nil && func() bool { b, _ := s.Control.Runner.Busy(); return b }(); busy {
+			fail(w, 409, "the nightly routine is running; save after it finishes")
+			return
+		}
+		err := config.Save(s.Settings.DataDir, cfg)
+		s.Store.Audit(ses.User.Name, "change Warden settings", "", "", err == nil)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true, "restarting": s.Settings.Restart != nil})
+		if s.Settings.Restart != nil {
+			go func() { time.Sleep(500 * time.Millisecond); s.Settings.Restart() }()
+		}
+	}))
+}
