@@ -329,7 +329,32 @@ $("adduser").addEventListener("submit", async (e) => {
 // ---- server control, nightly routine, backups
 const size = (n) => n > 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} GB` : n > 1 << 20 ? `${(n / (1 << 20)).toFixed(0)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 const when2 = (iso) => iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "–";
+async function loadWorlds() {
+  try {
+    const r = await api("/api/worlds"), rows = $("worldrows"); rows.replaceChildren();
+    $("world-new").parentElement.hidden = me.role !== "owner";
+    for (const w of r.worlds) {
+      const tr = el("tr"), acts = el("td", null, "acts"), name = el("td", w.label || w.id.slice(0, 8) + "…", "strong");
+      name.title = w.id;
+      if (w.active) name.append(el("span", w.size ? "running" : "starts fresh next time", "tag"));
+      const lb = el("button", w.label ? "Rename" : "Name it", "small");
+      lb.onclick = async () => { const t = await ask({ title: "Name this world", text: "Only shown in Warden, e.g. Season 1.", label: "Name", value: w.label || "", ok: "Save" }); if (t == null) return; try { await api("/api/worlds/label", { id: w.id, label: t }); loadWorlds(); } catch (e) { toast(e.message); } };
+      acts.append(lb);
+      if (!w.active && me.role === "owner") { const sw = el("button", "Switch to it", "small"); sw.onclick = () => switchWorld(w.id, w.label || w.id.slice(0, 8)); acts.append(sw); }
+      tr.append(name, el("td", w.size ? String(w.players) : "–", "num"), el("td", w.size ? size(w.size) : "–", "num"), el("td", w.size ? when2(w.modified) : "–"), acts); rows.append(tr);
+    }
+    if (!r.worlds.length) { const tr = el("tr"); const td = el("td", "No world yet: the server makes one the first time it starts.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+  } catch (e) {}
+}
+async function switchWorld(id, label) {
+  const fresh = id === "new";
+  const m = await ask({ title: fresh ? "Start a fresh world?" : `Switch to ${label}?`, text: (fresh ? "Players start over on a new map. The current world is kept and you can switch back to it." : "The current world is kept and you can switch back to it.") + " Warn players this many minutes ahead (0 = now):", label: "Minutes", value: "5", ok: fresh ? "Start fresh" : "Switch" });
+  if (m == null) return;
+  try { await api("/api/worlds/switch", { id, minutes: Math.max(0, Math.min(60, parseInt(m, 10) || 0)) }); toast("Switching: warnings, save, backup, then the switch. The run appears under Recent runs."); } catch (e) { toast(e.message); }
+}
+$("world-new").addEventListener("click", () => switchWorld("new"));
 async function loadServer() {
+  loadWorlds();
   try {
     const s = await api("/api/server"), h = s.host;
     $("srv-state").textContent = h.running ? "Running" : "Stopped";

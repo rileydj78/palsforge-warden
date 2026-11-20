@@ -164,7 +164,7 @@ func Run(ctx context.Context, p Plan, g Game, h Host, b Backups) *Report {
 	if stopped && p.BeforeStart != nil {
 		sum, err := p.BeforeStart(ctx)
 		if sum != "" || err != nil {
-			bad(r.add("mods", err, sum))
+			bad(r.add("changes while stopped", err, sum))
 		}
 	}
 

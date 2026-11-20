@@ -23,6 +23,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
+	"github.com/rileydj78/palsforge-warden/internal/worlds"
 )
 
 // Control is the server-control side of the panel (nil when Warden only watches).
@@ -115,6 +116,50 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		return nil
 	})
+	mux.HandleFunc("GET /api/worlds", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		ws, err := worlds.List(c.Cfg.ServerDir, config.SettingsPath(c.Cfg.ServerDir), c.Runner.Backups.DataDir)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{"worlds": ws, "pending": worlds.Pending(c.Runner.Backups.DataDir)})
+	}))
+	mux.HandleFunc("POST /api/worlds/switch", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			ID      string `json:"id"` // a world ID, or "new" for a fresh world
+			Minutes int    `json:"minutes"`
+		}
+		if readJSON(r, &in) != nil || in.Minutes < 0 || in.Minutes > 60 {
+			fail(w, 400, "bad request")
+			return
+		}
+		if busy, what := c.Runner.Busy(); busy {
+			fail(w, 409, "busy with "+what)
+			return
+		}
+		var warn []int
+		for _, m := range []int{15, 5, 1} {
+			if m <= in.Minutes {
+				warn = append(warn, m)
+			}
+		}
+		s.Store.Audit(ses.User.Name, "switch world", in.ID, fmt.Sprintf("warning %d min", in.Minutes), true)
+		go c.Runner.SwitchWorld(context.Background(), in.ID, warn)
+		writeJSON(w, 202, map[string]bool{"started": true})
+	}))
+	mux.HandleFunc("POST /api/worlds/label", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ ID, Label string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := worlds.SetLabel(c.Runner.Backups.DataDir, in.ID, cleanText(in.Label, 40))
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("GET /api/engine", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		p := gamesettings.EnginePath(config.SettingsPath(c.Cfg.ServerDir))
 		cur, _ := os.ReadFile(p)

@@ -137,6 +137,10 @@
         <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
       <section class="card admin-only"><h2>Game updates</h2><p id="upd-state" class="note">Warden updates the game in the nightly routine when updates are on.</p>
         <div class="row" style="justify-content:flex-start"><button type="button" class="small" id="upd-check">Check for a game update</button><button type="button" class="small" id="upd-allow" hidden></button></div></section>
+      <section class="card admin-only"><h2>Worlds</h2>
+        <p class="note">Each world is kept in its own folder; switching never deletes one, so you can always switch back. The current world is backed up first, and Warden only switches if that backup worked.</p>
+        <div class="tablewrap"><table><thead><tr><th>World</th><th>Players</th><th>Size</th><th>Last played</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="worldrows"></tbody></table></div>
+        <div class="row owner-only" style="justify-content:flex-start"><button type="button" class="small" id="world-new">Start a fresh world…</button></div></section>
       <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
       <section class="card"><h2>Server events</h2><div class="tablewrap"><table>
         <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>

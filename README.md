@@ -44,6 +44,8 @@ internet, and Palworld's admin password never leaves the server.
   the server is stopped (Palworld rewrites its settings when it shuts down).
 - **API keys for bots and websites:** `Authorization: Bearer wk_…` on the administration port; a
   key is a moderator or admin (never the owner), revocable at once, and in the activity log.
+- **Several worlds:** name them, switch between them, or start a fresh one (a new season) while
+  keeping the old: the current world is backed up first and Warden only switches if that worked.
 - **A public status page** (optional): name, online, player count, on its own read-only port;
   `warden remote public on` publishes only that page through Tailscale Funnel.
 - **New server from nothing:** `warden install-server C:\PalServer` (or type NEW in setup) gets

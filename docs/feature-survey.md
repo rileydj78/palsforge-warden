@@ -342,7 +342,8 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 23 | Docker | **Done** (sidecar image + guide, `warden adduser`); not tried with a live Palworld container |
 | 20 | Off-machine targets | **Done**: SFTP (pinned host key) and S3-compatible, each read back and checked; WebDAV not started |
 | 24 | API keys | **Done** (moderator/admin keys, hashed, revocable, audited) |
-| 25, 27–28, 30 | Auto-pause, worlds, self-update, files | Not started |
+| 27 | Several worlds | **Done** (list, name, switch, fresh world; backup-gated; nothing deleted) |
+| 25, 28, 30 | Auto-pause, self-update, files | Not started |
 | 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 

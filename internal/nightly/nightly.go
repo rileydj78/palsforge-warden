@@ -23,6 +23,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/routine"
 	"github.com/rileydj78/palsforge-warden/internal/store"
+	"github.com/rileydj78/palsforge-warden/internal/worlds"
 )
 
 // DataPaths is what a data backup holds, relative to the server folder: the world and settings,
@@ -399,4 +400,52 @@ func (r *Runner) Schedule(ctx context.Context) {
 		}
 		time.Sleep(time.Minute) // never twice in the same minute
 	}
+}
+
+// backupGate remembers whether this run's backup worked.
+type backupGate struct {
+	routine.Backups
+	ok bool
+}
+
+func (g *backupGate) MakeAll(ctx context.Context) ([]string, error) {
+	n, err := g.Backups.MakeAll(ctx)
+	g.ok = err == nil
+	return n, err
+}
+
+// SwitchWorld runs the server on another world (or a fresh one: id "new"): warnings, save, stop,
+// a backup of the current world, then the switch, but only if that backup worked, and start.
+// No world is deleted.
+func (r *Runner) SwitchWorld(ctx context.Context, id string, warn []int) (*routine.Report, error) {
+	if id == "new" {
+		id = worlds.NewID()
+	}
+	if err := worlds.Queue(r.Backups.DataDir, id); err != nil {
+		return nil, err
+	}
+	end, err := r.Begin("a world switch")
+	if err != nil {
+		worlds.Cancel(r.Backups.DataDir)
+		return nil, err
+	}
+	defer end()
+	gate := &backupGate{Backups: r.Backups}
+	p := routine.Plan{WarnMinutes: warn}
+	p.BeforeStart = func(ctx context.Context) (string, error) {
+		if !gate.ok {
+			worlds.Cancel(r.Backups.DataDir)
+			return "", errors.New("the world wasn't switched: the backup of the current world didn't work")
+		}
+		sum, err := r.WhileStopped(ctx)
+		ws, werr := worlds.ApplyPending(config.SettingsPath(r.Cfg.ServerDir), r.Backups.DataDir)
+		if ws != "" {
+			sum = strings.TrimPrefix(sum+"; "+ws, "; ")
+		}
+		return sum, errors.Join(err, werr)
+	}
+	rep := routine.Run(ctx, p, r.Game, r.Host, gate)
+	r.Store.AddRun("world switch", rep.Started, rep.OK, rep)
+	r.tell("world switch", rep)
+	return rep, nil
 }
