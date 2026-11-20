@@ -27,6 +27,8 @@ var schema = []string{
 	`CREATE TABLE IF NOT EXISTS samples (
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
 	`ALTER TABLE users ADD COLUMN totp TEXT`,
+	`ALTER TABLE samples ADD COLUMN cpu REAL`,
+	`ALTER TABLE samples ADD COLUMN mem REAL`,
 	`ALTER TABLE users ADD COLUMN totp_pending TEXT`,
 	`CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, kind TEXT, started INTEGER, ok INTEGER, report TEXT)`,
 	`CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, ts INTEGER, kind TEXT, text TEXT)`,
@@ -102,18 +104,20 @@ type Sample struct {
 	Players   int     `json:"players"`
 	FPS       float64 `json:"fps"`
 	FrameTime float64 `json:"frametime"`
+	CPU       float64 `json:"cpu"` // the machine's CPU use, %
+	Mem       float64 `json:"mem"` // the machine's memory use, %
 }
 
 // AddSample stores one history point.
 func (s *Store) AddSample(p Sample) {
-	s.DB.Exec(`INSERT OR REPLACE INTO samples(ts,online,players,fps,frametime) VALUES(?,?,?,?,?)`,
-		p.TS, p.Online, p.Players, p.FPS, p.FrameTime)
+	s.DB.Exec(`INSERT OR REPLACE INTO samples(ts,online,players,fps,frametime,cpu,mem) VALUES(?,?,?,?,?,?,?)`,
+		p.TS, p.Online, p.Players, p.FPS, p.FrameTime, p.CPU, p.Mem)
 }
 
 // History returns samples since a time, and drops ones older than 30 days.
 func (s *Store) History(since time.Time) ([]Sample, error) {
 	s.DB.Exec(`DELETE FROM samples WHERE ts < ?`, time.Now().Add(-30*24*time.Hour).Unix())
-	rows, err := s.DB.Query(`SELECT ts,online,COALESCE(players,0),COALESCE(fps,0),COALESCE(frametime,0) FROM samples WHERE ts >= ? ORDER BY ts`, since.Unix())
+	rows, err := s.DB.Query(`SELECT ts,online,COALESCE(players,0),COALESCE(fps,0),COALESCE(frametime,0),COALESCE(cpu,0),COALESCE(mem,0) FROM samples WHERE ts >= ? ORDER BY ts`, since.Unix())
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +125,7 @@ func (s *Store) History(since time.Time) ([]Sample, error) {
 	out := []Sample{}
 	for rows.Next() {
 		var p Sample
-		rows.Scan(&p.TS, &p.Online, &p.Players, &p.FPS, &p.FrameTime)
+		rows.Scan(&p.TS, &p.Online, &p.Players, &p.FPS, &p.FrameTime, &p.CPU, &p.Mem)
 		out = append(out, p)
 	}
 	return out, rows.Err()

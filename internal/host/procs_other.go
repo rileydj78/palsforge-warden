@@ -99,3 +99,43 @@ func openPorts() map[int]bool {
 	}
 	return open
 }
+
+// machineMem returns the machine's used and total memory in bytes.
+func machineMem() (used, total uint64) {
+	b, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0, 0
+	}
+	var tot, avail uint64
+	for _, line := range bytes.Split(b, []byte("\n")) {
+		f := bytes.Fields(line)
+		if len(f) < 2 {
+			continue
+		}
+		n, _ := strconv.ParseUint(string(f[1]), 10, 64)
+		switch string(f[0]) {
+		case "MemTotal:":
+			tot = n * 1024
+		case "MemAvailable:":
+			avail = n * 1024
+		}
+	}
+	return tot - avail, tot
+}
+
+// cpuTimes returns the machine's idle and total CPU time so far (jiffies).
+func cpuTimes() (idle, total uint64) {
+	b, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0, 0
+	}
+	f := bytes.Fields(bytes.SplitN(b, []byte("\n"), 2)[0])
+	for i, x := range f[1:] {
+		n, _ := strconv.ParseUint(string(x), 10, 64)
+		total += n
+		if i == 3 || i == 4 { // idle, iowait
+			idle += n
+		}
+	}
+	return idle, total
+}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 )
@@ -35,10 +36,12 @@ func SampleOnce(ctx context.Context, game *palworld.Client, st *store.Store) {
 	now := time.Now().Unix()
 	m, err := game.Metrics(ctx)
 	if err != nil {
-		st.AddSample(store.Sample{TS: now, Online: false})
+		ml := host.MachineLoad()
+		st.AddSample(store.Sample{TS: now, Online: false, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal)})
 		return
 	}
-	st.AddSample(store.Sample{TS: now, Online: true, Players: m.CurrentPlayers, FPS: m.ServerFPS, FrameTime: m.ServerFrameTime})
+	ml := host.MachineLoad()
+	st.AddSample(store.Sample{TS: now, Online: true, Players: m.CurrentPlayers, FPS: m.ServerFPS, FrameTime: m.ServerFrameTime, CPU: ml.CPUPercent, Mem: pct(ml.MemUsed, ml.MemTotal)})
 	ps, err := game.Players(ctx)
 	if err != nil {
 		return
@@ -66,4 +69,11 @@ func Run(ctx context.Context, game *palworld.Client, st *store.Store) {
 		case <-t.C:
 		}
 	}
+}
+
+func pct(a, b uint64) float64 {
+	if b == 0 {
+		return 0
+	}
+	return 100 * float64(a) / float64(b)
 }

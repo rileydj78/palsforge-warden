@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"unsafe"
 )
 
 // pidsOf lists the process ids running the program exe (matched by file name).
@@ -120,4 +121,35 @@ func openPorts() map[int]bool {
 		}
 	}
 	return open
+}
+
+var (
+	procMemStatus   = kernel32.NewProc("GlobalMemoryStatusEx")
+	procSystemTimes = kernel32.NewProc("GetSystemTimes")
+)
+
+type memStatusEx struct {
+	Length, MemoryLoad                                 uint32
+	TotalPhys, AvailPhys, TotalPageFile, AvailPageFile uint64
+	TotalVirtual, AvailVirtual, AvailExtendedVirtual   uint64
+}
+
+// machineMem returns the machine's used and total memory in bytes.
+func machineMem() (used, total uint64) {
+	var m memStatusEx
+	m.Length = uint32(unsafe.Sizeof(m))
+	if r, _, _ := procMemStatus.Call(uintptr(unsafe.Pointer(&m))); r == 0 {
+		return 0, 0
+	}
+	return m.TotalPhys - m.AvailPhys, m.TotalPhys
+}
+
+// cpuTimes returns the machine's idle and total CPU time so far (100 ns units).
+func cpuTimes() (idle, total uint64) {
+	var i, k, u syscall.Filetime
+	if r, _, _ := procSystemTimes.Call(uintptr(unsafe.Pointer(&i)), uintptr(unsafe.Pointer(&k)), uintptr(unsafe.Pointer(&u))); r == 0 {
+		return 0, 0
+	}
+	ft := func(f syscall.Filetime) uint64 { return uint64(f.HighDateTime)<<32 | uint64(f.LowDateTime) }
+	return ft(i), ft(k) + ft(u) // kernel time includes idle time
 }

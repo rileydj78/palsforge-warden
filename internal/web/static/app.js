@@ -199,6 +199,7 @@ async function history() {
     $("hist").textContent = range === "day" ? "The last 24 hours" : "The last 7 days";
     chart($("chart-players"), h, "players", "Players online", "var(--accent)", 4);
     chart($("chart-fps"), h, "fps", "Server FPS", "var(--chart2)", 60);
+    chart($("chart-cpu"), h, "cpu", "The machine's CPU, %", "var(--soft)", 100);
     const down = h.filter((s) => !s.online).length;
     $("histnote").textContent = down ? `The server didn't answer for about ${down} minute${down === 1 ? "" : "s"} in this period.` : "";
   } catch (e) {}
@@ -292,6 +293,7 @@ async function loadServer() {
     $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in warden.json";
     $("srv-crashes").textContent = h.crashes24h;
     $("srv-mem").textContent = s.memory ? `${(s.memory / (1 << 30)).toFixed(1)} GB` : "–";
+    if (s.machine) { $("srv-cpu").textContent = `${Math.round(s.machine.cpuPercent)}% CPU`; $("srv-ram").textContent = s.machine.memTotal ? `${(s.machine.memUsed / (1 << 30)).toFixed(1)} of ${(s.machine.memTotal / (1 << 30)).toFixed(0)} GB memory in use` : ""; }
     $("srv-memnote").textContent = s.health && s.health.memoryLimitGB ? `Restarts with warnings above ${s.health.memoryLimitGB} GB` : "No memory limit set";
     $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
     $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";

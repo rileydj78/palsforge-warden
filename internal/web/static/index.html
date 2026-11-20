@@ -62,6 +62,7 @@
           <div class="seg" role="group" aria-label="Range"><button id="r-day" aria-pressed="true">24 h</button><button id="r-week" aria-pressed="false">7 days</button></div></div>
         <div class="chart" id="chart-players" role="img" aria-label="Players online over time"></div>
         <div class="chart" id="chart-fps" role="img" aria-label="Server FPS over time"></div>
+        <div class="chart" id="chart-cpu" role="img" aria-label="The machine's CPU use over time"></div>
         <p class="note" id="histnote"></p>
       </section>
       <section class="card" aria-labelledby="pl">
@@ -122,6 +123,7 @@
         <div class="stat"><span class="label">Next nightly run</span><span class="value" id="srv-next">–</span><span class="note" id="srv-nightly"></span></div>
         <div class="stat"><span class="label">Crashes, 24 h</span><span class="value" id="srv-crashes">–</span><span class="note" id="srv-paused"></span></div>
         <div class="stat"><span class="label">Memory</span><span class="value" id="srv-mem">–</span><span class="note" id="srv-memnote"></span></div>
+        <div class="stat"><span class="label">This machine</span><span class="value" id="srv-cpu">–</span><span class="note" id="srv-ram"></span></div>
       </section>
       <section class="card admin-only"><h2>Setup check</h2><ul class="checks" id="checks"><li class="note">Checking…</li></ul></section>
       <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>

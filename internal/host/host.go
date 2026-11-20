@@ -388,3 +388,34 @@ func (h *Host) Memory() int64 {
 
 // OpenPorts lists TCP ports listening on all networks (for the exposure check).
 func OpenPorts() map[int]bool { return openPorts() }
+
+// Machine is the computer's own load.
+type Machine struct {
+	CPUPercent float64 `json:"cpuPercent"`
+	MemUsed    uint64  `json:"memUsed"`
+	MemTotal   uint64  `json:"memTotal"`
+}
+
+var lastCPU struct {
+	sync.Mutex
+	idle, total uint64
+}
+
+// MachineLoad returns CPU use since the previous call (the first call measures over 500 ms) and
+// memory use now.
+func MachineLoad() Machine {
+	lastCPU.Lock()
+	defer lastCPU.Unlock()
+	if lastCPU.total == 0 {
+		lastCPU.idle, lastCPU.total = cpuTimes()
+		time.Sleep(500 * time.Millisecond)
+	}
+	i, t := cpuTimes()
+	m := Machine{}
+	if dt := t - lastCPU.total; t > lastCPU.total && dt > 0 {
+		m.CPUPercent = 100 * float64(dt-(i-lastCPU.idle)) / float64(dt)
+	}
+	lastCPU.idle, lastCPU.total = i, t
+	m.MemUsed, m.MemTotal = machineMem()
+	return m
+}
