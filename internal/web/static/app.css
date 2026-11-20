@@ -1,3 +1,4 @@
+[hidden] { display: none !important; } /* page styles (display:flex) must never un-hide something */
 :root {
   --ground: #F2F3EF; --card: #FFFFFF; --ink: #17201B; --muted: #4E5C53; --soft: #5C6A61;
   --line: #DDE1D8; --rule: #ECEFE8; --accent: #1F7A5A; --accent-ink: #155C43; --accent-bg: #E3F0E9;

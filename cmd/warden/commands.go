@@ -124,7 +124,11 @@ WantedBy=multi-user.target
 		return fmt.Errorf("couldn't create the startup task (run this from an Administrator window): %s", strings.TrimSpace(string(out)))
 	}
 	exec.Command("schtasks", "/Run", "/TN", taskName).Run()
-	fmt.Printf("Warden will now start with Windows, and it's starting now.\nOpen the panel with: %s open\n", filepath.Base(exe))
+	if err := startMenuShortcut(exe); err == nil {
+		fmt.Println("Warden will now start with Windows, and it's starting now.\nOpen the panel from the Start menu: \"Palsforge Warden\".")
+	} else {
+		fmt.Printf("Warden will now start with Windows, and it's starting now.\nOpen the panel with: \"%s\" open\n", exe)
+	}
 	fmt.Println("The first time, it asks for a setup code: it's in warden.log in Warden's data folder (C:\\ProgramData\\Warden).")
 	return nil
 }
@@ -139,6 +143,7 @@ func uninstall() error {
 	if err != nil {
 		return fmt.Errorf("couldn't remove the startup task: %s", strings.TrimSpace(string(out)))
 	}
+	os.Remove(shortcutPath())
 	fmt.Println("Warden no longer starts with Windows. Its data and backups are kept.")
 	return nil
 }
@@ -256,4 +261,15 @@ func restartSelf() {
 	}
 	fmt.Fprintln(os.Stderr, "warden: settings changed; restarted as process", cmd.Process.Pid)
 	os.Exit(0)
+}
+
+func shortcutPath() string {
+	return filepath.Join(os.Getenv("ProgramData"), `Microsoft\Windows\Start Menu\Programs`, "Palsforge Warden.lnk")
+}
+
+// startMenuShortcut adds "Palsforge Warden" to every user's Start menu; it opens the panel.
+func startMenuShortcut(exe string) error {
+	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s'); $s.TargetPath='%s'; $s.Arguments='open'; $s.Description='Palsforge Warden: the Palworld server panel'; $s.Save()`,
+		strings.ReplaceAll(shortcutPath(), "'", "''"), strings.ReplaceAll(exe, "'", "''"))
+	return exec.Command("powershell", "-NoProfile", "-Command", ps).Run()
 }

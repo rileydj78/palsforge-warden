@@ -40,7 +40,8 @@ internet, and Palworld's admin password never leaves the server.
    warden install -server C:\PalServer
    ```
    Warden now starts with Windows. Its data, logs and backups live in `C:\ProgramData\Warden`.
-3. Open the panel: `warden open`. The first time, it asks for a **setup code**: it's in
+3. Open the panel from the Start menu (**Palsforge Warden**), or run `C:\Warden\warden.exe open`.
+   The first time, it asks for a **setup code**: it's in
    `C:\ProgramData\Warden\warden.log`. Create the owner account.
 4. In **Settings**, choose a second place for backups, the nightly time, and SteamCMD's location,
    then turn the nightly routine on. (It's off until you've looked at the settings.)
