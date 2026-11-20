@@ -42,6 +42,8 @@ internet, and Palworld's admin password never leaves the server.
   restarts in 6 hours so a broken server isn't restarted forever.
 - **Game settings in plain words**, with presets, import/export, and changes written only while
   the server is stopped (Palworld rewrites its settings when it shuts down).
+- **API keys for bots and websites:** `Authorization: Bearer wk_…` on the administration port; a
+  key is a moderator or admin (never the owner), revocable at once, and in the activity log.
 - **A public status page** (optional): name, online, player count, on its own read-only port;
   `warden remote public on` publishes only that page through Tailscale Funnel.
 - **New server from nothing:** `warden install-server C:\PalServer` (or type NEW in setup) gets

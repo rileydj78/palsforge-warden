@@ -341,7 +341,8 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | 22 | Version hold | **Done** (held while mods are on until an admin allows the build) |
 | 23 | Docker | **Done** (sidecar image + guide, `warden adduser`); not tried with a live Palworld container |
 | 20 | Off-machine targets | **Done**: SFTP (pinned host key) and S3-compatible, each read back and checked; WebDAV not started |
-| 24–25, 27–28, 30 | API keys, auto-pause, worlds, self-update, files | Not started |
+| 24 | API keys | **Done** (moderator/admin keys, hashed, revocable, audited) |
+| 25, 27–28, 30 | Auto-pause, worlds, self-update, files | Not started |
 | 29 | Command console | **Done** (Commands page) |
 | 26 | Player notes | **Done** |
 

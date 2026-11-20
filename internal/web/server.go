@@ -203,6 +203,21 @@ func (s *Server) session(r *http.Request) *auth.Session {
 // guard wraps a route: it needs a session with at least role min; POSTs also need CSRF.
 func (s *Server) guard(min string, h func(http.ResponseWriter, *http.Request, *auth.Session)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && !onLocalPort(r) {
+			// An API key (bots, websites): no cookie, so no CSRF; never the owner's routes or an
+			// account's own pages.
+			ses := s.Auth.KeySession(strings.TrimSpace(bearer))
+			if ses == nil {
+				fail(w, http.StatusUnauthorized, "that API key isn't valid (revoked or mistyped)")
+				return
+			}
+			if min == auth.Owner || strings.HasPrefix(r.URL.Path, "/api/me") || !auth.Allows(ses.User.Role, min) {
+				fail(w, http.StatusForbidden, "an API key can't do that")
+				return
+			}
+			h(w, r, ses)
+			return
+		}
 		ses := s.session(r)
 		if ses == nil {
 			fail(w, http.StatusUnauthorized, "please sign in")
@@ -326,6 +341,42 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, 200, p)
+	}))
+	mux.HandleFunc("GET /api/keys", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		k, err := s.Auth.Keys()
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, k)
+	}))
+	mux.HandleFunc("POST /api/keys", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Name, Role string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		tok, err := s.Auth.NewKey(strings.TrimSpace(in.Name), in.Role, ses.User.Name)
+		s.Store.Audit(ses.User.Name, "make API key", in.Name, in.Role, err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]string{"key": tok})
+	}))
+	mux.HandleFunc("POST /api/keys/revoke", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ Name string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := s.Auth.RevokeKey(in.Name)
+		s.Store.Audit(ses.User.Name, "revoke API key", in.Name, "", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
 	mux.HandleFunc("GET /api/instances", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		out := []map[string]any{}

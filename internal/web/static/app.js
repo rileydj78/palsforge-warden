@@ -287,7 +287,27 @@ async function loadAudit() {
     }
   } catch (e) {}
 }
+async function loadKeys() {
+  try {
+    const k = await api("/api/keys"), rows = $("keyrows"); rows.replaceChildren();
+    if (!k.length) { const tr = el("tr"); const td = el("td", "No keys yet.", "empty"); td.colSpan = 5; tr.append(td); rows.append(tr); }
+    for (const x of k) {
+      const tr = el("tr"), acts = el("td", null, "acts"), b = el("button", "Revoke", "small danger");
+      b.onclick = async () => { if (await ask({ title: `Revoke ${x.name}?`, text: "Anything using it stops working at once.", ok: "Revoke" }) == null) return; try { await api("/api/keys/revoke", { name: x.name }); toast("Revoked."); loadKeys(); } catch (e) { toast(e.message); } };
+      acts.append(b); tr.append(el("td", x.name, "strong"), el("td", x.role), el("td", when(x.created)), el("td", x.lastUsed ? when(x.lastUsed) : "never"), acts); rows.append(tr);
+    }
+  } catch (e) {}
+}
+$("keyform").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  try {
+    const r = await api("/api/keys", { name: $("key-name").value.trim(), role: $("key-role").value });
+    $("key-name").value = ""; loadKeys();
+    await ask({ title: "Here's the key", text: "Copy it now: it's shown only once. Anyone with it can act as this key, so keep it like a password.", label: "API key", value: r.key, ok: "Done" });
+  } catch (err) { toast(err.message); }
+});
 async function loadUsers() {
+  loadKeys();
   try {
     const u = await api("/api/users"); const rows = $("userrows"); rows.replaceChildren();
     if (!u.length) { const tr = el("tr"); const td = el("td", "No remote accounts yet. On this machine you never need one.", "empty"); td.colSpan = 6; tr.append(td); rows.append(tr); }

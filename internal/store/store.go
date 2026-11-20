@@ -28,6 +28,7 @@ var schema = []string{
 		ts INTEGER PRIMARY KEY, online INTEGER NOT NULL, players INTEGER, fps REAL, frametime REAL)`,
 	`ALTER TABLE users ADD COLUMN totp TEXT`,
 	`ALTER TABLE samples ADD COLUMN cpu REAL`,
+	`CREATE TABLE IF NOT EXISTS api_keys (name TEXT PRIMARY KEY, hash TEXT UNIQUE NOT NULL, role TEXT NOT NULL, created INTEGER, last_used INTEGER, by TEXT)`,
 	`CREATE TABLE IF NOT EXISTS kits (user_id TEXT PRIMARY KEY, given INTEGER)`,
 	`CREATE TABLE IF NOT EXISTS allowed (user_id TEXT PRIMARY KEY, added INTEGER, by TEXT)`,
 	`ALTER TABLE samples ADD COLUMN mem REAL`,

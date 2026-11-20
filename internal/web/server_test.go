@@ -231,3 +231,46 @@ func TestModeratorCannotRestart(t *testing.T) {
 		t.Fatalf("a moderator must not restart the server, got %d", code)
 	}
 }
+
+func TestAPIKeys(t *testing.T) {
+	c, _, au := setup(t)
+	tok, err := au.NewKey("discord-bot", auth.Moderator, "owner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := au.NewKey("x", auth.Owner, "owner"); err == nil {
+		t.Fatal("a key can never be the owner")
+	}
+	call := func(method, path, key string, body string) int {
+		req, _ := http.NewRequest(method, c.base+path, strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		if key != "" {
+			req.Header.Set("Authorization", "Bearer "+key)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	if code := call("GET", "/api/status", tok, ""); code != 200 {
+		t.Fatalf("a moderator key reads the status, got %d", code)
+	}
+	if code := call("POST", "/api/action/announce", tok, `{"message":"hi from the bot"}`); code != 200 {
+		t.Fatalf("a moderator key may announce without a cookie or CSRF, got %d", code)
+	}
+	if code := call("POST", "/api/action/ban", tok, `{"userId":"steam_1"}`); code != 403 {
+		t.Fatalf("a moderator key can't ban, got %d", code)
+	}
+	if code := call("GET", "/api/users", tok, ""); code != 403 {
+		t.Fatalf("no key reaches the owner's pages, got %d", code)
+	}
+	if code := call("GET", "/api/status", tok+"x", ""); code != 401 {
+		t.Fatalf("a wrong key is refused, got %d", code)
+	}
+	au.RevokeKey("discord-bot")
+	if code := call("GET", "/api/status", tok, ""); code != 401 {
+		t.Fatalf("a revoked key stops working at once, got %d", code)
+	}
+}

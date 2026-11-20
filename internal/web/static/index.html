@@ -311,6 +311,11 @@
         <button class="btn primary" type="submit">Add</button>
         <p class="msg" id="nu-msg" role="alert"></p>
       </form>
+      <section class="card"><h2>API keys</h2>
+        <p class="note">For a bot or a website (a Discord bot, your site's server status). Send it as <code>Authorization: Bearer wk_…</code> to the administration port. A key acts as a moderator or an admin, never the owner, and everything it does is in the activity log.</p>
+        <form id="keyform" class="inline"><label for="key-name" class="sr">Key name</label><input id="key-name" placeholder="Name, e.g. discord-bot" autocomplete="off" spellcheck="false" required>
+          <label for="key-role" class="sr">Role</label><select id="key-role"><option value="moderator">Moderator (see, announce, kick)</option><option value="admin">Admin (also ban, restart, backups)</option></select><button>Make a key</button></form>
+        <div class="tablewrap"><table><thead><tr><th>Name</th><th>Role</th><th>Made</th><th>Last used</th><th><span class="sr">Actions</span></th></tr></thead><tbody id="keyrows"></tbody></table></div></section>
     </section>
   </main>
 </div>

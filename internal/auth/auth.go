@@ -45,6 +45,7 @@ type Session struct {
 	User    User
 	CSRF    string
 	Expires time.Time
+	Key     bool // an API key, not a signed-in person
 }
 
 // Auth manages accounts and sessions.
