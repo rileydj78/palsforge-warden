@@ -159,6 +159,10 @@
         <p class="note">Import takes a file exported here or any PalWorldSettings.ini (from another server or a settings generator). Passwords are never exported or imported.</p></section>
       <div id="g-groups"></div>
       <section class="card" id="g-unknown-card" hidden><h2>Other options</h2><p class="note">Options Warden doesn't explain yet. They're kept exactly as they are.</p><p class="mono" id="g-unknown"></p></section>
+      <details class="card"><summary><h2 style="display:inline">Engine.ini (advanced)</h2></summary>
+        <p class="note">Unreal Engine tuning, such as the network tick rate. Written at the next stop, with a copy of the old file kept. Wrong values can make the server lag or not start, so change one thing at a time.</p>
+        <label for="g-engine" class="sr">Engine.ini</label><textarea id="g-engine" rows="12" spellcheck="false" class="mono"></textarea>
+        <p class="note" id="g-engine-state"></p><div class="row"><button type="button" id="g-engine-save">Save for the next stop</button></div></details>
     </section>
 
     <section id="view-mods" class="view" hidden>
@@ -271,6 +275,7 @@
         <label for="s-c-mode">Who runs the server</label><select id="s-c-mode"><option value="supervise">Warden runs it and restarts it after a crash</option><option value="external">Another program runs it (a service, a task, a host's panel)</option></select>
         <div id="s-sup"><label for="s-c-exe">Server program (inside the server folder)</label><input id="s-c-exe">
         <label for="s-c-args">Its options</label><input id="s-c-args">
+        <p class="note">Common options: <button type="button" class="small" data-arg="-publiclobby">-publiclobby</button> lists the server in the community browser; <button type="button" class="small" data-arg="-useperfthreads -NoAsyncLoadingThread -UseMultithreadForDS">performance threads</button> uses more CPU cores; <button type="button" class="small" data-arg="-port=8211">-port=8211</button> the game port.</p>
         <label for="s-c-aff">CPU cores it may use (Windows; e.g. 8-11; empty = all)</label><input id="s-c-aff"></div>
         <div id="s-ext"><label for="s-c-start">Command that starts it, one word per line</label><textarea id="s-c-start" rows="3"></textarea>
         <label for="s-c-stop">Stop file a watchdog script respects (optional)</label><input id="s-c-stop"></div>

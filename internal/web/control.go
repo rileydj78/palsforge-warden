@@ -115,6 +115,28 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		return nil
 	})
+	mux.HandleFunc("GET /api/engine", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		p := gamesettings.EnginePath(config.SettingsPath(c.Cfg.ServerDir))
+		cur, _ := os.ReadFile(p)
+		pend, waiting := gamesettings.PendingEngine(c.Runner.Backups.DataDir)
+		writeJSON(w, 200, map[string]any{"path": p, "text": string(cur), "pending": pend, "waiting": waiting})
+	}))
+	mux.HandleFunc("POST /api/engine", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct {
+			Text string `json:"text"`
+		}
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		err := gamesettings.QueueEngine(c.Runner.Backups.DataDir, in.Text)
+		s.Store.Audit(ses.User.Name, "change Engine.ini", "", "written at the next stop", err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("POST /api/update/check", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		latest, err := c.Host.LatestBuild(r.Context())
 		if err != nil {

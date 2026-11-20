@@ -285,6 +285,11 @@ func (r *Runner) WhileStopped(context.Context) (string, error) {
 		parts = append(parts, sum)
 	}
 	errs = append(errs, err)
+	sum, err = gamesettings.ApplyEngine(config.SettingsPath(r.Cfg.ServerDir), r.Backups.DataDir)
+	if sum != "" {
+		parts = append(parts, sum)
+	}
+	errs = append(errs, err)
 	return strings.Join(parts, "; "), errors.Join(errs...)
 }
 

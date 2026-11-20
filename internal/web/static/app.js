@@ -527,6 +527,7 @@ async function loadGame() {
       b.onclick = () => fillGame(p.values, p.name);
       pr.append(b);
     }
+    loadEngine();
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
 }
@@ -579,6 +580,21 @@ function gameEdits() {
   }
   return out;
 }
+async function loadEngine() {
+  try {
+    const e = await api("/api/engine");
+    $("g-engine").value = e.waiting ? e.pending : e.text;
+    $("g-engine-state").textContent = e.waiting ? "Changes are waiting for the next stop." : `From ${e.path}${e.text ? "" : " (doesn't exist yet)"}.`;
+  } catch (err) { $("g-engine-state").textContent = err.message; }
+}
+$("g-engine-save").addEventListener("click", async () => {
+  try { await api("/api/engine", { text: $("g-engine").value }); toast("Saved. Warden writes it at the next stop."); loadEngine(); } catch (e) { toast(e.message); }
+});
+for (const b of document.querySelectorAll("[data-arg]")) b.addEventListener("click", () => {
+  const box = $("s-c-args"), have = box.value.split(" ").filter(Boolean);
+  for (const a of b.dataset.arg.split(" ")) if (!have.some((h) => h.split("=")[0].toLowerCase() === a.split("=")[0].toLowerCase())) have.push(a);
+  box.value = have.join(" ");
+});
 $("g-review").addEventListener("click", async () => {
   const values = gameEdits();
   if (!Object.keys(values).length) { toast("Nothing has changed."); return; }
