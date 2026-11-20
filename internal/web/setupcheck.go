@@ -14,6 +14,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
@@ -85,6 +86,11 @@ func (s *Server) setupCheckRoutes(mux *http.ServeMux) {
 			add("Backups", false, false, "Backups are only on this machine. Add a second place in Settings so a dead disk can't take them.")
 		} else {
 			add("Backups", true, false, "Copied to %d second place(s) and checked.", len(c.Cfg.Backups.Offsite)+len(c.Cfg.Backups.Remotes()))
+		}
+		if probs := gamesettings.CheckFile(config.SettingsPath(c.Cfg.ServerDir)); len(probs) > 0 {
+			add("Settings file", false, true, "PalWorldSettings.ini has problems, so the game may ignore it and run on defaults: %s", strings.Join(probs, "; "))
+		} else {
+			add("Settings file", true, false, "PalWorldSettings.ini reads cleanly.")
 		}
 		if worlds.OptionFile(c.Cfg.ServerDir, config.SettingsPath(c.Cfg.ServerDir)) != "" {
 			add("Game settings", false, false, "The running world has its own WorldOption.sav, which overrides most of PalWorldSettings.ini (common after uploading a co-op world). See Game settings.")

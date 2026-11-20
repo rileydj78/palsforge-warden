@@ -618,7 +618,7 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 		cancel()
 		sort.Slice(notInEffect, func(i, j int) bool { return notInEffect[i]["label"] < notInEffect[j]["label"] })
 		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending, "presets": gamesettings.Presets,
-			"notInEffect": notInEffect, "worldOption": worlds.OptionFile(c.Cfg.ServerDir, path) != "", "worldOptionQueued": worlds.SetAsideOptionQueued(c.Runner.Backups.DataDir)})
+			"notInEffect": notInEffect, "fileProblems": gamesettings.CheckFile(path), "worldOption": worlds.OptionFile(c.Cfg.ServerDir, path) != "", "worldOptionQueued": worlds.SetAsideOptionQueued(c.Runner.Backups.DataDir)})
 	}
 	mux.HandleFunc("POST /api/game-settings/world-option", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
 		if worlds.OptionFile(c.Cfg.ServerDir, path) == "" {

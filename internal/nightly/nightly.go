@@ -336,6 +336,14 @@ func (r *Runner) WhileStopped(context.Context) (string, error) {
 		parts = append(parts, sum)
 	}
 	errs = append(errs, err)
+	// Last look before the game reads its settings: a broken file makes it run on defaults.
+	if probs := gamesettings.CheckFile(config.SettingsPath(r.Cfg.ServerDir)); len(probs) > 0 {
+		msg := "the settings file has problems (the game may ignore it and run on defaults): " + strings.Join(probs, "; ")
+		r.Store.AddEvent(time.Now(), "settings", msg)
+		if r.Notify != nil {
+			r.Notify.Send(context.Background(), notify.Warn, "settings-file", "Check PalWorldSettings.ini", msg)
+		}
+	}
 	return strings.Join(parts, "; "), errors.Join(errs...)
 }
 

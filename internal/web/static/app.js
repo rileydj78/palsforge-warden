@@ -586,13 +586,15 @@ async function loadGame() {
       pr.append(b);
     }
     loadEngine();
-    const ne = game.notInEffect || [];
-    $("g-effect").hidden = !ne.length && !game.worldOption;
+    const ne = game.notInEffect || [], fp = game.fileProblems || [];
+    $("g-effect").hidden = !ne.length && !game.worldOption && !fp.length;
     $("g-effect-text").textContent = game.worldOption
       ? (game.worldOptionQueued ? "WorldOption.sav will be set aside at the next restart (kept beside the world, so it can be put back); then this file applies." : "The running world has its own WorldOption.sav (it comes with a world uploaded from co-op). The game uses it instead of this file for almost every setting, so changes here don't take effect. Setting it aside makes this file apply; it's kept beside the world, so it can be put back.")
       : "The running server reports different values from this file, usually because it hasn't restarted since the file changed.";
     const ul = $("g-effect-list"); ul.replaceChildren();
+    for (const p of fp) ul.append(el("li", "In the file: " + p));
     for (const x of ne.slice(0, 12)) ul.append(el("li", `${x.label}: file ${x.file}, running ${x.running}`));
+    if (fp.length && !game.worldOption) $("g-effect-text").textContent = "PalWorldSettings.ini has problems. When the game can't read it, it quietly runs with its defaults:";
     $("g-wo").hidden = !game.worldOption || game.worldOptionQueued || me.role !== "owner";
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
