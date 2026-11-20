@@ -4,9 +4,11 @@ package nightly
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -112,7 +114,72 @@ func (b *Backups) CopyAndVerify(ctx context.Context, _ []string) error {
 			}
 		}
 	}
-	return errors.Join(errs...)
+	if len(errs) > 0 {
+		return errors.Join(errs...)
+	}
+	// Prove the copy in the first second place really restores: every file read back, a world in it.
+	for _, a := range b.made {
+		if a.Kind != backup.Data {
+			continue
+		}
+		p, err := backup.Prove(filepath.Join(b.Cfg.Backups.Offsite[0], a.Name))
+		saveProof(b.DataDir, a.Name, p, err)
+		if err != nil {
+			return fmt.Errorf("the copy of %s doesn't restore: %w", a.Name, err)
+		}
+	}
+	return nil
+}
+
+// ProofRecord is the last time a backup was read back completely.
+type ProofRecord struct {
+	Name  string    `json:"name"`
+	At    time.Time `json:"at"`
+	OK    bool      `json:"ok"`
+	World string    `json:"world,omitempty"`
+	Error string    `json:"error,omitempty"`
+}
+
+func saveProof(dataDir, name string, p *backup.Proof, err error) {
+	r := ProofRecord{Name: name, At: time.Now(), OK: err == nil}
+	if p != nil {
+		r.World = p.World
+	}
+	if err != nil {
+		r.Error = err.Error()
+	}
+	b, _ := json.Marshal(r)
+	os.WriteFile(filepath.Join(dataDir, "last-proof.json"), b, 0o600)
+}
+
+// LastProof returns the last proof, if any.
+func LastProof(dataDir string) *ProofRecord {
+	b, err := os.ReadFile(filepath.Join(dataDir, "last-proof.json"))
+	if err != nil {
+		return nil
+	}
+	var r ProofRecord
+	if json.Unmarshal(b, &r) != nil {
+		return nil
+	}
+	return &r
+}
+
+// PinLatest keeps the newest data backup (here and in every second place) whatever retention
+// says, e.g. the last one made before a crash, so routine backups of a broken world can't push it
+// out.
+func (r *Runner) PinLatest(why string) {
+	for _, dir := range append([]string{r.Backups.LocalDir()}, r.Cfg.Backups.Offsite...) {
+		list, _ := backup.ListTag(dir, r.Cfg.Backups.Tag)
+		for _, a := range list {
+			if a.Kind == backup.Data {
+				if a.Pinned == "" {
+					backup.Pin(dir, a.Name, why)
+				}
+				break
+			}
+		}
+	}
 }
 
 // Prune applies retention locally and in every second place.

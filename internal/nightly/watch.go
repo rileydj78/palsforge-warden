@@ -3,6 +3,8 @@ package nightly
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/notify"
@@ -37,6 +39,7 @@ func (r *Runner) Watch(ctx context.Context) {
 				send(notify.Info, "", "The server is back", "It is answering again.")
 			}
 			misses, down = 0, false
+			r.checkSaves(ctx, send)
 			if limit > 0 && !planned {
 				if mem := r.Host.Memory(); mem > limit {
 					msg := fmt.Sprintf("the server uses %.1f GB of memory (limit %.0f GB)", float64(mem)/(1<<30), r.Cfg.Health.MemoryLimitGB)
@@ -57,6 +60,7 @@ func (r *Runner) Watch(ctx context.Context) {
 			send(notify.Urgent, "down", "The server isn't answering", "No answer for 3 minutes.")
 		}
 		if frozen > 0 && misses >= frozen && r.Host.Running() {
+			r.PinLatest("the last backup before the server froze at " + time.Now().Format("Jan 2 15:04"))
 			r.Store.AddEvent(time.Now(), "frozen", fmt.Sprintf("no answer for %d minutes but still running: restarting it", misses))
 			send(notify.Urgent, "frozen", "Restarting a frozen server", fmt.Sprintf("It was running but hadn't answered for %d minutes.", misses))
 			r.Restart(ctx, "frozen", nil)
@@ -97,4 +101,28 @@ func (r *Runner) Restart(ctx context.Context, why string, warn []int) error {
 	err = r.Host.Start(ctx)
 	r.Store.AddEvent(time.Now(), "restart", fmt.Sprintf("restarted (%s): %v", why, err))
 	return err
+}
+
+// checkSaves raises the alarm when players are online but the world file hasn't been written for
+// 45 minutes: a server can keep running while its saves silently stop, and then a restart loses
+// everything since.
+func (r *Runner) checkSaves(ctx context.Context, send func(notify.Level, string, string, string)) {
+	samples, err := r.Store.History(time.Now().Add(-10 * time.Minute))
+	if err != nil || len(samples) == 0 || samples[len(samples)-1].Players == 0 {
+		return
+	}
+	matches, _ := filepath.Glob(filepath.Join(r.Cfg.ServerDir, "Pal", "Saved", "SaveGames", "*", "*", "Level.sav"))
+	var newest time.Time
+	for _, m := range matches {
+		if st, err := os.Stat(m); err == nil && st.ModTime().After(newest) {
+			newest = st.ModTime()
+		}
+	}
+	if newest.IsZero() || time.Since(newest) < 45*time.Minute {
+		return
+	}
+	msg := fmt.Sprintf("Players are online but the world hasn't been saved for %d minutes. Warden is asking the server to save now; if that doesn't help, restart it before the world is lost.", int(time.Since(newest).Minutes()))
+	r.Store.AddEvent(time.Now(), "saves", msg)
+	send(notify.Urgent, "saves", "The world isn't being saved", msg)
+	r.Game.Save(ctx)
 }

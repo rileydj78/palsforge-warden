@@ -102,12 +102,16 @@ func main() {
 		log.Printf("settings need attention (%s): %v; server control is off", config.ConfigPath(*dataDir), err)
 	} else {
 		nt := notify.New(wcfg.Notify, st.ServerName)
+		var pin func(string) // set once the runner exists
 		h := host.New(wcfg, *dataDir)
 		h.OnEvent = func(e host.Event) {
 			log.Printf("server: %s", e.Text)
 			st2.AddEvent(e.At, e.Kind, e.Text)
 			switch e.Kind {
 			case "crash":
+				if pin != nil {
+					pin("the last backup before the crash at " + e.At.Format("Jan 2 15:04"))
+				}
 				nt.Send(context.Background(), notify.Urgent, "crash", "The server crashed", e.Text+". Warden is starting it again.")
 			case "gave-up":
 				nt.Send(context.Background(), notify.Urgent, "gave-up", "The server keeps crashing", e.Text)
@@ -118,6 +122,7 @@ func main() {
 		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2, Notify: nt,
 			Mods:    &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir},
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
+		pin = runner.PinLatest
 		go runner.Watch(context.Background())
 		if evs, err := events.Parse(wcfg.Events); err == nil {
 			go runner.RunEvents(context.Background(), evs)

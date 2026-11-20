@@ -36,6 +36,7 @@ type Archive struct {
 	Name   string    `json:"name"`
 	Kind   string    `json:"kind"`
 	Tag    string    `json:"tag"`
+	Pinned string    `json:"pinned,omitempty"` // why it's kept whatever the retention says
 	Path   string    `json:"-"`
 	Size   int64     `json:"size"`
 	SHA256 string    `json:"sha256"`
@@ -228,6 +229,12 @@ func List(dir string) ([]Archive, error) {
 		if info != nil {
 			a.Size = info.Size()
 		}
+		if b, err := os.ReadFile(a.Path + ".keep"); err == nil {
+			a.Pinned = strings.TrimSpace(string(b))
+			if a.Pinned == "" {
+				a.Pinned = "kept"
+			}
+		}
 		if b, err := os.ReadFile(a.Path + ".sha256"); err == nil {
 			a.SHA256 = strings.Fields(string(b) + " ")[0]
 		}
@@ -291,9 +298,10 @@ func Prune(dir string, p Policy, tag string) ([]string, error) {
 	}
 	var removed []string
 	for _, a := range all {
-		if !keep[a.Name] {
+		if !keep[a.Name] && a.Pinned == "" {
 			os.Remove(a.Path)
 			os.Remove(a.Path + ".sha256")
+			os.Remove(a.Path + ".keep")
 			removed = append(removed, a.Name)
 		}
 	}
@@ -386,4 +394,53 @@ func Extract(path, root string, allowed []string) (int, error) {
 		n++
 	}
 	return n, nil
+}
+
+// Proof is the result of reading a backup back completely.
+type Proof struct {
+	Files int    `json:"files"`
+	World string `json:"world"` // the world file found, e.g. Pal/Saved/SaveGames/0/<id>/Level.sav
+	Bytes int64  `json:"bytes"`
+}
+
+// Prove reads every file in an archive (the zip reader checks each file's CRC as it's read) and
+// checks that a non-empty world file is inside: a backup that passes can really be restored.
+func Prove(path string) (*Proof, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, fmt.Errorf("can't open the backup: %w", err)
+	}
+	defer z.Close()
+	p := &Proof{}
+	for _, f := range z.File {
+		if f.FileInfo().IsDir() {
+			continue
+		}
+		rc, err := f.Open()
+		if err != nil {
+			return nil, fmt.Errorf("%s can't be read: %w", f.Name, err)
+		}
+		n, err := io.Copy(io.Discard, rc)
+		rc.Close()
+		if err != nil {
+			return nil, fmt.Errorf("%s is damaged: %w", f.Name, err)
+		}
+		p.Files++
+		p.Bytes += n
+		if strings.HasSuffix(f.Name, "/Level.sav") && n > 0 && !strings.Contains(f.Name, "/backup/") {
+			p.World = f.Name
+		}
+	}
+	if p.World == "" {
+		return p, errors.New("there's no world file (Level.sav) in it")
+	}
+	return p, nil
+}
+
+// Pin marks a backup to be kept whatever the retention says (e.g. the last one before a crash).
+func Pin(dir, name, why string) error {
+	if !nameRe.MatchString(name) {
+		return errors.New("not a backup name")
+	}
+	return os.WriteFile(filepath.Join(dir, name+".keep"), []byte(why+"\n"), 0o640)
 }

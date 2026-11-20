@@ -338,6 +338,7 @@ async function loadBackups() {
         const tr = el("tr"), acts = el("td", null, "acts");
         if (me.role !== "moderator") { const d = el("a", "Download", "small"); d.href = `/api/backups/download?place=${i}&name=${encodeURIComponent(a.name)}`; d.setAttribute("download", a.name); acts.append(d); }
         if (me.role === "owner" && a.kind === "data") { const b = el("button", "Restore…", "small warn"); b.onclick = () => restore(i, a.name); acts.append(b); }
+        if (a.pinned) acts.prepend(el("span", "kept", "tag"));
         tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–"), acts); tb.append(tr);
       }
       t.append(tb); const w = el("div", null, "tablewrap"); w.append(t); c.append(w); box.append(c);
@@ -632,7 +633,8 @@ async function refresh() {
     $("st-backup").hidden = false; $("st-next").hidden = false;
     const lr = s.lastRun;
     $("lastbk").textContent = lr ? when(lr.started) : "Never";
-    $("lastbknote").textContent = lr ? (lr.ok ? `${lr.kind} run completed` : `${lr.kind} run had problems: see Server`) : "No backup has run yet";
+    const pf = s.proof;
+    $("lastbknote").textContent = lr ? (lr.ok ? (pf && pf.ok ? `Restorable: tested ${when2(pf.at)}` : `${lr.kind} run completed`) : `${lr.kind} run had problems: see Server`) : "No backup has run yet";
     $("st-backup").classList.toggle("warn", !lr || !lr.ok || Date.now() / 1000 - lr.started > 36 * 3600);
     $("nextrun").textContent = s.nextRun ? when2(s.nextRun) : "Off";
     $("nextrunnote").textContent = s.nextRun ? (s.offsite ? "Backups copied to a second place" : "No second place for backups yet") : "Turn it on in Settings";

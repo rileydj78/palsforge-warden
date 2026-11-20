@@ -130,3 +130,30 @@ func TestExtractRefusesEscapes(t *testing.T) {
 		t.Fatal("nothing may be written when any entry is refused")
 	}
 }
+
+func TestProveAndPin(t *testing.T) {
+	root, out := makeServer(t), t.TempDir()
+	a, err := Make(out, FileName("pal", Data, time.Now()), root, []string{"Pal/Saved"}, func(r string) bool { return strings.Contains(r, "/backup/") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := Prove(a.Path)
+	if err != nil || p.World != "Pal/Saved/SaveGames/0/world/Level.sav" {
+		t.Fatalf("%+v %v", p, err)
+	}
+	cfgOnly, _ := Make(out, "pal-data-20260101-000000.zip", root, []string{"Pal/Saved/Config"}, nil)
+	if _, err := Prove(cfgOnly.Path); err == nil {
+		t.Fatal("a backup without a world must not count as restorable")
+	}
+	// A pinned backup survives retention that would otherwise delete it.
+	dir := t.TempDir()
+	for i := 0; i < 20; i++ {
+		os.WriteFile(filepath.Join(dir, FileName("pal", Data, time.Date(2026, 6, 1+i, 4, 0, 0, 0, time.Local))), []byte("x"), 0o644)
+	}
+	oldest := FileName("pal", Data, time.Date(2026, 6, 1, 4, 0, 0, 0, time.Local))
+	Pin(dir, oldest, "last good before the crash")
+	Prune(dir, Policy{Daily: 3, Weekly: 0}, "pal")
+	if _, err := os.Stat(filepath.Join(dir, oldest)); err != nil {
+		t.Fatal("a pinned backup must be kept")
+	}
+}
