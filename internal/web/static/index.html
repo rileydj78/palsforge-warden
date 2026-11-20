@@ -99,6 +99,7 @@
         <div class="stat"><span class="label">Game build</span><span class="value" id="srv-build">–</span><span class="note" id="srv-update"></span></div>
         <div class="stat"><span class="label">Next nightly run</span><span class="value" id="srv-next">–</span><span class="note" id="srv-nightly"></span></div>
         <div class="stat"><span class="label">Crashes, 24 h</span><span class="value" id="srv-crashes">–</span><span class="note" id="srv-paused"></span></div>
+        <div class="stat"><span class="label">Memory</span><span class="value" id="srv-mem">–</span><span class="note" id="srv-memnote"></span></div>
       </section>
       <section class="card" id="pd-card" hidden><h2>PalDefender</h2><p id="pd-state"></p>
         <button class="btn" id="pd-connect" hidden>Connect PalDefender</button></section>
@@ -180,6 +181,9 @@
         <label class="check"><input type="checkbox" id="s-u-on"> Update the game during the nightly routine</label>
         <label for="s-u-path">SteamCMD program</label><input id="s-u-path" placeholder="C:\steamcmd\steamcmd.exe">
         <label class="check"><input type="checkbox" id="s-u-val"> Check every game file (slower)</label>
+        <h2>Keeping it healthy</h2>
+        <label for="s-h-frozen">Restart a server that's running but hasn't answered for this many minutes (0 = only tell me)</label><input id="s-h-frozen" type="number" min="0" max="60">
+        <label for="s-h-mem">Restart with warnings when the server uses more memory than this many GB (0 = off; Palworld's memory grows over days)</label><input id="s-h-mem" type="number" min="0" step="0.5">
         <h2>Server messages</h2>
         <label class="check"><input type="checkbox" id="s-m-on"> Send messages in the game</label>
         <label for="s-m-list">Messages, one per line, sent in turn while anyone is online (your Discord, website, rules, events)</label><textarea id="s-m-list" rows="4"></textarea>

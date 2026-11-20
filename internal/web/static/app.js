@@ -252,6 +252,8 @@ async function loadServer() {
     $("srv-next").textContent = s.nextRun ? when2(s.nextRun) : "Off";
     $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in warden.json";
     $("srv-crashes").textContent = h.crashes24h;
+    $("srv-mem").textContent = s.memory ? `${(s.memory / (1 << 30)).toFixed(1)} GB` : "–";
+    $("srv-memnote").textContent = s.health && s.health.memoryLimitGB ? `Restarts with warnings above ${s.health.memoryLimitGB} GB` : "No memory limit set";
     $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
     $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";
     $("srv-sub").textContent = s.offsite ? "" : "Backups are kept on this machine only. Add a second place (backups.offsite) so a dead disk can't take them.";
@@ -484,6 +486,8 @@ async function loadSettings() {
     $("s-u-on").checked = cfg.update.enabled; $("s-u-path").value = cfg.update.steamcmd; $("s-u-val").checked = cfg.update.validate;
     $("s-c-mode").value = cfg.control.mode; $("s-c-exe").value = cfg.control.exe; $("s-c-args").value = (cfg.control.args || []).join(" ");
     $("s-c-aff").value = cfg.control.affinity; $("s-c-start").value = (cfg.control.startCommand || []).join("\n"); $("s-c-stop").value = cfg.control.stopMarker;
+    const hl = cfg.health || {};
+    $("s-h-frozen").value = hl.restartFrozenMinutes ?? 5; $("s-h-mem").value = hl.memoryLimitGB || 0;
     const b = cfg.broadcasts || {};
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
@@ -500,6 +504,7 @@ $("setform").addEventListener("submit", async (e) => {
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
   Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked });
   c.notify = notifyForm();
+  c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0 };
   c.broadcasts = { enabled: $("s-m-on").checked, messages: lines($("s-m-list").value), everyMinutes: parseInt($("s-m-every").value, 10) || 0, welcome: $("s-m-welcome").value.trim() };
   Object.assign(c.control, { mode: $("s-c-mode").value, exe: $("s-c-exe").value.trim(), args: $("s-c-args").value.split(" ").filter(Boolean), affinity: $("s-c-aff").value.trim(), startCommand: lines($("s-c-start").value), stopMarker: $("s-c-stop").value.trim() });
   try {

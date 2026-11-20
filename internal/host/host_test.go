@@ -63,6 +63,9 @@ func TestSuperviseStartsAndPlannedStopHolds(t *testing.T) {
 	if !h.Running() {
 		t.Fatal("the server should be running")
 	}
+	if h.Memory() <= 0 {
+		t.Fatal("a running server's memory should be measurable")
+	}
 	go h.Supervise(ctx)
 	h.PlanStop(ctx)
 	if err := h.ForceStop(ctx); err != nil {

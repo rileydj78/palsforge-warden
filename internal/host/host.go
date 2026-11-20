@@ -379,3 +379,9 @@ func (h *Host) ConsoleTail(n int) string {
 	b, _ := io.ReadAll(f)
 	return lastLines(string(b), n)
 }
+
+// Memory is how much memory the server uses now, in bytes (0 if it isn't running).
+func (h *Host) Memory() int64 {
+	n, _ := memOf(h.cfg.Abs(h.cfg.Control.Exe))
+	return n
+}

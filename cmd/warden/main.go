@@ -116,7 +116,7 @@ func main() {
 		runner := &nightly.Runner{Cfg: wcfg, Game: nightly.Game{C: game}, Host: h, Store: st2, Notify: nt,
 			Mods:    &mods.Manager{ServerDir: wcfg.ServerDir, DataDir: *dataDir},
 			Backups: &nightly.Backups{Cfg: wcfg, DataDir: *dataDir}}
-		go runner.WatchDown(context.Background())
+		go runner.Watch(context.Background())
 		var private broadcast.Private
 		if pd := paldefender.New(wcfg.PalDef); pd != nil {
 			private = pd.Message

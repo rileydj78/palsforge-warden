@@ -66,3 +66,30 @@ func setAffinity(pid int, mask uint64) error {
 func hideWindow(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x00000200} // CREATE_NEW_PROCESS_GROUP
 }
+
+// memOf returns the working-set memory of the processes running exe, in bytes.
+func memOf(exe string) (int64, error) {
+	name := filepath.Base(exe)
+	cmd := exec.Command("tasklist", "/FO", "CSV", "/NH", "/FI", "IMAGENAME eq "+name)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	out, err := cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := csv.NewReader(strings.NewReader(string(out))).ReadAll()
+	var total int64
+	for _, r := range rows {
+		if len(r) > 4 && strings.EqualFold(r[0], name) {
+			kb := strings.Map(func(c rune) rune {
+				if c >= '0' && c <= '9' {
+					return c
+				}
+				return -1
+			}, r[4]) // "1,234,567 K"
+			if n, err := strconv.ParseInt(kb, 10, 64); err == nil {
+				total += n * 1024
+			}
+		}
+	}
+	return total, nil
+}

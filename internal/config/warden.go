@@ -28,6 +28,15 @@ type Warden struct {
 	Notify    notify.Config      `json:"notify"`
 	PalDef    paldefender.Config `json:"palDefender"`
 	Broadcast broadcast.Config   `json:"broadcasts"`
+	Health    Health             `json:"health"`
+}
+
+// Health is what Warden does on its own to keep the server up.
+type Health struct {
+	// Restart a server that's running but hasn't answered for this many minutes (0 = only alert).
+	RestartFrozenMinutes int `json:"restartFrozenMinutes"`
+	// Restart (with in-game warnings) when the server uses more memory than this (0 = off).
+	MemoryLimitGB float64 `json:"memoryLimitGB"`
 }
 
 // Control says how Warden starts and stops the game server.
@@ -88,6 +97,7 @@ func Defaults(serverDir string) Warden {
 	w.Nightly = Nightly{Enabled: true, Time: "04:00", WarnMinutes: []int{15, 5, 1}}
 	w.Backups = Backups{Image: "weekly", Daily: 14, Weekly: 8, Tag: "pal"}
 	w.Update = Update{Enabled: true}
+	w.Health = Health{RestartFrozenMinutes: 5}
 	return w
 }
 
@@ -145,6 +155,12 @@ func (w *Warden) Check() error {
 	}
 	if w.Broadcast.EveryMinutes != 0 && (w.Broadcast.EveryMinutes < 5 || w.Broadcast.EveryMinutes > 720) {
 		bad = append(bad, "broadcasts.everyMinutes must be between 5 and 720")
+	}
+	if w.Health.RestartFrozenMinutes < 0 || w.Health.RestartFrozenMinutes > 60 {
+		bad = append(bad, "health.restartFrozenMinutes must be 0 (off) to 60")
+	}
+	if w.Health.MemoryLimitGB < 0 || (w.Health.MemoryLimitGB > 0 && w.Health.MemoryLimitGB < 4) {
+		bad = append(bad, "health.memoryLimitGB must be 0 (off) or at least 4")
 	}
 	if err := w.Notify.Check(); err != nil {
 		bad = append(bad, err.Error())

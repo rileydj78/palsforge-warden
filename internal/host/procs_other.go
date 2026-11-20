@@ -47,3 +47,26 @@ func setAffinity(pid int, mask uint64) error {
 }
 
 func hideWindow(cmd *exec.Cmd) {}
+
+// memOf returns the resident memory of the processes running exe, in bytes.
+func memOf(exe string) (int64, error) {
+	pids, err := pidsOf(exe)
+	if err != nil {
+		return 0, err
+	}
+	var total int64
+	for _, pid := range pids {
+		b, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "status"))
+		if err != nil {
+			continue
+		}
+		for _, line := range bytes.Split(b, []byte("\n")) {
+			if f := bytes.Fields(line); len(f) >= 2 && string(f[0]) == "VmRSS:" {
+				if kb, err := strconv.ParseInt(string(f[1]), 10, 64); err == nil {
+					total += kb * 1024
+				}
+			}
+		}
+	}
+	return total, nil
+}
