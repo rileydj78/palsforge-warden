@@ -205,6 +205,10 @@ function renderRoster() {
       acts.append(b);
     }
     const name = el("td", p.name, "strong"); if (p.banned) name.append(el("span", "banned", "tag"));
+    if (p.note) name.append(el("div", p.note, "note"));
+    const nb = el("button", p.note ? "Edit note" : "Note", "small");
+    nb.onclick = async () => { const t = await ask({ title: `Note about ${p.name}`, text: "Only admins see it.", label: "Note", value: p.note || "", ok: "Save" }); if (t == null) return; try { await api("/api/players/note", { userId: p.userId, note: t }); loadRoster(); } catch (e) { toast(e.message); } };
+    acts.append(nb);
     tr.append(name, el("td", p.platform), el("td", String(p.level), "num"), el("td", when(p.firstSeen)), el("td", when(p.lastSeen)), el("td", duration(p.seconds), "num"), acts);
     rows.append(tr);
   }
@@ -326,6 +330,7 @@ async function loadBackups() {
       if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 6; tr.append(td); tb.append(tr); }
       for (const a of p.archives) {
         const tr = el("tr"), acts = el("td", null, "acts");
+        if (me.role !== "moderator") { const d = el("a", "Download", "small"); d.href = `/api/backups/download?place=${i}&name=${encodeURIComponent(a.name)}`; d.setAttribute("download", a.name); acts.append(d); }
         if (me.role === "owner" && a.kind === "data") { const b = el("button", "Restore…", "small warn"); b.onclick = () => restore(i, a.name); acts.append(b); }
         tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–"), acts); tb.append(tr);
       }
@@ -508,11 +513,11 @@ async function loadSettings() {
     const b = cfg.broadcasts || {};
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
-    $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk;
+    $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk; $("s-x-joins").checked = !!n.joins;
     showMode();
   } catch (e) {}
 }
-const notifyForm = () => ({ discordWebhook: $("s-x-dc").value.trim(), ntfyUrl: $("s-x-ntfy").value.trim(), ntfyToken: $("s-x-tok").value.trim(), routineOk: $("s-x-ok").checked });
+const notifyForm = () => ({ discordWebhook: $("s-x-dc").value.trim(), ntfyUrl: $("s-x-ntfy").value.trim(), ntfyToken: $("s-x-tok").value.trim(), routineOk: $("s-x-ok").checked, joins: $("s-x-joins").checked });
 $("s-x-test").addEventListener("click", async () => { try { await api("/api/notify/test", notifyForm()); toast("Test sent."); } catch (e) { toast(e.message); } });
 $("setform").addEventListener("submit", async (e) => {
   e.preventDefault();

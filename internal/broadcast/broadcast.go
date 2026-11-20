@@ -29,16 +29,23 @@ type Game interface {
 // Private sends one player a message (PalDefender); nil when not available.
 type Private func(ctx context.Context, userID, msg string) error
 
+// Seen is told when players join and leave (for notifications); nil to skip.
+type Seen func(joined, left []string)
+
 // Run sends messages until ctx ends. busy reports when the routine or a restart is running.
-func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() bool) {
-	if !cfg.Enabled || (len(cfg.Messages) == 0 && cfg.Welcome == "") {
+func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() bool, seenFn Seen) {
+	msgsOn := cfg.Enabled && (len(cfg.Messages) > 0 || cfg.Welcome != "")
+	if !msgsOn && seenFn == nil {
 		return
+	}
+	if !cfg.Enabled {
+		cfg.Messages, cfg.Welcome = nil, ""
 	}
 	every := time.Duration(max(5, cfg.EveryMinutes)) * time.Minute
 	if cfg.EveryMinutes == 0 {
 		every = 20 * time.Minute
 	}
-	seen := map[string]bool{}
+	seen := map[string]string{}
 	first := true
 	next, idx := time.Now().Add(2*time.Minute), 0
 	tick := time.NewTicker(30 * time.Second)
@@ -59,10 +66,14 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 			first = true // after an outage, don't welcome everyone who was already on
 			continue
 		}
-		now := map[string]bool{}
+		now := map[string]string{}
+		var joined, left []string
 		for _, p := range ps {
-			now[p.UserID] = true
-			if !first && !seen[p.UserID] && cfg.Welcome != "" {
+			now[p.UserID] = p.Name
+			if _, was := seen[p.UserID]; !first && !was {
+				joined = append(joined, p.Name)
+			}
+			if _, was := seen[p.UserID]; !first && !was && cfg.Welcome != "" {
 				msg := clean(strings.ReplaceAll(cfg.Welcome, "{name}", p.Name))
 				c, cancel := context.WithTimeout(ctx, 10*time.Second)
 				if private != nil {
@@ -76,6 +87,16 @@ func Run(ctx context.Context, cfg Config, g Game, private Private, busy func() b
 					log.Printf("broadcast: welcome failed: %v", err)
 				}
 			}
+		}
+		if !first {
+			for id, name := range seen {
+				if _, still := now[id]; !still {
+					left = append(left, name)
+				}
+			}
+		}
+		if seenFn != nil && (len(joined) > 0 || len(left) > 0) {
+			seenFn(joined, left)
 		}
 		seen, first = now, false
 		if len(ps) > 0 && len(cfg.Messages) > 0 && time.Now().After(next) {

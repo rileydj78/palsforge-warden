@@ -240,3 +240,15 @@ func (s *Store) Events(n int) ([]Event, error) {
 	}
 	return out, rows.Err()
 }
+
+// SetNote stores an admin's note about a player.
+func (s *Store) SetNote(userID, note string) error {
+	res, err := s.DB.Exec(`UPDATE players SET note=? WHERE user_id=?`, note, userID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("no player %s in the roster yet", userID)
+	}
+	return nil
+}

@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
@@ -121,7 +122,20 @@ func main() {
 		if pd := paldefender.New(wcfg.PalDef); pd != nil {
 			private = pd.Message
 		}
-		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b })
+		var seenFn broadcast.Seen
+		if wcfg.Notify.Joins && nt.Enabled() {
+			seenFn = func(joined, left []string) {
+				var parts []string
+				if len(joined) > 0 {
+					parts = append(parts, "Joined: "+strings.Join(joined, ", "))
+				}
+				if len(left) > 0 {
+					parts = append(parts, "Left: "+strings.Join(left, ", "))
+				}
+				nt.Send(context.Background(), notify.Info, "", "Players", strings.Join(parts, "\n"))
+			}
+		}
+		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
 		go h.Supervise(context.Background())

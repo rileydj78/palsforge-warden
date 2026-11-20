@@ -160,6 +160,40 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		fail(w, 404, "no such log")
 	}))
+	mux.HandleFunc("GET /api/backups/download", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
+		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))
+		if err != nil {
+			fail(w, 404, err.Error())
+			return
+		}
+		f, err := os.Open(a.Path)
+		if err != nil {
+			fail(w, 500, err.Error())
+			return
+		}
+		defer f.Close()
+		s.Store.Audit(ses.User.Name, "download backup", a.Name, "", true)
+		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", `attachment; filename="`+a.Name+`"`)
+		w.Header().Set("X-Checksum-Sha256", a.SHA256)
+		http.ServeContent(w, r, a.Name, a.When, f)
+	}))
+	mux.HandleFunc("POST /api/players/note", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, ses *auth.Session) {
+		var in struct{ UserID, Note string }
+		if readJSON(r, &in) != nil {
+			fail(w, 400, "bad request")
+			return
+		}
+		note := cleanText(in.Note, 300)
+		err := s.Store.SetNote(in.UserID, note)
+		s.Store.Audit(ses.User.Name, "note", in.UserID, note, err == nil)
+		if err != nil {
+			fail(w, 400, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]bool{"ok": true})
+	}))
 	mux.HandleFunc("GET /api/backups/preview", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
 		a, err := c.Runner.FindArchive(place, r.URL.Query().Get("name"))

@@ -111,3 +111,4 @@ pre.log { background: #0F1411; color: #CFE3D6; font: 12.5px/1.5 var(--mono); pad
 .map .gridlbl { font: 11px var(--mono); fill: var(--soft); }
 .map .dot { fill: var(--accent); stroke: var(--card); stroke-width: 2; }
 .map .dotlbl { font: 600 13px var(--font); fill: var(--ink); paint-order: stroke; stroke: var(--card); stroke-width: 3px; }
+a.small { text-decoration: none; display: inline-block; }

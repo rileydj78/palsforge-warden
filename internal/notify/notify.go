@@ -22,6 +22,7 @@ type Config struct {
 	NtfyURL        string `json:"ntfyUrl"`        // https://ntfy.sh/<topic> or your own server
 	NtfyToken      string `json:"ntfyToken"`      // optional access token
 	RoutineOK      bool   `json:"routineOk"`      // also report runs that went fine (default: problems only)
+	Joins          bool   `json:"joins"`          // tell me when players join and leave
 }
 
 // Check validates the addresses.
