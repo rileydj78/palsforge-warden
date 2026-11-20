@@ -23,6 +23,8 @@
   <nav class="side" aria-label="Sections">
     <a href="#/" data-view="dash">Dashboard</a>
     <a href="#/players" data-view="players">Players</a>
+    <a href="#/server" data-view="server" id="servernav" hidden>Server</a>
+    <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
     <a href="#/activity" data-view="activity">Activity</a>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Admins</a>
   </nav>
@@ -67,6 +69,34 @@
       <div class="card"><div class="tablewrap"><table>
         <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First seen</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="rosterrows"></tbody></table></div></div>
+    </section>
+
+    <section id="view-server" class="view" hidden>
+      <div class="herorow">
+        <div class="hero"><h1 id="srv-head">Server</h1><p id="srv-sub"></p></div>
+        <div class="actions admin-only">
+          <button class="btn" id="b-start">Start</button>
+          <button class="btn" id="b-stop">Stop…</button>
+          <button class="btn primary" id="b-routine">Run the nightly routine now…</button>
+        </div>
+      </div>
+      <section class="stats" aria-label="Server">
+        <div class="stat"><span class="label">State</span><span class="value" id="srv-state">–</span><span class="note" id="srv-mode"></span></div>
+        <div class="stat"><span class="label">Game build</span><span class="value" id="srv-build">–</span><span class="note" id="srv-update"></span></div>
+        <div class="stat"><span class="label">Next nightly run</span><span class="value" id="srv-next">–</span><span class="note" id="srv-nightly"></span></div>
+        <div class="stat"><span class="label">Crashes, 24 h</span><span class="value" id="srv-crashes">–</span><span class="note" id="srv-paused"></span></div>
+      </section>
+      <section class="card"><h2>Recent runs</h2><div id="runs"></div></section>
+      <section class="card"><h2>Server events</h2><div class="tablewrap"><table>
+        <thead><tr><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody id="eventrows"></tbody></table></div></section>
+    </section>
+
+    <section id="view-backups" class="view" hidden>
+      <div class="herorow">
+        <div class="hero"><h1>Backups</h1><p class="sub" id="bk-sub">Every backup is checked against its checksum when it is copied.</p></div>
+        <div class="actions admin-only"><button class="btn primary" id="b-backup">Back up now</button></div>
+      </div>
+      <div id="bk-places"></div>
     </section>
 
     <section id="view-activity" class="view" hidden>

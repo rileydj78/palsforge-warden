@@ -61,6 +61,8 @@ function signedIn(out) {
   $("signout").textContent = `Sign out (${me.name})`;
   $("adminsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
+  for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
+  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -223,15 +225,81 @@ $("adduser").addEventListener("submit", async (e) => {
   catch (err) { $("nu-msg").textContent = err.message; }
 });
 
+// ---- server control, nightly routine, backups
+const size = (n) => n > 1 << 30 ? `${(n / (1 << 30)).toFixed(1)} GB` : n > 1 << 20 ? `${(n / (1 << 20)).toFixed(0)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+const when2 = (iso) => iso ? new Date(iso).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "–";
+async function loadServer() {
+  try {
+    const s = await api("/api/server"), h = s.host;
+    $("srv-state").textContent = h.running ? "Running" : "Stopped";
+    $("srv-mode").textContent = h.mode === "supervise" ? "Warden runs it and restarts it after a crash" : "Run by another program; Warden starts and stops it";
+    $("srv-build").textContent = s.build || "–";
+    $("srv-update").textContent = s.update ? "Updated by the nightly routine" : "Updates are off";
+    $("srv-next").textContent = s.nextRun ? when2(s.nextRun) : "Off";
+    $("srv-nightly").textContent = s.nightly.enabled ? `Warnings ${s.nightly.warnMinutes.join(", ")} min before` : "Turn it on in warden.json";
+    $("srv-crashes").textContent = h.crashes24h;
+    $("srv-paused").textContent = h.pausedTill && new Date(h.pausedTill) > new Date() ? `Restarts paused until ${when2(h.pausedTill)}` : "";
+    $("srv-head").textContent = s.routineRunning ? "The nightly routine is running…" : "Server";
+    $("srv-sub").textContent = s.offsite ? "" : "Backups are kept on this machine only. Add a second place (backups.offsite) so a dead disk can't take them.";
+    const runs = await api("/api/runs"), box = $("runs"); box.replaceChildren();
+    if (!runs.length) box.append(el("p", "No runs yet.", "note"));
+    for (const r of runs.slice(0, 10)) {
+      const d = el("details", null, "run"), sm = el("summary");
+      sm.append(el("span", r.ok ? "Completed" : "Problems", r.ok ? "tag" : "tag bad"), el("span", ` ${r.kind} · ${when(r.started)}`));
+      d.append(sm);
+      const t = el("table"), tb = el("tbody");
+      for (const st of (r.report.steps || [])) { const tr = el("tr"); tr.append(el("td", st.ok ? "✓" : "✗", st.ok ? "" : "bad"), el("td", st.name, "strong"), el("td", st.detail || "")); tb.append(tr); }
+      t.append(tb); d.append(t); box.append(d);
+    }
+    const ev = await api("/api/events"), rows = $("eventrows"); rows.replaceChildren();
+    if (!ev.length) { const tr = el("tr"); const td = el("td", "Nothing yet.", "empty"); td.colSpan = 3; tr.append(td); rows.append(tr); }
+    for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts)), el("td", e.kind, "strong"), el("td", e.text)); rows.append(tr); }
+  } catch (e) {}
+}
+$("b-start").addEventListener("click", async () => { try { await api("/api/server/start", {}); toast("Starting the server."); setTimeout(loadServer, 3000); } catch (e) { toast(e.message); } });
+$("b-stop").addEventListener("click", async () => {
+  const ok = await ask({ title: "Stop the server?", text: "Players are told it is stopping. It stays off until someone starts it.", label: "Type STOP to confirm", confirmWord: "STOP", ok: "Stop" });
+  if (ok == null) return;
+  try { await api("/api/server/stop", {}); toast("The server is stopped."); loadServer(); } catch (e) { toast(e.message); }
+});
+$("b-routine").addEventListener("click", async () => {
+  const ok = await ask({ title: "Run the nightly routine now?", text: "Players get warnings, then the world is saved, the server stops, is backed up and updated, and starts again. Type NOW to run it without the warnings, or RUN to include them.", label: "RUN or NOW" });
+  if (ok == null) return;
+  const w = ok.trim().toUpperCase();
+  if (w !== "RUN" && w !== "NOW") { toast("Not confirmed; nothing was done."); return; }
+  try { await api("/api/routine/run", { warn: w === "RUN", update: true }); toast("The routine has started."); setTimeout(loadServer, 2000); } catch (e) { toast(e.message); }
+});
+async function loadBackups() {
+  try {
+    const places = await api("/api/backups"), box = $("bk-places"); box.replaceChildren();
+    places.forEach((p, i) => {
+      const c = el("section", null, "card");
+      c.append(el("h2", i === 0 ? "On this machine" : "Second place"), el("p", p.dir, "note mono"));
+      if (p.error) c.append(el("p", p.error, "problem"));
+      const t = el("table"), tb = el("tbody");
+      t.append(Object.assign(el("thead"), { innerHTML: "<tr><th>Backup</th><th>Kind</th><th>Made</th><th>Size</th><th>Checked</th></tr>" }));
+      if (!p.archives.length) { const tr = el("tr"); const td = el("td", "None yet.", "empty"); td.colSpan = 5; tr.append(td); tb.append(tr); }
+      for (const a of p.archives) { const tr = el("tr"); tr.append(el("td", a.name, "mono"), el("td", a.kind === "server" ? "Whole server" : "World, settings, mods"), el("td", when2(a.when)), el("td", size(a.size), "num"), el("td", a.sha256 ? "✓ checksum" : "–")); tb.append(tr); }
+      t.append(tb); const w = el("div", null, "tablewrap"); w.append(t); c.append(w); box.append(c);
+    });
+  } catch (e) {}
+}
+$("b-backup").addEventListener("click", async () => {
+  toast("Backing up… this can take a minute.");
+  try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${r.made.join(", ")}`); loadBackups(); } catch (e) { toast(e.message); }
+});
+
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
   if (view === "activity") loadAudit();
   if (view === "admins") loadUsers();
+  if (view === "server") loadServer();
+  if (view === "backups") loadBackups();
 }
 window.addEventListener("hashchange", route);
 async function refresh() { try { render(await api("/api/status")); } catch (e) {} }
