@@ -17,6 +17,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/auth"
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/crash"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
@@ -168,7 +169,12 @@ func main() {
 				if pin != nil {
 					pin("the last backup before the crash at " + e.At.Format("Jan 2 15:04"))
 				}
-				nt.Send(context.Background(), notify.Urgent, "crash", "The server crashed", e.Text+". Warden is starting it again.")
+				msg := e.Text + ". Warden is starting it again."
+				if hint := crash.Find(wcfg.ServerDir, crashLogDir(), e.At.Add(-10*time.Minute)); hint.Summary != "" {
+					msg += "\n" + hint.Summary
+					st2.AddEvent(time.Now(), "crash", "why: "+hint.Summary)
+				}
+				nt.Send(context.Background(), notify.Urgent, "crash", "The server crashed", msg)
 			case "gave-up":
 				nt.Send(context.Background(), notify.Urgent, "gave-up", "The server keeps crashing", e.Text)
 			case "update":
@@ -316,4 +322,12 @@ func savePorts(data string, p ports) {
 	os.MkdirAll(data, 0o700)
 	b, _ := json.Marshal(p)
 	os.WriteFile(filepath.Join(data, "ports.json"), b, 0o600)
+}
+
+// crashLogDir is where UE4SS's log lives under the server folder.
+func crashLogDir() string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join("Pal", "Binaries", "Win64")
+	}
+	return filepath.Join("Pal", "Binaries", "Linux")
 }
