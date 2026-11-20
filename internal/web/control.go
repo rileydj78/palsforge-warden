@@ -532,6 +532,9 @@ func (s *Server) settingsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/settings", s.guard(auth.Owner, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		cfg, _, err := config.Load(s.Settings.DataDir, "")
 		resp := map[string]any{"settings": cfg.Masked(), "path": config.ConfigPath(s.Settings.DataDir)}
+		if s.Bot != nil {
+			resp["discordBot"] = s.Bot.State()
+		}
 		if err != nil {
 			resp["error"] = err.Error()
 		} else if err := cfg.Check(); err != nil {

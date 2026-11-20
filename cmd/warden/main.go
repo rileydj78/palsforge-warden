@@ -18,6 +18,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/crash"
+	"github.com/rileydj78/palsforge-warden/internal/discordbot"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
@@ -285,6 +286,11 @@ func main() {
 			}
 			srv.Public = pub
 			log.Printf("status page on http://%s/ (read-only)", *publicListen)
+		}
+		if wcfg.DiscordBot.Enabled() {
+			bot := &discordbot.Bot{Cfg: wcfg.DiscordBot, Call: srv.BotCall, Log: log.Printf}
+			srv.Bot = bot
+			go bot.Run(context.Background())
 		}
 		go h.Supervise(context.Background())
 		go runner.Schedule(context.Background())

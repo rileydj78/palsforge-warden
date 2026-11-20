@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased (1.0.0-rc.4)
+
+- **Discord commands**: a slash-command bot in your own Discord server. /status for everyone;
+  /players, /announce and /kick for the roles you map to Moderator; /ban, /save, /backup,
+  /restart, /start and /stop for Admin roles. Player names autocomplete; bans, restarts and stops
+  ask "are you sure?" (only the asker can answer). Each command goes through the panel's own
+  permission checks and is recorded in Activity as discord:<name>; the bot never gets owner
+  powers. The token is kept like the other secrets. Settings → Discord commands.
+- Layout pass, graphs, the Inter font, side menu grouped Server / Players / Records / Admin.
+
 ## 1.0.0-rc.3 (2026-11-20)
 
 - Linux tested with a real Palworld server in Docker (backups, settings with a restart, a full
@@ -81,6 +91,6 @@ The first release candidate. Warden has run a live Palworld community server on 
 - Windows builds are not code-signed yet: SmartScreen warns ("More info" → "Run anyway"), and
   Smart App Control, where it's on, blocks the program.
 - No translations yet (planned for 1.1); no character / host-save migration (Palworld's saves use
-  proprietary Oodle compression); no Discord command bot (API keys let existing bots use Warden).
+  proprietary Oodle compression); no Discord command bot (API keys let existing bots use Warden; added in rc.4).
 - Not yet tried by hand: the double-click setup's Windows permission prompt; the map's
   coordinates against in-game positions.

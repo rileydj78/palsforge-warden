@@ -277,3 +277,42 @@ func TestAPIKeys(t *testing.T) {
 		t.Fatalf("a revoked key stops working at once, got %d", code)
 	}
 }
+
+func TestDiscordBotCallsAreLimitedAndAudited(t *testing.T) {
+	st, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	au, _ := auth.New(st.DB)
+	fg := &fakeGame{}
+	s := &Server{Game: fg.start(t), Store: st, Auth: au, Version: "test"}
+	ctx := t.Context()
+	if code, _ := s.BotCall(ctx, auth.Moderator, "discord:pat", "GET", "/api/status", nil); code != 200 {
+		t.Fatalf("moderator status: %d", code)
+	}
+	if code, _ := s.BotCall(ctx, auth.Moderator, "discord:pat", "POST", "/api/action/ban", map[string]any{"userId": "steam_1"}); code != 403 {
+		t.Fatalf("moderator ban: %d", code)
+	}
+	for _, p := range []string{"/api/users", "/api/keys"} { // owner pages: never, even as admin
+		if code, _ := s.BotCall(ctx, auth.Admin, "discord:pat", "GET", p, nil); code != 403 {
+			t.Fatalf("admin %s: %d", p, code)
+		}
+	}
+	if code, _ := s.BotCall(ctx, auth.Owner, "discord:pat", "GET", "/api/status", nil); code != 403 {
+		t.Fatalf("an owner role must never be accepted: %d", code)
+	}
+	if code, _ := s.BotCall(ctx, auth.Moderator, "discord:pat", "POST", "/api/action/kick", map[string]any{"userId": "steam_1", "name": "Moss"}); code != 200 {
+		t.Fatalf("moderator kick: %d", code)
+	}
+	log, _ := st.RecentAudit(5)
+	if len(log) == 0 || log[0].Who != "discord:pat" || log[0].Action != "kick" {
+		t.Fatalf("audit: %+v", log)
+	}
+	// Over HTTP nobody can claim to be the bot.
+	ts := httptest.NewServer(s.Handler())
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/api/status")
+	if err != nil || resp.StatusCode != 401 {
+		t.Fatalf("plain HTTP should need sign-in: %v %v", resp.StatusCode, err)
+	}
+}

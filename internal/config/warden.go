@@ -15,6 +15,7 @@ import (
 
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/broadcast"
+	"github.com/rileydj78/palsforge-warden/internal/discordbot"
 	"github.com/rileydj78/palsforge-warden/internal/events"
 	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
@@ -24,15 +25,17 @@ import (
 // Warden is Warden's own configuration, kept in warden.json in its data folder. Everything has a
 // sensible default, so a new install only needs the server folder.
 type Warden struct {
-	ServerDir string             `json:"serverDir"`
-	Control   Control            `json:"control"`
-	Nightly   Nightly            `json:"nightly"`
-	Backups   Backups            `json:"backups"`
-	Update    Update             `json:"update"`
-	Notify    notify.Config      `json:"notify"`
-	PalDef    paldefender.Config `json:"palDefender"`
-	Broadcast broadcast.Config   `json:"broadcasts"`
-	Health    Health             `json:"health"`
+	ServerDir string        `json:"serverDir"`
+	Control   Control       `json:"control"`
+	Nightly   Nightly       `json:"nightly"`
+	Backups   Backups       `json:"backups"`
+	Update    Update        `json:"update"`
+	Notify    notify.Config `json:"notify"`
+	// Slash commands in your Discord server, checked against Warden's roles (see docs).
+	DiscordBot discordbot.Config  `json:"discordBot"`
+	PalDef     paldefender.Config `json:"palDefender"`
+	Broadcast  broadcast.Config   `json:"broadcasts"`
+	Health     Health             `json:"health"`
 	// Allow-list: when on, players who aren't on Warden's list are kicked as they join.
 	AllowList AllowList `json:"allowList"`
 	// Items and Pals every new player gets once (needs PalDefender).
@@ -278,6 +281,9 @@ func (w *Warden) Check() error {
 		}
 	}
 	if err := w.Notify.Check(); err != nil {
+		bad = append(bad, err.Error())
+	}
+	if err := w.DiscordBot.Check(); err != nil {
 		bad = append(bad, err.Error())
 	}
 	if len(bad) > 0 {

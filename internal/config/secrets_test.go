@@ -12,9 +12,10 @@ func TestSecretsNeverLeaveAndSurviveASave(t *testing.T) {
 	w := Defaults(t.TempDir())
 	w.PalDef.Token = "pd-secret"
 	w.Notify.DiscordWebhook = "https://discord.com/api/webhooks/1/abc"
+	w.DiscordBot.Token = "bot-secret"
 	w.Backups.S3 = []backup.S3Target{{Endpoint: "https://s3.example.com", Region: "us-east-1", Bucket: "b", AccessKey: "AK", SecretKey: "s3-secret"}}
 	b, _ := json.Marshal(w.Masked())
-	for _, s := range []string{"pd-secret", "webhooks/1/abc", "s3-secret"} {
+	for _, s := range []string{"pd-secret", "webhooks/1/abc", "s3-secret", "bot-secret"} {
 		if strings.Contains(string(b), s) {
 			t.Fatalf("%s reached the browser", s)
 		}
@@ -25,7 +26,7 @@ func TestSecretsNeverLeaveAndSurviveASave(t *testing.T) {
 	var back Warden
 	json.Unmarshal(b, &back)
 	back.KeepSecrets(w)
-	if back.PalDef.Token != "pd-secret" || back.Notify.DiscordWebhook != w.Notify.DiscordWebhook || back.Backups.S3[0].SecretKey != "s3-secret" {
+	if back.PalDef.Token != "pd-secret" || back.Notify.DiscordWebhook != w.Notify.DiscordWebhook || back.Backups.S3[0].SecretKey != "s3-secret" || back.DiscordBot.Token != "bot-secret" {
 		t.Fatal("an unchanged placeholder keeps the saved secret")
 	}
 	w.Notify.NtfyURL, w.Notify.NtfyToken = "https://ntfy.sh/mine", "ntfy-secret"

@@ -9,15 +9,18 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"math"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"time"
@@ -57,11 +60,14 @@ type Server struct {
 	// News: Pocketpair's announcements (only when "update soon" is on); nil = none.
 	News *news.Feed
 	// Instances: the other Wardens on this machine (one per game server); nil = don't list.
-	Instances *InstancesInfo
-	mu        sync.Mutex
-	local     *auth.Session // the local port's session: the owner, at the server
-	last      *Status
-	lastAt    time.Time
+	Instances  *InstancesInfo
+	mu         sync.Mutex
+	local      *auth.Session // the local port's session: the owner, at the server
+	botOnce    sync.Once
+	botHandler http.Handler
+	Bot        interface{ State() string } // the Discord bot, when it runs
+	last       *Status
+	lastAt     time.Time
 }
 
 // PlayerView is what the panel shows about a player. No IP addresses: the panel never needs them.
@@ -219,6 +225,15 @@ func (s *Server) session(r *http.Request) *auth.Session {
 // guard wraps a route: it needs a session with at least role min; POSTs also need CSRF.
 func (s *Server) guard(min string, h func(http.ResponseWriter, *http.Request, *auth.Session)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if ses, ok := r.Context().Value(botKey{}).(*auth.Session); ok {
+			// Warden's own Discord bot, in-process: the same limits as an API key.
+			if min == auth.Owner || strings.HasPrefix(r.URL.Path, "/api/me") || !auth.Allows(ses.User.Role, min) {
+				fail(w, http.StatusForbidden, "the Discord bot can't do that")
+				return
+			}
+			h(w, r, ses)
+			return
+		}
 		if bearer, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && !onLocalPort(r) {
 			// An API key (bots, websites): no cookie, so no CSRF; never the owner's routes or an
 			// account's own pages.
@@ -262,6 +277,29 @@ func cleanText(s string, max int) string {
 		s = string([]rune(s)[:max])
 	}
 	return s
+}
+
+// botKey marks requests from Warden's Discord bot (only reachable in-process, never over HTTP).
+type botKey struct{}
+
+// BotCall runs one panel API request for the Discord bot, as role, audited under who.
+func (s *Server) BotCall(ctx context.Context, role, who, method, path string, body any) (int, []byte) {
+	if role != auth.Moderator && role != auth.Admin {
+		return http.StatusForbidden, []byte(`{"error":"no Warden role"}`)
+	}
+	s.botOnce.Do(func() { s.botHandler = s.Handler() })
+	var rd io.Reader = http.NoBody
+	if body != nil {
+		buf, _ := json.Marshal(body)
+		rd = bytes.NewReader(buf)
+	}
+	ses := &auth.Session{User: auth.User{Name: who, Role: role}, Key: true, Expires: time.Now().Add(time.Minute)}
+	r := httptest.NewRequestWithContext(context.WithValue(ctx, botKey{}, ses), method, path, rd)
+	r.Host = "127.0.0.1"
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.botHandler.ServeHTTP(w, r)
+	return w.Code, w.Body.Bytes()
 }
 
 // Handler is the panel's HTTP handler.

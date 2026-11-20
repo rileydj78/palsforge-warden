@@ -39,7 +39,8 @@ internet, and Palworld's admin password never leaves the server.
 - **Community and moderation:** server messages and a private welcome, weekly events (double XP
   weekends switch on and off by themselves), an allow-list, one list of every ban (game and
   PalDefender), player notes; with PalDefender: inventories, Pals, guilds, bases on the map, and
-  giving items or Pals. Discord or ntfy alerts, and a live status message in Discord.
+  giving items or Pals. Discord or ntfy alerts, a live status message in Discord, and Discord slash commands
+  (/status, /players, /kick, /ban, /restart, …) checked against Warden's roles.
 - **Keeps a stuck server going:** restarts a frozen server, optionally restarts when memory grows
   too large (with warnings), keeps the last backup before a crash, and stops after 3 automatic
   restarts in 6 hours so a broken server isn't restarted forever.

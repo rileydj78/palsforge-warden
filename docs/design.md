@@ -30,7 +30,7 @@ for now: the project is too new; Smart App Control blocks unsigned programs).
 | Signed Windows release; self-update | after code signing |
 | Translations | 1.1 |
 | Character / host-save migration | not planned: Palworld's saves use Oodle, which is proprietary |
-| Discord command bot | not planned for 1.0: API keys let existing bots use Warden |
+| Discord command bot | done (rc.4): slash commands mapped to Warden roles, audited |
 | File manager | not planned: Warden runs on the machine, and each file worth editing has its page |
 
 The full competitor comparison and the parity gaps are in [feature-survey.md](feature-survey.md).

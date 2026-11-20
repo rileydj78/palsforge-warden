@@ -29,6 +29,7 @@ func (w Warden) Masked() Warden {
 	mask(&m.PalDef.Token)
 	mask(&m.Notify.DiscordWebhook)
 	mask(&m.Notify.NtfyToken)
+	mask(&m.DiscordBot.Token)
 	m.Backups.S3 = append(m.Backups.S3[:0:0], w.Backups.S3...)
 	for i := range m.Backups.S3 {
 		mask(&m.Backups.S3[i].SecretKey)
@@ -49,6 +50,7 @@ func (w *Warden) KeepSecrets(old Warden) {
 		w.PalDef.Token = ""
 	}
 	keep(&w.Notify.DiscordWebhook, old.Notify.DiscordWebhook) // the webhook is its own address
+	keep(&w.DiscordBot.Token, old.DiscordBot.Token)           // the bot token only ever goes to Discord
 	if sameHost(w.Notify.NtfyURL, old.Notify.NtfyURL) {
 		keep(&w.Notify.NtfyToken, old.Notify.NtfyToken)
 	} else if w.Notify.NtfyToken == Unchanged {

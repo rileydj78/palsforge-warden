@@ -774,6 +774,7 @@ $("s-c-mode").addEventListener("change", showMode);
 async function loadSettings() {
   try {
     const r = await api("/api/settings"); cfg = r.settings;
+    const ds = $("s-d-state"); ds.hidden = !r.discordBot; ds.textContent = r.discordBot ? "Discord bot: " + r.discordBot : "";
     $("set-path").textContent = `Saved in ${r.path}. The server folder is ${cfg.serverDir}.`;
     $("set-error").hidden = !r.error; $("set-error").textContent = r.error ? `Needs attention: ${r.error}` : "";
     $("s-n-on").checked = cfg.nightly.enabled; $("s-n-time").value = cfg.nightly.time; $("s-n-warn").value = (cfg.nightly.warnMinutes || []).join(", ");
@@ -793,6 +794,8 @@ async function loadSettings() {
     $("s-m-on").checked = !!b.enabled; $("s-m-list").value = (b.messages || []).join("\n"); $("s-m-every").value = b.everyMinutes || ""; $("s-m-welcome").value = b.welcome || "";
     const n = cfg.notify || {};
     $("s-x-dc").value = n.discordWebhook || ""; $("s-x-ntfy").value = n.ntfyUrl || ""; $("s-x-tok").value = n.ntfyToken || ""; $("s-x-ok").checked = !!n.routineOk; $("s-x-joins").checked = !!n.joins; $("s-x-live").checked = !!n.liveStatus;
+    const db = cfg.discordBot || {};
+    $("s-d-tok").value = db.token || ""; $("s-d-guild").value = db.guild || ""; $("s-d-mod").value = (db.modRoles || []).join("\n"); $("s-d-adm").value = (db.adminRoles || []).join("\n"); $("s-d-chan").value = db.channel || "";
     showMode();
   } catch (e) {}
 }
@@ -805,6 +808,7 @@ $("setform").addEventListener("submit", async (e) => {
   Object.assign(c.backups, { dir: $("s-b-dir").value.trim(), offsite: lines($("s-b-off").value), image: $("s-b-img").value, keepDaily: +$("s-b-d").value, keepWeekly: +$("s-b-w").value });
   Object.assign(c.update, { enabled: $("s-u-on").checked, steamcmd: $("s-u-path").value.trim(), validate: $("s-u-val").checked, holdForMods: $("s-u-hold").checked, soon: $("s-u-soon").checked });
   c.notify = notifyForm();
+  c.discordBot = { token: $("s-d-tok").value.trim(), guild: $("s-d-guild").value.trim(), modRoles: lines($("s-d-mod").value), adminRoles: lines($("s-d-adm").value), channel: $("s-d-chan").value.trim() };
   c.events = $("s-ev").value;
   c.health = { restartFrozenMinutes: parseInt($("s-h-frozen").value, 10) || 0, memoryLimitGB: parseFloat($("s-h-mem").value) || 0, pauseEmptyMinutes: parseInt($("s-h-pause").value, 10) || 0 };
   c.starterKit = { on: $("s-k-on").checked, items: $("s-k-items").value.trim(), pals: $("s-k-pals").value.trim(), message: $("s-k-msg").value.trim() };

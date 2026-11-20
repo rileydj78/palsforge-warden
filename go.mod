@@ -3,6 +3,7 @@ module github.com/rileydj78/palsforge-warden
 go 1.27.3
 
 require (
+	github.com/coder/websocket v1.8.14
 	github.com/pkg/sftp v1.13.9
 	golang.org/x/crypto v0.59.0
 	golang.org/x/net v0.62.0
