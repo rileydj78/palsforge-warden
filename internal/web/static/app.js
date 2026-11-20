@@ -63,7 +63,7 @@ function signedIn(out) {
   $("settingsnav").hidden = me.role !== "owner";
   for (const id of ["b-save", "b-shutdown"]) $(id).hidden = me.role === "moderator";
   for (const e of document.querySelectorAll(".admin-only")) e.hidden = me.role === "moderator";
-  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; }).catch(() => {});
+  api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; }).catch(() => {});
   route(); refresh(); history();
 }
 
@@ -302,6 +302,27 @@ $("b-backup").addEventListener("click", async () => {
   try { const r = await api("/api/backups/now", {}); toast(`Backed up: ${r.made.join(", ")}`); loadBackups(); } catch (e) { toast(e.message); }
 });
 
+// ---- logs
+async function loadLogs(first) {
+  const sel = $("lg-src");
+  try {
+    if (first || !sel.options.length) {
+      const r = await api("/api/logs"); const cur = sel.value; sel.replaceChildren();
+      for (const s of r.sources) { const o = el("option", s.label); o.value = s.id; sel.append(o); }
+      if (cur) sel.value = cur;
+      if (!r.sources.length) { $("lg-out").textContent = "No logs found yet."; return; }
+    }
+    const q = $("lg-q").value.trim();
+    const r = await api(`/api/logs?source=${encodeURIComponent(sel.value)}&lines=400&q=${encodeURIComponent(q)}`);
+    const out = $("lg-out"), atEnd = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent = r.lines.length ? r.lines.join("\n") : (q ? "No lines match." : "The log is empty.");
+    if (atEnd || first) out.scrollTop = out.scrollHeight;
+  } catch (e) {}
+}
+$("lg-src").addEventListener("change", () => loadLogs(false));
+let lgT; $("lg-q").addEventListener("input", () => { clearTimeout(lgT); lgT = setTimeout(() => loadLogs(false), 300); });
+setInterval(() => { if (!$("view-logs").hidden && $("lg-follow").checked) loadLogs(false); }, 5000);
+
 // ---- Warden's own settings (owner)
 let cfg = null;
 const lines = (t) => t.split("\n").map((x) => x.trim()).filter(Boolean);
@@ -343,7 +364,7 @@ $("setform").addEventListener("submit", async (e) => {
 // ---- routing and polling
 function route() {
   const v = (location.hash.replace("#/", "") || "dash");
-  const view = ["players", "activity", "admins", "server", "backups", "settings"].includes(v) ? v : "dash";
+  const view = ["players", "activity", "admins", "server", "backups", "settings", "logs"].includes(v) ? v : "dash";
   for (const s of document.querySelectorAll(".view")) s.hidden = s.id !== `view-${view}`;
   for (const a of document.querySelectorAll(".side a")) a.classList.toggle("on", a.dataset.view === view);
   if (view === "players") loadRoster();
@@ -352,6 +373,7 @@ function route() {
   if (view === "server") loadServer();
   if (view === "backups") loadBackups();
   if (view === "settings") loadSettings();
+  if (view === "logs") loadLogs(true);
 }
 window.addEventListener("hashchange", route);
 async function refresh() {

@@ -25,6 +25,7 @@
     <a href="#/players" data-view="players">Players</a>
     <a href="#/server" data-view="server" id="servernav" hidden>Server</a>
     <a href="#/backups" data-view="backups" id="backupsnav" hidden>Backups</a>
+    <a href="#/logs" data-view="logs" id="logsnav" hidden>Logs</a>
     <a href="#/activity" data-view="activity">Activity</a>
     <a href="#/admins" data-view="admins" id="adminsnav" hidden>Admins</a>
     <a href="#/settings" data-view="settings" id="settingsnav" hidden>Settings</a>
@@ -100,6 +101,17 @@
         <div class="actions admin-only"><button class="btn primary" id="b-backup">Back up now</button></div>
       </div>
       <div id="bk-places"></div>
+    </section>
+
+    <section id="view-logs" class="view" hidden>
+      <h1>Logs</h1>
+      <p class="sub">Player IP addresses are masked and passwords removed.</p>
+      <div class="logbar">
+        <select id="lg-src" aria-label="Which log"></select>
+        <input class="search" id="lg-q" type="search" placeholder="Search" aria-label="Search the log">
+        <label class="check"><input type="checkbox" id="lg-follow" checked> Follow</label>
+      </div>
+      <pre class="log" id="lg-out" tabindex="0"></pre>
     </section>
 
     <section id="view-activity" class="view" hidden>

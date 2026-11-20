@@ -11,6 +11,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/host"
+	"github.com/rileydj78/palsforge-warden/internal/logs"
 	"github.com/rileydj78/palsforge-warden/internal/nightly"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
 )
@@ -120,6 +121,34 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		s.Store.Audit(ses.User.Name, "run routine now", "", map[bool]string{true: "with warnings", false: "no warnings"}[in.Warn], true)
 		go c.Runner.RunNow(context.Background(), "manual", warn, in.Update && c.Cfg.Update.Enabled)
 		writeJSON(w, 202, map[string]bool{"started": true})
+	}))
+	mux.HandleFunc("GET /api/logs", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		srcs := logs.Sources(c.Cfg.ServerDir, c.Runner.Backups.DataDir)
+		id := r.URL.Query().Get("source")
+		if id == "" {
+			writeJSON(w, 200, map[string]any{"sources": srcs})
+			return
+		}
+		for _, src := range srcs {
+			if src.ID == id {
+				n, _ := strconv.Atoi(r.URL.Query().Get("lines"))
+				if n <= 0 || n > 2000 {
+					n = 300
+				}
+				q := r.URL.Query().Get("q")
+				if len(q) > 100 {
+					q = q[:100]
+				}
+				lines, err := logs.Tail(src, n, q)
+				if err != nil {
+					fail(w, 500, "can't read that log: "+err.Error())
+					return
+				}
+				writeJSON(w, 200, map[string]any{"sources": srcs, "lines": lines})
+				return
+			}
+		}
+		fail(w, 404, "no such log")
 	}))
 	mux.HandleFunc("GET /api/backups/preview", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		place, _ := strconv.Atoi(r.URL.Query().Get("place"))
