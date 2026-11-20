@@ -14,6 +14,7 @@ import (
 
 	"github.com/rileydj78/palsforge-warden/internal/backup"
 	"github.com/rileydj78/palsforge-warden/internal/config"
+	"github.com/rileydj78/palsforge-warden/internal/gamesettings"
 	"github.com/rileydj78/palsforge-warden/internal/host"
 	"github.com/rileydj78/palsforge-warden/internal/mods"
 	"github.com/rileydj78/palsforge-warden/internal/notify"
@@ -182,17 +183,32 @@ func (r *Runner) RunNow(ctx context.Context, kind string, warn []int, update boo
 	}
 	defer end()
 	p := routine.Plan{WarnMinutes: warn, Update: update}
-	if r.Mods != nil {
-		p.BeforeStart = func(context.Context) (string, error) {
-			done, err := r.Mods.ApplyPending()
-			return strings.Join(done, ", "), err
-		}
-	}
+	p.BeforeStart = r.WhileStopped
 	rep := routine.Run(ctx, p, r.Game, r.Host, r.Backups)
 	r.Store.AddRun(kind, rep.Started, rep.OK, rep)
 	log.Printf("%s routine finished: ok=%v", kind, rep.OK)
 	r.tell(kind, rep)
 	return rep, nil
+}
+
+// WhileStopped makes the changes that can only happen with the server stopped: waiting mod
+// changes, and waiting game-settings changes (Palworld rewrites its settings file on shutdown).
+func (r *Runner) WhileStopped(context.Context) (string, error) {
+	var parts []string
+	var errs []error
+	if r.Mods != nil {
+		done, err := r.Mods.ApplyPending()
+		if len(done) > 0 {
+			parts = append(parts, "mods: "+strings.Join(done, ", "))
+		}
+		errs = append(errs, err)
+	}
+	sum, err := gamesettings.ApplyPending(config.SettingsPath(r.Cfg.ServerDir), r.Backups.DataDir)
+	if sum != "" {
+		parts = append(parts, sum)
+	}
+	errs = append(errs, err)
+	return strings.Join(parts, "; "), errors.Join(errs...)
 }
 
 // tell sends a run's result: problems always, a clean run only if the admin asked for that.

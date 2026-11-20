@@ -57,3 +57,19 @@ func TestPlanRefusesBadValues(t *testing.T) {
 		}
 	}
 }
+
+func TestPendingAppliedWhileStopped(t *testing.T) {
+	p, data := write(t), t.TempDir()
+	if err := AddPending(data, map[string]string{"ExpRate": "10"}); err != nil {
+		t.Fatal(err)
+	}
+	AddPending(data, map[string]string{"bIsPvP": "True"})
+	sum, err := ApplyPending(p, data)
+	if err != nil || !strings.Contains(sum, "2 changed") {
+		t.Fatalf("%q %v", sum, err)
+	}
+	f, _ := Read(p)
+	if f.Values["ExpRate"] != "10.000000" || f.Values["bIsPvP"] != "True" || len(LoadPending(data)) != 0 {
+		t.Fatalf("%v", f.Values)
+	}
+}

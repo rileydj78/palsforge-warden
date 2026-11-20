@@ -332,7 +332,15 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 				unknown = append(unknown, p.Key)
 			}
 		}
-		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path})
+		pending := gamesettings.LoadPending(c.Runner.Backups.DataDir)
+		for k, v := range pending { // show what the server will have after the next stop
+			if o, ok := gamesettings.Lookup(k); ok && o.Type == "secret" {
+				pending[k] = "(changed)"
+				continue
+			}
+			values[k] = v
+		}
+		writeJSON(w, 200, map[string]any{"catalog": gamesettings.Catalog, "values": values, "secretsSet": secrets, "unknown": unknown, "path": path, "pending": pending})
 	}
 	mux.HandleFunc("GET /api/game-settings", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) { view(w) }))
 	plan := func(r *http.Request) (*gamesettings.File, []gamesettings.Change, string, error) {
@@ -380,39 +388,62 @@ func (s *Server) gameSettingsRoutes(mux *http.ServeMux) {
 			fail(w, 400, "nothing changed")
 			return
 		}
-		end, err := c.Runner.Begin("a settings change")
-		if err != nil {
-			fail(w, 409, err.Error())
-			return
-		}
-		bak, err := f.Apply(ch)
+		_ = f
 		var names []string
+		vals := map[string]string{}
+		for _, x := range ch {
+			vals[x.Key] = x.New
+		}
 		for _, x := range mask(ch) {
 			names = append(names, x.Label+": "+x.Old+" → "+x.New)
 		}
-		s.Store.Audit(ses.User.Name, "change game settings", "", strings.Join(names, "; "), err == nil)
-		if err != nil {
-			end()
+		s.Store.Audit(ses.User.Name, "change game settings", restart, strings.Join(names, "; "), true)
+		// Palworld rewrites its settings file when it shuts down, so changes are written only while
+		// it's stopped: now if it already is, otherwise by the restart below or the nightly routine.
+		if err := gamesettings.AddPending(c.Runner.Backups.DataDir, vals); err != nil {
 			fail(w, 500, err.Error())
 			return
 		}
-		if restart != "now" {
+		if !c.Host.Running() {
+			end, err := c.Runner.Begin("a settings change")
+			if err != nil {
+				writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "next stop"})
+				return
+			}
+			sum, err := c.Runner.WhileStopped(r.Context())
 			end()
-		} else {
-			go func() { // a restart with a minute's warning; the settings apply as the server starts
-				defer end()
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-				defer cancel()
-				s.Game.Announce(ctx, "The server restarts in 1 minute to apply new settings.")
-				c.Host.PlanStop(ctx) // on purpose: not a crash
-				if err := s.Game.Shutdown(ctx, 60, "Restarting to apply new settings."); err != nil || !c.Host.WaitStopped(ctx, 4*time.Minute) {
-					c.Host.ForceStop(ctx)
-					c.Host.WaitStopped(ctx, time.Minute)
-				}
-				c.Host.Start(ctx)
-			}()
+			if err != nil {
+				fail(w, 500, err.Error())
+				return
+			}
+			writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "now", "done": sum})
+			return
 		}
-		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "backup": bak})
+		if restart != "now" {
+			writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "next nightly stop"})
+			return
+		}
+		end, err := c.Runner.Begin("a settings change")
+		if err != nil {
+			writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "next stop", "note": err.Error()})
+			return
+		}
+		go func() { // stop with a minute's warning, write the settings, start
+			defer end()
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			s.Game.Announce(ctx, "The server restarts in 1 minute to apply new settings.")
+			c.Host.PlanStop(ctx) // on purpose: not a crash
+			if err := s.Game.Shutdown(ctx, 60, "Restarting to apply new settings."); err != nil || !c.Host.WaitStopped(ctx, 4*time.Minute) {
+				c.Host.ForceStop(ctx)
+				c.Host.WaitStopped(ctx, time.Minute)
+			}
+			time.Sleep(3 * time.Second) // let the game finish writing its own copy first
+			sum, err := c.Runner.WhileStopped(ctx)
+			s.Store.AddEvent(time.Now(), "settings", fmt.Sprintf("%s %v", sum, err))
+			c.Host.Start(ctx)
+		}()
+		writeJSON(w, 200, map[string]any{"ok": true, "changes": mask(ch), "when": "restarting now"})
 	}))
 }
 

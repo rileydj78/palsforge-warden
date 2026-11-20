@@ -378,6 +378,8 @@ async function loadGame() {
       }
       box.append(card);
     }
+    const np = Object.keys(game.pending || {}).length;
+    $("g-sub").textContent = np ? `${np} change${np === 1 ? " is" : "s are"} waiting: Palworld rewrites its settings when it stops, so Warden writes them at the next stop (the nightly routine, or a restart from here).` : "Changes are written while the server is stopped (Palworld rewrites its settings when it shuts down). Every change keeps a copy of the old file.";
     $("g-unknown-card").hidden = !game.unknown.length; $("g-unknown").textContent = game.unknown.join(", ");
   } catch (e) { toast(e.message); }
 }
@@ -400,7 +402,7 @@ $("g-review").addEventListener("click", async () => {
   if (ans == null) return;
   const w = ans.trim().toUpperCase();
   if (w !== "LATER" && w !== "NOW") { toast("Not confirmed; nothing was changed."); return; }
-  try { await api("/api/game-settings/apply", { values, restart: w === "NOW" ? "now" : "later" }); toast(w === "NOW" ? "Saved. The server restarts in 1 minute." : "Saved. They apply at the next restart."); loadGame(); } catch (e) { toast(e.message); }
+  try { await api("/api/game-settings/apply", { values, restart: w === "NOW" ? "now" : "later" }); toast(w === "NOW" ? "Saved. The server restarts in 1 minute and starts with them." : "Saved. Warden writes them at the next stop."); loadGame(); } catch (e) { toast(e.message); }
 });
 
 // ---- mods
