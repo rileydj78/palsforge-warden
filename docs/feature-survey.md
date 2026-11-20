@@ -314,6 +314,36 @@ player names, IDs, IPs, chat or save data, by its own docs).
 | Supercraft | Web RCON console, **character recovery**, allow/block list management, Thunderstore mods | – |
 | CubeCoders AMP | Scheduler triggers, backups incl. S3, RCON console; several forum reports of Palworld backup and RCON failures | Roles/audit details (KB not readable) |
 
+## Where the gaps stand (updated 2026-11-20, 0.1.0-rc19)
+
+| # | Gap | Status |
+|---|---|---|
+| 1 | Allow-list / maintenance lockdown | **Done** (Warden's own list, kick on join; lockdown = turn it on) |
+| 2 | Frozen-server restart, RAM threshold | **Done** (capped at 3 automatic restarts per 6 h) |
+| 3 | Inventory, Pals, guilds, bases | **Done through PalDefender**; save parser for servers without it: not started |
+| 4 | Give items / Pals | **Done through PalDefender**; kits and starter kits: not started |
+| 6 | Richer map | **Partly**: bases; Alpha Pals, landmarks, offline positions not started |
+| 7 | Discord | **Partly**: join/leave alerts, live status message; command bot and chat relay not started |
+| 8 | Character migration / host-save fix | Not started |
+| 9 | More than one server | Not started (0.3 plan) |
+| 10 | Translations | Not started |
+| 11 | Two-factor sign-in | **Done** (TOTP, escalating lock, codes work once) |
+| 12 | Public status page | **Partly**: the Discord live status; a web page not started |
+| 13 | Install the server from scratch | Not started |
+| 14 | Host metrics | **Partly**: CPU and RAM in history; disk and network not started |
+| 15 | Settings extras | **Partly**: presets, import/export; Engine.ini and launch arguments not started |
+| 16 | Scheduled events | **Done** (weekly events, admin edits kept, survive restarts) |
+| 17 | Timed broadcasts / MOTD | **Done** (rotating messages, private welcome) |
+| 18 | Ban list from every source | **Done** (game list, PalDefender incl. IP bans) |
+| 19 | Anti-cheat review | Not started |
+| 20 | S3 / WebDAV / SFTP targets | Not started |
+| 21 | Download a backup | **Done** |
+| 22–25, 27–30 | Version hold, Docker, API keys, auto-pause, worlds, self-update, console, files | Not started |
+| 26 | Player notes | **Done** |
+
+Not release-ready until the "Not started" items that matter most to owners (8, 9, 10, 13, 22,
+23) are decided: built, or consciously left out of 1.0 and said so.
+
 ## Parity gaps (others have it, Warden doesn't)
 
 Ordered roughly by how much they matter to a server owner. Effort: **S** = days, **M** = a week or
