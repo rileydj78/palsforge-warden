@@ -353,8 +353,14 @@ async function switchWorld(id, label) {
   try { await api("/api/worlds/switch", { id, minutes: Math.max(0, Math.min(60, parseInt(m, 10) || 0)) }); toast("Switching: warnings, save, backup, then the switch. The run appears under Recent runs."); } catch (e) { toast(e.message); }
 }
 $("world-new").addEventListener("click", () => switchWorld("new"));
+async function loadConn() {
+  try {
+    const r = await api("/api/connection"), ul = $("conn"); ul.replaceChildren();
+    for (const c of r.checks) { const li = el("li", null, c.State === "note" ? "info" : c.State); li.append(el("b", c.Area + ":"), el("span", c.Text)); ul.append(li); }
+  } catch (e) { $("conn").replaceChildren(el("li", e.message, "note")); }
+}
 async function loadServer() {
-  loadWorlds();
+  loadWorlds(); if (me.role !== "moderator") loadConn();
   try {
     const s = await api("/api/server"), h = s.host;
     $("srv-state").textContent = h.running ? "Running" : "Stopped";

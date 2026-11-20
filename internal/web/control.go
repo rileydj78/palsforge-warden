@@ -191,6 +191,64 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	}))
+	mux.HandleFunc("GET /api/connection", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
+		port := nightly.GamePort(c.Cfg.Control.Args)
+		f := c.Host.Connection(port)
+		if c.Cfg.Control.Mode != "supervise" { // another program starts it: its command line says
+			if p := nightly.GamePort(strings.Fields(f.CommandLine)); p != port {
+				port = p
+				f = c.Host.Connection(port)
+			}
+		}
+		type item struct {
+			State, Area, Text string
+		}
+		var out []item
+		add := func(state, area, text string, a ...any) {
+			out = append(out, item{state, area, fmt.Sprintf(text, a...)})
+		}
+		if f.Listening {
+			add("ok", "Game port", "The game is listening on UDP %d.", port)
+		} else {
+			add("bad", "Game port", "Nothing is listening on UDP %d: the server isn't running, or it uses another port.", port)
+		}
+		switch {
+		case !f.Known:
+			add("note", "Firewall", "Warden can't read this machine's firewall; make sure it lets UDP %d in.", port)
+		case !f.FirewallOn:
+			add("ok", "Firewall", "Windows Firewall is off on this machine.")
+		case f.Allowed:
+			add("ok", "Firewall", "Windows Firewall lets UDP %d in.", port)
+		default:
+			add("bad", "Firewall", "Windows Firewall has no rule letting players in. In an Administrator PowerShell: New-NetFirewallRule -DisplayName \"Palworld %d\" -Direction Inbound -Protocol UDP -LocalPort %d -Action Allow", port, port)
+		}
+		lc := strings.ToLower(f.CommandLine)
+		switch {
+		case f.CommandLine == "":
+			add("note", "Server list", "Couldn't read the server's launch options. It shows in the community server list only with -publiclobby, and console players can only join from that list.")
+		case strings.Contains(lc, "-publiclobby"):
+			add("ok", "Server list", "Launched with -publiclobby: it appears in the community server list (console players join from there).")
+		default:
+			add("warn", "Server list", "Not in the community server list (no -publiclobby). Fine for a private server, but console players can only join from that list.")
+		}
+		if ini, err := config.ReadSettings(config.SettingsPath(c.Cfg.ServerDir)); err == nil {
+			cp := ini.All["CrossplayPlatforms"]
+			switch {
+			case cp == "":
+				add("note", "Crossplay", "CrossplayPlatforms isn't set: the game's default applies.")
+			case strings.Contains(cp, "Xbox") && strings.Contains(cp, "PS5"):
+				add("ok", "Crossplay", "Open to %s.", strings.Trim(cp, "()"))
+			default:
+				add("warn", "Crossplay", "Only %s can join (CrossplayPlatforms). Add Xbox, PS5 and Mac in Game settings to let console and Mac players in.", strings.Trim(cp, "()"))
+			}
+		}
+		lan := "this machine's address on your network"
+		if len(f.LANAddrs) > 0 {
+			lan = strings.Join(f.LANAddrs, " or ")
+		}
+		add("note", "Router", "From the internet, players need your router to forward UDP %d to %s. If they still can't connect, your provider may use CGNAT (the router's internet address starts with 100.64-100.127, or differs from what whatismyip.com shows): forwarding can't work then; ask for a public IP or use a VPS.", port, lan)
+		writeJSON(w, 200, map[string]any{"port": port, "checks": out})
+	}))
 	mux.HandleFunc("POST /api/update/check", s.guard(auth.Admin, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		latest, err := c.Host.LatestBuild(r.Context())
 		if err != nil {

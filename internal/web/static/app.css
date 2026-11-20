@@ -167,3 +167,5 @@ form.inline button { font: inherit; font-weight: 600; padding: 9px 16px; border-
 @media (prefers-color-scheme: dark) { form.inline button { color: #0B0F0D; } }
 
 .card.warnbox { border-color: var(--warn-ink); background: var(--warn-bg); }
+ul.checks li.info::before { content: "i"; color: var(--soft); font-style: italic; }
+ul.checks li span { overflow-wrap: anywhere; }
