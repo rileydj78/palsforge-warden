@@ -6,6 +6,8 @@ A free, open-source admin panel for **Palworld dedicated servers**, from the peo
 > **Status: 1.0 release candidate.** It runs a live community server. Windows builds aren't
 > code-signed yet (see below). What's in 1.0 and what isn't: [CHANGELOG.md](CHANGELOG.md).
 
+![The dashboard of a live server](docs/img/dashboard.png)
+
 One program on the machine that runs your Palworld server. Use it **locally** in its own window,
 or **remotely** as a web page over your own **Tailscale** network. Nothing is opened to the
 internet, and Palworld's admin password never leaves the server.
@@ -54,6 +56,21 @@ internet, and Palworld's admin password never leaves the server.
 - **No sign-in on the server, accounts for remote admins:** at the machine you're the owner; for
   others you create moderator, admin or owner accounts that sign in over Tailscale, with optional
   two-step sign-in (authenticator app). Every action is in the audit log.
+
+## Getting started in five minutes (Windows)
+
+1. Download `warden.exe` from the latest release and put it in a folder such as `C:\Warden`.
+2. Double-click it. It finds your server (or offers to install one), asks Windows for permission
+   once, and opens the panel. You're the owner; there's no account to make on the server itself.
+3. Follow the yellow **Finish setting up** banner: it lists what's left (a second place for
+   backups, the nightly routine, notifications) and **Can players get in?** on the Server page
+   checks your port, firewall and listing.
+4. To let friends help from their own devices, add accounts under **Accounts** and run
+   `warden remote on` (needs Tailscale).
+
+| Backups you can trust | Game settings in plain words | On a phone |
+|---|---|---|
+| ![Backups](docs/img/backups.png) | ![Game settings](docs/img/game-settings.png) | ![Phone](docs/img/phone.png) |
 
 ## Install (Windows)
 

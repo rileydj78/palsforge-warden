@@ -135,8 +135,17 @@ async function unban(p) { doAction("unban", { userId: p.userId, name: p.name }, 
 function render(st) {
   const state = $("state");
   if (!st.online) {
-    state.classList.add("down"); $("statetext").textContent = "Not answering";
-    $("headline").textContent = "The server isn't answering"; $("subline").textContent = st.error || "";
+    state.classList.add("down");
+    if (st.paused) {
+      $("statetext").textContent = "Paused"; $("headline").textContent = "Paused: nobody was on.";
+      $("subline").textContent = "It starts by itself when someone tries to join (their first try takes a minute).";
+    } else if (st.stopped) {
+      $("statetext").textContent = "Stopped"; $("headline").textContent = "The server is stopped.";
+      $("subline").textContent = "Stopped on purpose (by an admin, a routine, or a restore in progress). Start it from the Server page.";
+    } else {
+      $("statetext").textContent = "Not answering"; $("headline").textContent = "The server isn't answering";
+      $("subline").textContent = "Warden keeps checking and tells you if it stays down. Details: " + (st.error || "no answer");
+    }
     return;
   }
   state.classList.remove("down");

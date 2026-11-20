@@ -85,6 +85,8 @@ func mapCoords(x, y float64) (int, int) {
 // Status is GET /api/status.
 type Status struct {
 	Online  bool              `json:"online"`
+	Paused  bool              `json:"paused,omitempty"`  // stopped by auto-pause: starts when someone joins
+	Stopped bool              `json:"stopped,omitempty"` // stopped on purpose (by an admin or a routine)
 	Error   string            `json:"error,omitempty"`
 	Server  *palworld.Info    `json:"server,omitempty"`
 	Metrics *palworld.Metrics `json:"metrics,omitempty"`
@@ -100,6 +102,10 @@ func (s *Server) status(ctx context.Context, fresh bool) *Status {
 		return s.last
 	}
 	st := &Status{Warden: s.Version, Checked: time.Now().UTC(), Players: []PlayerView{}}
+	if s.Control != nil && s.Control.Runner != nil {
+		st.Paused = s.Control.Runner.AutoPaused()
+		st.Stopped = !st.Paused && !s.Control.Host.State().Wanted
+	}
 	info, err := s.Game.Info(ctx)
 	if err != nil {
 		st.Error = err.Error()

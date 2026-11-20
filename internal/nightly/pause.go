@@ -131,3 +131,6 @@ func (r *Runner) playersOnline(ctx context.Context) (int, error) {
 	}
 	return m.CurrentPlayers, nil
 }
+
+// AutoPaused says whether the server is stopped by auto-pause (it starts when someone joins).
+func (r *Runner) AutoPaused() bool { return r.autoPaused.Load() }
