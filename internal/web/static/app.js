@@ -401,7 +401,7 @@ async function loadServer() {
     }
     const ev = await api("/api/events"), rows = $("eventrows"); rows.replaceChildren();
     if (!ev.length) { const tr = el("tr"); const td = el("td", "Nothing yet.", "empty"); td.colSpan = 3; tr.append(td); rows.append(tr); }
-    for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts), "nowrap"), el("td", e.kind, "strong"), el("td", e.text)); rows.append(tr); }
+    for (const e of ev.slice(0, 50)) { const tr = el("tr"); tr.append(el("td", when(e.ts), "nowrap"), el("td", e.kind, "strong"), el("td", e.text, "wrap")); rows.append(tr); }
   } catch (e) {}
 }
 $("pd-connect").addEventListener("click", async () => {
