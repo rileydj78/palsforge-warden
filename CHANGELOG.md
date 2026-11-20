@@ -18,6 +18,11 @@
   Every save keeps the previous version (last 20 per file, viewable and restorable), deletes go
   to Warden's bin, and everything is in Activity. World saves stay with Backups; PalDefender's
   token folder is never shown; paths can't leave the folders, even through links.
+- **Who has joined comes from the game.** The Players page counts everyone with a save in the
+  running world (and names them, with their guild, through PalDefender); the first-join time is
+  when the game created their save. Players who joined while Warden wasn't running are listed
+  as "not seen by Warden" instead of missing. Warden's own records now carry the game's player
+  ID, so the two always line up.
 - Layout pass, graphs, the Inter font, side menu grouped Server / Players / Records / Admin.
 
 ## 1.0.0-rc.3 (2026-11-20)

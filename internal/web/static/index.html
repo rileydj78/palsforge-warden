@@ -111,11 +111,12 @@
 
     <section id="view-players" class="view" hidden>
       <h1>Everyone who has played</h1>
-      <p class="sub">First and last seen, and total time online since Warden started watching.</p>
+      <p class="sub">Who has joined comes from the game itself (each player's save in the running world, and PalDefender when connected). Last seen and time played are what Warden saw on the game's own API; players it never saw online show as "not seen by Warden".</p>
+      <p class="note" id="rcount"></p>
       <div class="row start"><input class="search" id="rsearch" type="search" placeholder="Find a player" aria-label="Find a player">
         <label for="rfilter" class="sr">Show</label><select id="rfilter" class="search narrow"><option value="all">Everyone</option><option value="week">Played this week</option><option value="inactive">Not seen for 30+ days</option></select></div>
       <div class="card"><div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table>
-        <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First seen</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
+        <thead><tr><th>Player</th><th>Platform</th><th>Level</th><th>First joined</th><th>Last seen</th><th>Time played</th><th><span class="sr">Actions</span></th></tr></thead>
         <tbody id="rosterrows"></tbody></table></div></div>
       <section class="card"><h2>Bans</h2><p class="note">Every ban, wherever it was made: in Warden, in the game, or by PalDefender.</p>
         <div class="tablewrap" tabindex="0" role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Player</th><th>Banned by</th><th>Reason</th><th><span class="sr">Actions</span></th></tr></thead>

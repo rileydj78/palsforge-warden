@@ -41,6 +41,8 @@ var schema = []string{
 		user_id TEXT PRIMARY KEY, name TEXT NOT NULL, platform TEXT, level INTEGER,
 		first_seen INTEGER NOT NULL, last_seen INTEGER NOT NULL, seconds INTEGER NOT NULL DEFAULT 0,
 		banned INTEGER NOT NULL DEFAULT 0, note TEXT)`,
+	`ALTER TABLE players ADD COLUMN player_uid TEXT`,
+	`CREATE TABLE IF NOT EXISTS game_players (player_uid TEXT PRIMARY KEY, world TEXT NOT NULL, name TEXT, guild TEXT, first_joined INTEGER, checked INTEGER)`,
 	`ALTER TABLE players ADD COLUMN last_x INTEGER`,
 	`ALTER TABLE players ADD COLUMN last_y INTEGER`,
 	`CREATE INDEX IF NOT EXISTS audit_ts ON audit(ts)`,
@@ -151,11 +153,18 @@ type SeenPlayer struct {
 	Seconds   int64  `json:"seconds"`
 	Banned    bool   `json:"banned"`
 	Note      string `json:"note"`
+	PlayerUID string `json:"playerUid,omitempty"`
+	Guild     string `json:"guild,omitempty"`
+	InWorld   bool   `json:"inWorld,omitempty"` // the game has a save for them in the running world
+	Unseen    bool   `json:"unseen,omitempty"`  // known only from the game: Warden never saw them online
 }
 
 // SawPlayer records that a player was online at ts, adding elapsed seconds since the last sighting
 // when it is recent enough to count as the same session.
-func (s *Store) SawPlayer(userID, name, platform string, level int, ts int64, gap int64) {
+func (s *Store) SawPlayer(userID, playerUID, name, platform string, level int, ts int64, gap int64) {
+	if uid := NormUID(playerUID); uid != "" {
+		defer s.DB.Exec(`UPDATE players SET player_uid=? WHERE user_id=?`, uid, userID)
+	}
 	var last int64
 	err := s.DB.QueryRow(`SELECT last_seen FROM players WHERE user_id=?`, userID).Scan(&last)
 	if err == sql.ErrNoRows {
@@ -171,6 +180,61 @@ func (s *Store) SawPlayer(userID, name, platform string, level int, ts int64, ga
 		name, platform, level, ts, add, userID)
 }
 
+// NormUID writes a game player ID one way: 32 upper-case hex digits (the game, its REST API,
+// PalDefender and the save files each format it differently).
+func NormUID(s string) string {
+	s = strings.ToUpper(strings.ReplaceAll(strings.TrimSpace(s), "-", ""))
+	if len(s) != 32 {
+		return ""
+	}
+	for _, c := range s {
+		if !strings.ContainsRune("0123456789ABCDEF", c) {
+			return ""
+		}
+	}
+	return s
+}
+
+// GamePlayer is a player the game itself knows in a world: from the world's player saves and,
+// when connected, PalDefender (which reads the running game).
+type GamePlayer struct {
+	UID         string `json:"playerUid"`
+	Name        string `json:"name"`
+	Guild       string `json:"guild"`
+	FirstJoined int64  `json:"firstJoined"` // when the game created their save (0 = unknown)
+}
+
+// SyncGamePlayers replaces the world's list with what the game says now. A first-join time
+// only ever moves earlier (a restore re-creates files with new dates).
+func (s *Store) SyncGamePlayers(world string, ps []GamePlayer) {
+	now := time.Now().UnixNano() // marks this sync; rows it didn't touch are gone from the world
+	for _, p := range ps {
+		s.DB.Exec(`INSERT INTO game_players(player_uid,world,name,guild,first_joined,checked) VALUES(?,?,?,?,?,?)
+			ON CONFLICT(player_uid) DO UPDATE SET world=excluded.world,
+			  name=CASE WHEN excluded.name<>'' THEN excluded.name ELSE game_players.name END,
+			  guild=CASE WHEN excluded.name<>'' THEN excluded.guild ELSE game_players.guild END,
+			  first_joined=CASE WHEN game_players.first_joined>0 AND (excluded.first_joined=0 OR game_players.first_joined<excluded.first_joined) THEN game_players.first_joined ELSE excluded.first_joined END,
+			  checked=excluded.checked`, p.UID, world, p.Name, p.Guild, p.FirstJoined, now)
+	}
+	s.DB.Exec(`DELETE FROM game_players WHERE world=? AND checked<>?`, world, now)
+}
+
+// GamePlayers lists the players the game knows in a world.
+func (s *Store) GamePlayers(world string) ([]GamePlayer, error) {
+	rows, err := s.DB.Query(`SELECT player_uid,COALESCE(name,''),COALESCE(guild,''),COALESCE(first_joined,0) FROM game_players WHERE world=?`, world)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []GamePlayer{}
+	for rows.Next() {
+		var p GamePlayer
+		rows.Scan(&p.UID, &p.Name, &p.Guild, &p.FirstJoined)
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // SetBanned marks a player banned or not in the roster.
 func (s *Store) SetBanned(userID string, banned bool) {
 	s.DB.Exec(`UPDATE players SET banned=? WHERE user_id=?`, banned, userID)
@@ -178,7 +242,7 @@ func (s *Store) SetBanned(userID string, banned bool) {
 
 // Roster returns everyone seen, most recent first.
 func (s *Store) Roster() ([]SeenPlayer, error) {
-	rows, err := s.DB.Query(`SELECT user_id,name,COALESCE(platform,''),COALESCE(level,0),first_seen,last_seen,seconds,banned,COALESCE(note,'') FROM players ORDER BY last_seen DESC`)
+	rows, err := s.DB.Query(`SELECT user_id,name,COALESCE(platform,''),COALESCE(level,0),first_seen,last_seen,seconds,banned,COALESCE(note,''),COALESCE(player_uid,'') FROM players ORDER BY last_seen DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +250,7 @@ func (s *Store) Roster() ([]SeenPlayer, error) {
 	out := []SeenPlayer{}
 	for rows.Next() {
 		var p SeenPlayer
-		rows.Scan(&p.UserID, &p.Name, &p.Platform, &p.Level, &p.FirstSeen, &p.LastSeen, &p.Seconds, &p.Banned, &p.Note)
+		rows.Scan(&p.UserID, &p.Name, &p.Platform, &p.Level, &p.FirstSeen, &p.LastSeen, &p.Seconds, &p.Banned, &p.Note, &p.PlayerUID)
 		out = append(out, p)
 	}
 	return out, rows.Err()

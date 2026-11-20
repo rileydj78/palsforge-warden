@@ -32,6 +32,7 @@ import (
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
 	"github.com/rileydj78/palsforge-warden/internal/web"
+	"github.com/rileydj78/palsforge-warden/internal/worlds"
 )
 
 var version = "0.0.1-dev"
@@ -273,6 +274,41 @@ func main() {
 		go broadcast.Run(context.Background(), wcfg.Broadcast, game, private, func() bool { b, _ := runner.Busy(); return b }, seenFn, gate, game.Kick)
 		srv.Control = &web.Control{Cfg: wcfg, Host: h, Runner: runner}
 		srv.PalDef = paldefender.New(wcfg.PalDef)
+		go func() { // who has joined: from the game's own records (player saves, PalDefender), every 10 minutes
+			for {
+				world, saves := worlds.PlayerSaves(wcfg.ServerDir, config.SettingsPath(wcfg.ServerDir))
+				if world != "" {
+					byUID := map[string]store.GamePlayer{}
+					for _, sv := range saves {
+						g := store.GamePlayer{UID: store.NormUID(sv.UID)}
+						if !sv.Created.IsZero() {
+							g.FirstJoined = sv.Created.Unix()
+						}
+						byUID[g.UID] = g
+					}
+					if srv.PalDef != nil {
+						c, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+						if ps, err := srv.PalDef.Players(c); err == nil {
+							for _, p := range ps {
+								if g, ok := byUID[store.NormUID(p.PlayerUID)]; ok { // only players with a save in this world
+									g.Name, g.Guild = p.Name, p.GuildName
+									byUID[g.UID] = g
+								}
+							}
+						}
+						cancel()
+					}
+					list := make([]store.GamePlayer, 0, len(byUID))
+					for _, g := range byUID {
+						if g.UID != "" {
+							list = append(list, g)
+						}
+					}
+					st2.SyncGamePlayers(world, list)
+				}
+				time.Sleep(10 * time.Minute)
+			}
+		}()
 		if wcfg.StatusPage.On {
 			pub := &web.Public{ShowNames: wcfg.StatusPage.ShowNames, Invite: wcfg.StatusPage.Invite, Address: wcfg.StatusPage.Address}
 			for _, l := range strings.Split(wcfg.StatusPage.Rules, "\n") {

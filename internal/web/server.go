@@ -27,12 +27,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/rileydj78/palsforge-warden/internal/auth"
+	"github.com/rileydj78/palsforge-warden/internal/config"
 	"github.com/rileydj78/palsforge-warden/internal/instances"
 	"github.com/rileydj78/palsforge-warden/internal/monitor"
 	"github.com/rileydj78/palsforge-warden/internal/news"
 	"github.com/rileydj78/palsforge-warden/internal/paldefender"
 	"github.com/rileydj78/palsforge-warden/internal/palworld"
 	"github.com/rileydj78/palsforge-warden/internal/store"
+	"github.com/rileydj78/palsforge-warden/internal/worlds"
 )
 
 //go:embed static
@@ -279,6 +281,56 @@ func cleanText(s string, max int) string {
 	return s
 }
 
+// withGamePlayers merges what the game itself records (who has a save in the running world,
+// their names and guilds from PalDefender, when the game created their save) into Warden's own
+// observations. Players the game knows but Warden never saw online are added, marked unseen:
+// the count of who joined always comes from the game.
+func (s *Server) withGamePlayers(ro []store.SeenPlayer) []store.SeenPlayer {
+	if s.Control == nil {
+		return ro
+	}
+	world := worlds.Active(config.SettingsPath(s.Control.Cfg.ServerDir))
+	gs, err := s.Store.GamePlayers(world)
+	if err != nil || len(gs) == 0 {
+		return ro
+	}
+	byUID := map[string]int{}
+	for i, p := range ro {
+		if p.PlayerUID != "" {
+			byUID[p.PlayerUID] = i
+		}
+	}
+	// Records from before Warden noted the game's player ID: link by name when exactly one
+	// unlinked record has it (the next time they play, the ID itself links them).
+	byName := map[string][]int{}
+	for i, p := range ro {
+		if p.PlayerUID == "" {
+			byName[strings.ToLower(p.Name)] = append(byName[strings.ToLower(p.Name)], i)
+		}
+	}
+	for _, g := range gs {
+		i, ok := byUID[g.UID]
+		if !ok && g.Name != "" {
+			if c := byName[strings.ToLower(g.Name)]; len(c) == 1 {
+				i, ok = c[0], true
+			}
+		}
+		if ok {
+			ro[i].InWorld, ro[i].Guild = true, g.Guild
+			if g.FirstJoined > 0 && g.FirstJoined < ro[i].FirstSeen {
+				ro[i].FirstSeen = g.FirstJoined
+			}
+			continue
+		}
+		name := g.Name
+		if name == "" {
+			name = "Player " + g.UID[:8]
+		}
+		ro = append(ro, store.SeenPlayer{Name: name, PlayerUID: g.UID, Guild: g.Guild, FirstSeen: g.FirstJoined, InWorld: true, Unseen: true})
+	}
+	return ro
+}
+
 // botKey marks requests from Warden's Discord bot (only reachable in-process, never over HTTP).
 type botKey struct{}
 
@@ -465,7 +517,7 @@ func (s *Server) Handler() http.Handler {
 			fail(w, 500, "roster unavailable")
 			return
 		}
-		writeJSON(w, 200, p)
+		writeJSON(w, 200, s.withGamePlayers(p))
 	}))
 	mux.HandleFunc("GET /api/audit", s.guard(auth.Moderator, func(w http.ResponseWriter, r *http.Request, _ *auth.Session) {
 		a, err := s.Store.RecentAudit(200)

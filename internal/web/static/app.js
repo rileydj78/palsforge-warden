@@ -226,13 +226,21 @@ function renderRoster() {
   const q = $("rsearch").value.trim().toLowerCase();
   const rows = $("rosterrows"); rows.replaceChildren();
   const f = $("rfilter").value, now = Date.now() / 1000;
-  const list = roster.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (f === "all" || (f === "week" ? now - p.lastSeen < 7 * 86400 : now - p.lastSeen > 30 * 86400)));
+  const inWorld = roster.filter((p) => p.inWorld).length, unseen = roster.filter((p) => p.unseen).length;
+  $("rcount").textContent = inWorld ? `${inWorld} ${inWorld === 1 ? "player has" : "players have"} joined this world, by the game's own saves${unseen ? `; Warden never saw ${unseen} of them online (they played while Warden wasn't running)` : ""}.` : "";
+  const list = roster.filter((p) => (!q || p.name.toLowerCase().includes(q)) && (f === "all" || (f === "week" ? p.lastSeen && now - p.lastSeen < 7 * 86400 : !p.unseen && now - p.lastSeen > 30 * 86400)));
   if (!list.length) { const tr = el("tr"); const td = el("td", roster.length ? "No match." : "Nobody yet. Players appear here once Warden has seen them online.", "empty"); td.colSpan = 7; tr.append(td); rows.append(tr); }
   // Progress check: level per hour played, against everyone else's (works at any XP rate).
   const rate = (p) => p.level / Math.max(p.seconds / 3600, 0.25);
-  const rates = roster.filter((p) => p.seconds >= 3600 && p.level > 1).map(rate).sort((a, b) => a - b);
+  const rates = roster.filter((p) => !p.unseen && p.seconds >= 3600 && p.level > 1).map(rate).sort((a, b) => a - b);
   const median = rates.length >= 5 ? rates[Math.floor(rates.length / 2)] : 0;
   for (const p of list) {
+    if (p.unseen) { // known only from the game: no account ID yet, so no actions
+      const tr = el("tr"), name = el("td", p.name, "strong");
+      if (p.guild) name.append(el("div", p.guild, "note"));
+      tr.append(name, el("td", "–"), el("td", "–", "num"), el("td", p.firstSeen ? when(p.firstSeen) : "unknown"), el("td", "not seen by Warden"), el("td", "–", "num"), el("td", null, "acts"));
+      rows.append(tr); continue;
+    }
     const tr = el("tr"); const acts = el("td", null, "acts");
     const fast = median > 0 && p.level >= 15 && rate(p) > 4 * median;
     if (me.role !== "moderator") {
@@ -991,7 +999,7 @@ async function loadCommands() {
   try {
     const [r, st] = await Promise.all([api("/api/roster").catch(() => []), api("/api/status").catch(() => ({ players: [] }))]);
     const online = new Set((st.players || []).map((p) => p.userId));
-    people = r.map((p) => ({ name: p.name, userId: p.userId, online: online.has(p.userId) }));
+    people = r.filter((p) => p.userId).map((p) => ({ name: p.name, userId: p.userId, online: online.has(p.userId) }));
     const dl = $("c-people"); dl.replaceChildren();
     for (const p of people) { const o = el("option"); o.value = p.name; o.label = p.online ? "online" : p.userId; dl.append(o); }
   } catch (e) {}

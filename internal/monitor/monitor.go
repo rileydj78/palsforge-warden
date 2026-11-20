@@ -50,7 +50,7 @@ func SampleOnce(ctx context.Context, game *palworld.Client, st *store.Store) {
 		if p.UserID == "" {
 			continue
 		}
-		st.SawPlayer(p.UserID, p.Name, Platform(p.UserID), p.Level, now, int64(3*Every/time.Second))
+		st.SawPlayer(p.UserID, p.PlayerID, p.Name, Platform(p.UserID), p.Level, now, int64(3*Every/time.Second))
 	}
 }
 
