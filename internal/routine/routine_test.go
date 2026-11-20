@@ -23,7 +23,8 @@ func (f *fake) Shutdown(context.Context, int, string) error {
 	f.log = append(f.log, "shutdown")
 	return nil
 }
-func (f *fake) Alive(context.Context) bool { return f.alive }
+func (f *fake) Alive(context.Context) bool     { return f.alive }
+func (f *fake) PlanStop(context.Context) error { return nil }
 func (f *fake) WaitStopped(context.Context, time.Duration) bool {
 	f.log = append(f.log, "wait")
 	return f.stops

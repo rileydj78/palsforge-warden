@@ -23,6 +23,7 @@ type Game interface {
 
 // Host is what the routine needs from the machine.
 type Host interface {
+	PlanStop(ctx context.Context) error                    // the coming stop is on purpose: don't restart
 	WaitStopped(ctx context.Context, d time.Duration) bool // true once the server process is gone
 	ForceStop(ctx context.Context) error
 	Start(ctx context.Context) error
@@ -119,6 +120,9 @@ func Run(ctx context.Context, p Plan, g Game, h Host, b Backups) *Report {
 
 	// 2. Save and stop.
 	bad(r.add("save", g.Save(ctx), ""))
+	if err := h.PlanStop(ctx); err != nil {
+		r.add("plan stop", err, "the watchdog may restart the server early")
+	}
 	stopped := false
 	if err := g.Shutdown(ctx, 10, "Restarting now. Back in a few minutes."); err == nil {
 		stopped = h.WaitStopped(ctx, 3*time.Minute)
