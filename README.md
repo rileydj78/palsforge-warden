@@ -36,11 +36,10 @@ internet, and Palworld's admin password never leaves the server.
 
 1. Turn on Palworld's REST API: in `Pal\Saved\Config\WindowsServer\PalWorldSettings.ini` set
    `RESTAPIEnabled=True` and an `AdminPassword`, then restart the server.
-2. Put `warden.exe` anywhere (for example `C:\Warden`). In an **Administrator** terminal:
-   ```
-   warden install -server C:\PalServer
-   ```
-   Warden now starts with Windows. Its data, logs and backups live in `C:\ProgramData\Warden`.
+2. Put `warden.exe` anywhere (for example `C:\Warden`) and **double-click it**. It finds your
+   server (or asks where it is), asks Windows for permission once, sets itself to start with
+   Windows, and opens the panel. (From a terminal: `warden install -server C:\PalServer`.)
+   Warden's data, logs and backups live in `C:\ProgramData\Warden`.
 3. Open the panel from the Start menu (**Palsforge Warden**), or run `C:\Warden\warden.exe open`.
    On the server machine there's no account or password: whoever is at the machine is the owner.
 4. In **Settings**, choose a second place for backups, the nightly time, and SteamCMD's location,

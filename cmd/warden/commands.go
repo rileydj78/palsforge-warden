@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -276,4 +277,53 @@ func startMenuShortcut(exe string) error {
 	ps := fmt.Sprintf(`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s'); $s.TargetPath='%s'; $s.Arguments='open'; $s.Description='Palsforge Warden: the Palworld server panel'; $s.Save()`,
 		strings.ReplaceAll(shortcutPath(), "'", "''"), strings.ReplaceAll(exe, "'", "''"))
 	return exec.Command("powershell", "-NoProfile", "-Command", ps).Run()
+}
+
+// firstRun is what a double-click does (no arguments): a short guided setup that finds the
+// server, installs Warden to start with Windows (asking Windows for permission once), and opens
+// the panel. On other systems it explains the command to run.
+func firstRun() {
+	fmt.Println("Palsforge Warden setup")
+	fmt.Println("======================")
+	exe, _ := os.Executable()
+	if runtime.GOOS != "windows" {
+		fmt.Println("Run:  warden install -server /path/to/PalServer   (it prints a systemd unit to install)")
+		return
+	}
+	server := findServer()
+	in := bufio.NewReader(os.Stdin)
+	if server != "" {
+		fmt.Printf("\nFound your Palworld server at:\n  %s\nIs that right? [Y/n] ", server)
+		if a, _ := in.ReadString('\n'); strings.HasPrefix(strings.ToLower(strings.TrimSpace(a)), "n") {
+			server = ""
+		}
+	}
+	for server == "" {
+		fmt.Print("\nWhere is your Palworld server folder (the one with PalServer.exe)? ")
+		a, _ := in.ReadString('\n')
+		a = strings.Trim(strings.TrimSpace(a), `"`)
+		if fileExists(filepath.Join(a, "Pal")) {
+			server = a
+		} else if a != "" {
+			fmt.Println("That folder has no Pal folder inside; try again.")
+		}
+	}
+	fmt.Println("\nWarden will start with Windows and look after this server. Windows will ask for permission once.")
+	fmt.Print("Install now? [Y/n] ")
+	if a, _ := in.ReadString('\n'); strings.HasPrefix(strings.ToLower(strings.TrimSpace(a)), "n") {
+		fmt.Println("Nothing was installed.")
+		pauseIfDoubleClicked()
+		return
+	}
+	ps := fmt.Sprintf(`Start-Process -FilePath '%s' -ArgumentList 'install','-server','"%s"' -Verb RunAs -Wait -WindowStyle Hidden`,
+		strings.ReplaceAll(exe, "'", "''"), strings.ReplaceAll(server, "'", "''"))
+	if err := exec.Command("powershell", "-NoProfile", "-Command", ps).Run(); err != nil {
+		fmt.Println("Windows didn't give permission, so nothing was installed. Run warden.exe again to retry.")
+		pauseIfDoubleClicked()
+		return
+	}
+	fmt.Println("\nInstalled. Opening the panel... (next time, use \"Palsforge Warden\" in the Start menu)")
+	time.Sleep(3 * time.Second)
+	openPanel("127.0.0.1:8282")
+	time.Sleep(2 * time.Second)
 }

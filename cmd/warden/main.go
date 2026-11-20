@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -31,6 +32,10 @@ var version = "0.0.1-dev"
 
 func main() {
 	if subcommand(os.Args[1:]) {
+		return
+	}
+	if len(os.Args) == 1 && runtime.GOOS == "windows" { // double-clicked: guided setup
+		firstRun()
 		return
 	}
 	serverDir := flag.String("server", "", "the Palworld server folder (the one that holds Pal/ and PalServer)")

@@ -64,6 +64,11 @@ function signedIn(out) {
   api("/api/server").then(() => { $("servernav").hidden = false; $("backupsnav").hidden = false; $("logsnav").hidden = me.role === "moderator"; $("gamenav").hidden = me.role === "moderator"; $("modsnav").hidden = me.role === "moderator"; }).catch(() => {});
   api("/api/paldefender").then((pd) => { pdConnected = pd.connected && !pd.error; $("guildsnav").hidden = !pdConnected; }).catch(() => {});
   route(); refresh(); history();
+  if (me.role !== "moderator") api("/api/setup-check").then((cs) => {
+    const bad = cs.filter((c) => !c.ok);
+    $("todo").hidden = !bad.length;
+    $("todo").textContent = `Finish setting up: ${bad.length} thing${bad.length === 1 ? "" : "s"} to look at (${bad.slice(0, 3).map((c) => c.area.toLowerCase()).join(", ")}${bad.length > 3 ? "…" : ""}) →`;
+  }).catch(() => {});
 }
 
 // ---- dialogs (one at a time, typed confirmation for anything that can't be undone)
